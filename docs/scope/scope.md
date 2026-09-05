@@ -12,7 +12,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | in-progress |
-| 2 | Coding standards & tooling | Foundation | in-progress |
+| 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model & migrations | Foundation | planned |
 | 4 | Tenant scoping data access layer | Foundation | planned |
 | 5 | Design system & UI foundation | Foundation | planned |
@@ -45,12 +45,12 @@ Spec 0001 · code in `src/`, `drizzle.config.ts`, `scripts/db-check.ts`
 
 _Tagged `Beta` because a scaffold has no user facing behavior for a fresh model review or a release note to describe. `/develop` derives the scaffold steps from spec 0001 at build time; they are deliberately not duplicated here._
 
-### 2. Coding standards & tooling · in-progress
+### 2. Coding standards & tooling · done
 Capture the real conventions from the scaffolded project, then install lint, format, type strictness, `pre-commit` hooks and CI so all later code is held to them. Includes the ESLint rule spec 0001 requires: nothing outside the data access layer may import the raw database handle.
 **Done when:** root `AGENTS.md` reflects the real stack and the installed skills, lint, format and typecheck run clean, and the raw database handle import rule actually fails a build when violated.
-- [ ] Capture conventions + tooling choices: `/audit`
+- [ ] Capture conventions + tooling choices: `/audit` · skipped, `AGENTS.md` is already written and committed
 - [x] Install the tooling: `/develop tooling`
-- [ ] Check it runs clean: `/test tooling`
+- [x] Check it runs clean: `/test tooling`
 Tooling choices in [AGENTS.md](../../AGENTS.md) `## Tooling` · code in `prettier.config.mjs`, `eslint.config.mjs`, `tools/eslint/`, `.githooks/`, `scripts/migrations-check.ts`, `.github/workflows/ci.yml` · verify steps in [docs/verify/0002-coding-standards-and-tooling.md](../verify/0002-coding-standards-and-tooling.md)
 
 _Tagged `Alpha` in spirit: this is configuration, so the closing stages are a clean run rather than a review. Comes after the scaffold, never before, because `/audit` reads the real project instead of guessing._
