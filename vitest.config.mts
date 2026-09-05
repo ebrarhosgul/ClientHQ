@@ -21,7 +21,11 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "scripts/**/*.test.ts",
+      "tools/**/*.test.mts",
+    ],
     exclude: ["node_modules/**", ".next/**", "e2e/**"],
     // Each file gets its own module registry. These tests reset modules and
     // touch process.env and globalThis, which would otherwise leak sideways.
