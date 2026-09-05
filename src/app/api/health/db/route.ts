@@ -32,7 +32,11 @@ export async function GET() {
     await db.execute(sql`select 1`);
 
     return NextResponse.json(
-      { status: "ok", database: "reachable", roundTripMs: Date.now() - started },
+      {
+        status: "ok",
+        database: "reachable",
+        roundTripMs: Date.now() - started,
+      },
       { status: 200 },
     );
   } catch (error) {

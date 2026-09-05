@@ -1,0 +1,32 @@
+# Prettier formats what this project writes. Everything below is either
+# generated, vendored, or edited line by line by something other than a person.
+
+node_modules/
+.next/
+out/
+build/
+coverage/
+next-env.d.ts
+
+# Test and report output.
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Vendored third party agent skills and their lockfile. Not this project's code.
+.agents/
+.claude/
+skills-lock.json
+
+# Generated SQL and Drizzle's journal. Never hand edited, so never reformatted.
+drizzle/
+
+# Lockfile: pnpm owns its layout.
+pnpm-lock.yaml
+
+# Markdown is left alone on purpose. AGENTS.md, docs/scope/ and docs/specs/ are
+# edited a line at a time by the workflow skills, which match on the exact shape
+# of a checkbox, a status line or a table row. Reformatting those underneath them
+# is churn at best and a broken edit at worst.
+*.md

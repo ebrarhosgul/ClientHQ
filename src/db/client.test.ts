@@ -94,7 +94,9 @@ describe("db client", () => {
     await importClient();
 
     expect(drizzleMock).toHaveBeenCalledOnce();
-    expect(drizzleMock.mock.calls[0][1]).toMatchObject({ schema: expect.anything() });
+    expect(drizzleMock.mock.calls[0][1]).toMatchObject({
+      schema: expect.anything(),
+    });
   });
 
   it("exports the drizzle instance as db", async () => {

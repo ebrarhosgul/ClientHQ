@@ -39,7 +39,10 @@ async function runDbCheck(env: Record<string, string>): Promise<Failure> {
       cwd: process.cwd(),
       // Only PATH plus what the test sets: NODE_ENV and friends are not needed
       // and their absence is part of what is under test.
-      env: { PATH: process.env.PATH ?? "", ...env } as unknown as NodeJS.ProcessEnv,
+      env: {
+        PATH: process.env.PATH ?? "",
+        ...env,
+      } as unknown as NodeJS.ProcessEnv,
       timeout: 60_000,
     });
     return { code: 0, stdout, stderr };
@@ -59,61 +62,41 @@ const UNREACHABLE = {
 };
 
 describe("db:check", () => {
-  it(
-    "exits non zero when the database cannot be reached",
-    async () => {
-      const result = await runDbCheck(UNREACHABLE);
+  it("exits non zero when the database cannot be reached", async () => {
+    const result = await runDbCheck(UNREACHABLE);
 
-      // CI has to be able to tell a failed check from a passing one.
-      expect(result.code).not.toBe(0);
-    },
-    90_000,
-  );
+    // CI has to be able to tell a failed check from a passing one.
+    expect(result.code).not.toBe(0);
+  }, 90_000);
 
-  it(
-    "says plainly that it could not reach the database",
-    async () => {
-      const result = await runDbCheck(UNREACHABLE);
+  it("says plainly that it could not reach the database", async () => {
+    const result = await runDbCheck(UNREACHABLE);
 
-      expect(result.stderr).toContain("Could not reach the database.");
-    },
-    90_000,
-  );
+    expect(result.stderr).toContain("Could not reach the database.");
+  }, 90_000);
 
-  it(
-    "tells you where to look, naming the variable and the pooler port",
-    async () => {
-      const result = await runDbCheck(UNREACHABLE);
+  it("tells you where to look, naming the variable and the pooler port", async () => {
+    const result = await runDbCheck(UNREACHABLE);
 
-      // The most common cause is the wrong port, so the message says which.
-      expect(result.stderr).toContain("DATABASE_URL");
-      expect(result.stderr).toContain("6543");
-    },
-    90_000,
-  );
+    // The most common cause is the wrong port, so the message says which.
+    expect(result.stderr).toContain("DATABASE_URL");
+    expect(result.stderr).toContain("6543");
+  }, 90_000);
 
-  it(
-    "reports the environment problem when DATABASE_URL is set but empty",
-    async () => {
-      // An empty value still counts as present, so the .env file does not fill
-      // it in. This is the "you forgot to configure it" path, and it has to name
-      // the variable rather than fail somewhere deep inside the driver.
-      const result = await runDbCheck({ DATABASE_URL: "", DIRECT_URL: "" });
+  it("reports the environment problem when DATABASE_URL is set but empty", async () => {
+    // An empty value still counts as present, so the .env file does not fill
+    // it in. This is the "you forgot to configure it" path, and it has to name
+    // the variable rather than fail somewhere deep inside the driver.
+    const result = await runDbCheck({ DATABASE_URL: "", DIRECT_URL: "" });
 
-      expect(result.code).not.toBe(0);
-      expect(result.stderr).toContain("DATABASE_URL is required");
-      expect(result.stderr).toContain(".env.example");
-    },
-    90_000,
-  );
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("DATABASE_URL is required");
+    expect(result.stderr).toContain(".env.example");
+  }, 90_000);
 
-  it(
-    "prints nothing to stdout when it fails, so a pipe stays clean",
-    async () => {
-      const result = await runDbCheck(UNREACHABLE);
+  it("prints nothing to stdout when it fails, so a pipe stays clean", async () => {
+    const result = await runDbCheck(UNREACHABLE);
 
-      expect(result.stdout.trim()).toBe("");
-    },
-    90_000,
-  );
+    expect(result.stdout.trim()).toBe("");
+  }, 90_000);
 });

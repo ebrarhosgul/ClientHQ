@@ -26,7 +26,10 @@ export default function Home() {
       </header>
 
       <section className="flex flex-col gap-3" aria-labelledby="foundation">
-        <h2 id="foundation" className="text-sm font-medium uppercase tracking-wide opacity-60">
+        <h2
+          id="foundation"
+          className="text-sm font-medium uppercase tracking-wide opacity-60"
+        >
           Foundation
         </h2>
         <p className="text-sm leading-relaxed opacity-80">

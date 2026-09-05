@@ -22,7 +22,9 @@ test.describe("the entry page", () => {
   test("shows one first level heading naming the product", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("ClientHQ");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      "ClientHQ",
+    );
   });
 
   test("renders inside a main landmark", async ({ page }) => {
@@ -41,9 +43,9 @@ test.describe("the entry page", () => {
     // Tailwind pipeline runs at all and the font variables reach the document.
     const styling = await page.evaluate(() => ({
       sheets: document.styleSheets.length,
-      fontVariable: getComputedStyle(
-        document.documentElement,
-      ).getPropertyValue("--font-geist-sans"),
+      fontVariable: getComputedStyle(document.documentElement).getPropertyValue(
+        "--font-geist-sans",
+      ),
     }));
 
     expect(styling.sheets).toBeGreaterThan(0);
@@ -73,7 +75,9 @@ test.describe("the entry page", () => {
     expect(overflows).toBe(false);
   });
 
-  test("fits a 1280px viewport without sideways scrolling", async ({ page }) => {
+  test("fits a 1280px viewport without sideways scrolling", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
 
@@ -84,7 +88,9 @@ test.describe("the entry page", () => {
     expect(overflows).toBe(false);
   });
 
-  test("reaches the health check from the link on the page", async ({ page }) => {
+  test("reaches the health check from the link on the page", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     // Wait on the navigation the click starts, rather than on the click alone:
