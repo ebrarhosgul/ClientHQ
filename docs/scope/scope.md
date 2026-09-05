@@ -38,10 +38,10 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 The stack, the tenancy model and the foundational architecture, plus a runnable project so every later slice builds on real structure. Already decided in spec 0001; what remains is the scaffold.
 **Done when:** the empty scaffold boots locally, deploys to Vercel, connects to Supabase through Drizzle, and passes a clean build.
 - [x] Decide the stack (spec): `/architect stack & architecture`
-- [ ] Scaffold from the decision: `/develop stack & architecture`
+- [x] Scaffold from the decision: `/develop stack & architecture`
 - [ ] Verify it: `/check verify stack & architecture`
 - [ ] Test it: `/test stack & architecture`
-Spec 0001
+Spec 0001 · code in `src/`, `drizzle.config.ts`, `scripts/db-check.ts`
 
 _Tagged `Beta` because a scaffold has no user facing behavior for a fresh model review or a release note to describe. `/develop` derives the scaffold steps from spec 0001 at build time; they are deliberately not duplicated here._
 
