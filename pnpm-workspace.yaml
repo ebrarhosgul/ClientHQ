@@ -1,0 +1,5 @@
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+  # drizzle-kit bundles esbuild; its postinstall fetches the platform binary.
+  esbuild: true
