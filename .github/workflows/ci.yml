@@ -1,0 +1,64 @@
+# The gate every push and pull request goes through.
+#
+# Four checks, matching what the pre-commit hook runs locally plus the unit
+# tests and the migration check: format, lint, typecheck, tests, migrations.
+# None of them need a database or any provider credentials, which is deliberate:
+# a check that needs a secret cannot run on a fork's pull request.
+#
+# Preview deploys are not here. Vercel handles those on its own.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# A new push to the same branch makes the run in flight pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, test, migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Before setup-node, so its pnpm cache lookup finds pnpm. The version
+      # comes from the "packageManager" field in package.json.
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Every check below runs even when an earlier one fails, so one push
+      # reports every problem instead of one problem at a time.
+      - name: Formatting
+        if: ${{ !cancelled() }}
+        run: pnpm format:check
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
+
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: pnpm typecheck
+
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: pnpm test
+
+      # Are the committed migrations still in step with src/db/schema.ts?
+      - name: Migration check
+        if: ${{ !cancelled() }}
+        run: pnpm db:migrate:check

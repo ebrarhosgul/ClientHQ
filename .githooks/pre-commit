@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Runs before every commit: format, lint, typecheck.
+#
+# Format and lint look at the files you actually staged, so a commit touching
+# one file does not wait on the whole repo. Typecheck is different: TypeScript
+# cannot honestly check one file in isolation, because a change here can break a
+# type over there, so it runs across the project.
+#
+# This hook only reports. It never rewrites or re-stages your files, so what you
+# staged is what gets committed. When it complains about formatting, run
+# `pnpm format` and stage the result.
+#
+# In a hurry: `git commit --no-verify` skips this. CI runs the same three checks,
+# so skipping here means finding out later rather than not at all.
+#
+# Installed by `pnpm install`, which points `core.hooksPath` at `.githooks/`.
+# See scripts/install-git-hooks.mjs.
+
+set -e
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+# Use this project's own tool versions, not whatever is on the global PATH.
+PATH="$root/node_modules/.bin:$PATH"
+export PATH
+
+# Added, Copied, Modified, Renamed. Deleted files have nothing left to check.
+set --
+while IFS= read -r file; do
+  [ -n "$file" ] && set -- "$@" "$file"
+done <<STAGED
+$(git diff --cached --name-only --diff-filter=ACMR)
+STAGED
+
+if [ "$#" -eq 0 ]; then
+  exit 0
+fi
+
+failed=0
+
+# Both tools skip what they do not own: Prettier ignores unknown extensions and
+# anything in .prettierignore, ESLint ignores files no config matches.
+printf 'pre-commit: checking formatting on %d staged file(s)\n' "$#"
+if ! prettier --check --ignore-unknown "$@"; then
+  printf '\n  Formatting is off. Run `pnpm format`, then stage the changes.\n\n'
+  failed=1
+fi
+
+printf 'pre-commit: linting staged files\n'
+if ! eslint --no-warn-ignored "$@"; then
+  printf '\n  Lint failed. Fix the errors above, or `pnpm lint --fix` for the easy ones.\n\n'
+  failed=1
+fi
+
+# Mirrors `pnpm typecheck`. Next's generated route types are gitignored, so
+# typegen has to run first or a clean checkout fails on types it should have.
+printf 'pre-commit: typechecking the project\n'
+if ! (next typegen && tsc --noEmit); then
+  printf '\n  Typecheck failed. A change can break a type in a file you did not stage,\n'
+  printf '  so this one always runs across the whole project.\n\n'
+  failed=1
+fi
+
+if [ "$failed" -ne 0 ]; then
+  printf 'pre-commit: nothing was committed. Fix the above, or use --no-verify to skip.\n'
+  exit 1
+fi
+
+printf 'pre-commit: all good\n'

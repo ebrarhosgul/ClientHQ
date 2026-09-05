@@ -25,7 +25,9 @@ async function main() {
     version: string;
     database: string;
     now: string;
-  }>(sql`select version() as version, current_database() as database, now() as now`);
+  }>(
+    sql`select version() as version, current_database() as database, now() as now`,
+  );
 
   const row = rows[0];
   const elapsed = Date.now() - started;
