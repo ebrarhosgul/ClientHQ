@@ -2077,6 +2077,12 @@
       "skillPath": "universal/security/security-scanning/SKILL.md",
       "computedHash": "748e177da68e0bd1f477f0b06f2f24dc842a077991d9859d1f3073f2357f5f12"
     },
+    "sentry-nextjs-sdk": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-nextjs-sdk/SKILL.md",
+      "computedHash": "03d3615a553aea79f21cb78e4ea4d37c30bc9d5c1bc5c90629424aa9e7fdd647"
+    },
     "seo-local-business": {
       "source": "jezweb/claude-skills",
       "sourceType": "github",
