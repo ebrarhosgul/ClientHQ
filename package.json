@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:check": "tsx scripts/migrations-check.ts",
     "db:studio": "drizzle-kit studio",
     "db:check": "tsx scripts/db-check.ts",
     "test": "vitest run",
