@@ -11,6 +11,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(postgres@3.4.9)
+      drizzle-zod:
+        specifier: ^0.8.3
+        version: 0.8.3(drizzle-orm@0.45.2(postgres@3.4.9))(zod@4.5.4)
       next:
         specifier: 16.3.4
         version: 16.3.4(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.62.1)(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -1847,6 +1850,12 @@ packages:
         optional: true
       sqlite3:
         optional: true
+
+  drizzle-zod@0.8.3:
+    resolution: {integrity: sha512-66yVOuvGhKJnTdiqj1/Xaaz9/qzOdRJADpDa68enqS6g3t0kpNkwNYjUuaeXgZfO/UWuIM9HIhSlJ6C5ZraMww==}
+    peerDependencies:
+      drizzle-orm: '>=0.36.0'
+      zod: ^3.25.0 || ^4.0.0
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -4589,6 +4598,11 @@ snapshots:
   drizzle-orm@0.45.2(postgres@3.4.9):
     optionalDependencies:
       postgres: 3.4.9
+
+  drizzle-zod@0.8.3(drizzle-orm@0.45.2(postgres@3.4.9))(zod@4.5.4):
+    dependencies:
+      drizzle-orm: 0.45.2(postgres@3.4.9)
+      zod: 4.5.4
 
   dunder-proto@1.0.1:
     dependencies:

@@ -1,7 +1,7 @@
 /**
  * The migration check CI runs on every push and pull request.
  *
- * Migrations are generated from `src/db/schema.ts` and committed under
+ * Migrations are generated from `src/db/schema/` and committed under
  * `drizzle/` so schema changes are reviewable. That only holds if the two never
  * drift apart, which is exactly what a reviewer cannot see by eye. This script
  * makes the drift fail a build instead.
@@ -12,7 +12,7 @@
  *      journal entry? A migration committed without its journal line is never
  *      applied, and a journal line without its file crashes the migrator.
  *   2. Would generating right now produce a new migration? If it would, someone
- *      changed `schema.ts` and did not run `pnpm db:generate`.
+ *      changed the schema and did not run `pnpm db:generate`.
  *
  * It needs no database. Generation is a diff between the schema and the
  * snapshots already in `drizzle/meta/`, so this runs anywhere, including a CI
@@ -121,13 +121,21 @@ function checkForDrift(): Result {
         ...SCHEMA_PATHS.flatMap((schema) => ["--schema", schema]),
         "--dialect",
         String(drizzleConfig.dialect),
+        // Relative on purpose. drizzle-kit prefixes `--out` with `./`, so an
+        // absolute path becomes `.//var/...`, the snapshot read fails, and
+        // drizzle-kit still exits zero. That made this check pass while the
+        // schema had uncommitted tables. Never pass it an absolute path.
         "--out",
-        workspace,
+        path.relative(ROOT, workspace),
       ],
       { cwd: ROOT, encoding: "utf8" },
     );
 
-    if (generated.status !== 0) {
+    // drizzle-kit reports some failures on stderr and still exits zero (the
+    // snapshot read above is one). Treat a printed error as a failure too.
+    const printedError = /\b(ENOENT|Error)\b/.test(generated.stderr);
+
+    if (generated.status !== 0 || printedError) {
       return {
         ok: false,
         problem: `drizzle-kit could not generate:\n${generated.stderr || generated.stdout}`,

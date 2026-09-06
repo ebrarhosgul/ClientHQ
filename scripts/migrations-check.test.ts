@@ -31,6 +31,12 @@ const TSX = path.resolve(ROOT, "node_modules/.bin/tsx");
 const MIGRATIONS_DIR = path.resolve(ROOT, "drizzle");
 const JOURNAL_PATH = path.join(MIGRATIONS_DIR, "meta", "_journal.json");
 
+/** A schema file that exists only while the drift test runs. */
+const DRIFT_TABLE_PATH = path.resolve(
+  ROOT,
+  "src/db/schema/zz-drift-for-test.ts",
+);
+
 type Outcome = {
   readonly code: number;
   readonly stdout: string;
@@ -69,6 +75,7 @@ beforeAll(() => {
 
 afterEach(() => {
   fs.writeFileSync(JOURNAL_PATH, originalJournal);
+  fs.rmSync(DRIFT_TABLE_PATH, { force: true });
 
   for (const name of fs.readdirSync(MIGRATIONS_DIR)) {
     if (!originalFiles.includes(name)) {
@@ -171,5 +178,32 @@ describe("db:migrate:check when the journal and the SQL files disagree", () => {
 
     // Whoever hits this in CI has probably never seen the journal before.
     expect(result.stderr).toContain("generated together");
+  }, 150_000);
+});
+
+describe("db:migrate:check when the schema has changed without a migration", () => {
+  it("fails, naming the migration that generating would add", async () => {
+    // A table drizzle-kit has never seen. Every file in `src/db/schema/` is
+    // part of the schema, so this alone is a change with no migration.
+    fs.writeFileSync(
+      DRIFT_TABLE_PATH,
+      [
+        'import { pgTable, text } from "drizzle-orm/pg-core";',
+        "",
+        'export const zzDriftForTest = pgTable("zz_drift_for_test", {',
+        '  id: text("id").primaryKey(),',
+        "});",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runCheck();
+
+    // This is the case that once passed silently: drizzle-kit could not read
+    // the snapshot from an absolute `--out` path, printed the error, and
+    // exited zero anyway.
+    expect(result.code).not.toBe(0);
+    expect(result.stdout).toContain("FAIL");
+    expect(result.stderr).toContain("no committed migration");
   }, 150_000);
 });
