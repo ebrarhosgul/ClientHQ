@@ -13,7 +13,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | in-progress |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model & migrations | Foundation | planned |
+| 3 | Data model & migrations | Foundation | in-progress |
 | 4 | Tenant scoping data access layer | Foundation | planned |
 | 5 | Design system & UI foundation | Foundation | planned |
 | 6 | Agency sign in & organization | Slice 1 | planned |
@@ -55,10 +55,21 @@ Tooling choices in [AGENTS.md](../../AGENTS.md) `## Tooling` · code in `prettie
 
 _Tagged `Alpha` in spirit: this is configuration, so the closing stages are a clean run rather than a review. Comes after the scaffold, never before, because `/audit` reads the real project instead of guessing._
 
-### 3. Data model & migrations · needs a decision
+### 3. Data model & migrations · in-progress
 Every table, column, constraint, index and cascade behind the product: organizations, users, memberships, subscriptions, clients, contacts, projects, deliverables, invoices, line items and the webhook idempotency ledger. Spec 0001 sketched the entities; this settles the real schema.
 **Done when:** migrations apply cleanly to a fresh database and roll forward on an existing one, every tenant scoped table carries and indexes `org_id`, money is integer cents with an explicit currency, and the invoice number uniqueness constraint holds under concurrent inserts.
-- [ ] Design it (spec): `/architect data model & migrations`
+- [x] Design it (spec): `/architect data model & migrations`
+- [ ] Build it: `/develop data model & migrations`
+  - [ ] Foundations and a proven pipe: shared column helpers, `organizations`, the first migration, and both CI jobs (apply to a throwaway container, migrate on merge) · AC-1, AC-2, AC-6, AC-7, AC-8, AC-13
+  - [ ] Identity and clients: `users`, `memberships`, `subscriptions`, `clients`, `client_contacts`, plus the scrub helper and the lowercase email rule · AC-2, AC-6, AC-11, AC-12
+  - [ ] Delivery and invoicing: `projects`, `deliverables`, `invoices`, `invoice_line_items`, `processed_webhook_events`, the RESTRICT foreign keys, the money constraints and the relations · AC-2, AC-3, AC-4, AC-5, AC-6
+  - [ ] One baseline migration: squash to a single generated migration and prove it applies to a fresh database · AC-1, AC-7, AC-8
+  - [ ] Money helpers, drizzle-zod schemas and the guarded seed script · AC-3, AC-5, AC-9, AC-10
+- [ ] Verify it: `/check verify data model & migrations`
+- [ ] Test it: `/test data model & migrations`
+- [ ] Review it (fresh model): `/check review data model & migrations`
+- [ ] Document it: `/document data model & migrations`
+Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan`
 
 ### 4. Tenant scoping data access layer · needs a decision
 The single shared layer every read and write goes through, so no screen or action can reach another agency's rows. Covers resolving tenant context from the Clerk session or the contact row, the scoped query builder, the `withTenantAction()` wrapper, and how the raw handle stays unreachable.
@@ -175,9 +186,10 @@ Knowing what happens in production: errors and traces across server and browser,
 Out of scope for the current build pass, kept so the plan stays honest.
 - **Marketing landing page & SEO**: a public page with metadata, sitemap and social cards. You left it out, so `/` stays a minimal entry point to sign in and sign up · needs a decision
 - **Legal pages & cookie consent**: privacy policy, terms, consent banner. Becomes required rather than optional if real agencies ever sign up · needs a decision
-- **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up · needs a decision
-- **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design · needs a decision
-- **Audit log**: who did what, deliberately left out of the first schema · needs a decision
+- **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up. Spec 0002 ships a guarded local seed script, which is most of the data work · needs a decision
+- **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper · from spec 0002 · needs a decision
+- **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 leaves it unblocked (`org_id` is not null on every tenant table) and records the policy shape; what remains is applying a per request setting inside each transaction on the pooler, which feature 4 must settle first · needs a decision
+- **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
 
