@@ -8,3 +8,7 @@
  */
 export * from "./identity";
 export * from "./clients";
+export * from "./projects";
+export * from "./invoices";
+export * from "./webhooks";
+export * from "./relations";
