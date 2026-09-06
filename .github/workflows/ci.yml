@@ -120,3 +120,8 @@ jobs:
 
       - name: Assert the schema matches spec 0002
         run: pnpm db:schema:assert
+
+      # The money helpers and the CHECK constraints must round the same way.
+      # This test is skipped without a database, so it runs here, not above.
+      - name: Check the TypeScript rounding agrees with PostgreSQL
+        run: pnpm vitest run src/lib/money.db.test.ts

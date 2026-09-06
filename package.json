@@ -15,6 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:check": "tsx scripts/migrations-check.ts",
     "db:schema:assert": "tsx scripts/db-schema-assert.ts",
+    "db:seed": "tsx scripts/db-seed.ts",
     "db:studio": "drizzle-kit studio",
     "db:check": "tsx scripts/db-check.ts",
     "test": "vitest run",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
+    "drizzle-zod": "^0.8.3",
     "next": "16.3.4",
     "postgres": "^3.4.9",
     "react": "19.2.8",

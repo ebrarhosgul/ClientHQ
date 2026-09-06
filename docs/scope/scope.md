@@ -59,17 +59,17 @@ _Tagged `Alpha` in spirit: this is configuration, so the closing stages are a cl
 Every table, column, constraint, index and cascade behind the product: organizations, users, memberships, subscriptions, clients, contacts, projects, deliverables, invoices, line items and the webhook idempotency ledger. Spec 0001 sketched the entities; this settles the real schema.
 **Done when:** migrations apply cleanly to a fresh database and roll forward on an existing one, every tenant scoped table carries and indexes `org_id`, money is integer cents with an explicit currency, and the invoice number uniqueness constraint holds under concurrent inserts.
 - [x] Design it (spec): `/architect data model & migrations`
-- [ ] Build it: `/develop data model & migrations`
+- [x] Build it: `/develop data model & migrations`
   - [x] Foundations and a proven pipe: shared column helpers, `organizations`, the first migration, and both CI jobs (apply to a throwaway container, migrate on merge) · AC-1, AC-2, AC-6, AC-7, AC-8, AC-13
   - [x] Identity and clients: `users`, `memberships`, `subscriptions`, `clients`, `client_contacts`, plus the scrub helper and the lowercase email rule · AC-2, AC-6, AC-11, AC-12
   - [x] Delivery and invoicing: `projects`, `deliverables`, `invoices`, `invoice_line_items`, `processed_webhook_events`, the RESTRICT foreign keys, the money constraints and the relations · AC-2, AC-3, AC-4, AC-5, AC-6
   - [x] One baseline migration: squash to a single generated migration and prove it applies to a fresh database · AC-1, AC-7, AC-8
-  - [ ] Money helpers, drizzle-zod schemas and the guarded seed script · AC-3, AC-5, AC-9, AC-10
+  - [x] Money helpers, drizzle-zod schemas and the guarded seed script · AC-3, AC-5, AC-9, AC-10
 - [ ] Verify it: `/check verify data model & migrations`
 - [ ] Test it: `/test data model & migrations`
 - [ ] Review it (fresh model): `/check review data model & migrations`
 - [ ] Document it: `/document data model & migrations`
-Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan`
+Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/`, `drizzle/`, `src/lib/id.ts`, `src/lib/money.ts`, `src/lib/scrub.ts`, `scripts/db-schema-assert.ts`, `scripts/db-seed.ts`, `.github/workflows/migrate.yml`, `vercel.json`
 
 ### 4. Tenant scoping data access layer · needs a decision
 The single shared layer every read and write goes through, so no screen or action can reach another agency's rows. Covers resolving tenant context from the Clerk session or the contact row, the scoped query builder, the `withTenantAction()` wrapper, and how the raw handle stays unreachable.

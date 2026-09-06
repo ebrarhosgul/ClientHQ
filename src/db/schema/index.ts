@@ -12,3 +12,4 @@ export * from "./projects";
 export * from "./invoices";
 export * from "./webhooks";
 export * from "./relations";
+export * from "./zod";

@@ -24,6 +24,12 @@ const serverEnvSchema = z.object({
 
   /** Absolute base URL, used later by Stripe redirects and email links. */
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
+
+  /**
+   * Development only. A database host besides `localhost` that `pnpm db:seed`
+   * may write to. Unset, the seed refuses every remote host.
+   */
+  SEED_ALLOW_HOST: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
