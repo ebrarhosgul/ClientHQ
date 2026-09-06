@@ -1,0 +1,79 @@
+# Migrate the deployed database, then deploy. Runs on every push to main, which
+# in practice means every merged pull request.
+#
+# Order is the whole point. Vercel's own git integration would deploy main the
+# moment it changes, with or without the migration, so this repository turns
+# that off for main in vercel.json and hands the production deploy to the job
+# below. A migration that fails stops the release: the deploy job needs the
+# migrate job, so it never runs.
+#
+# Two repository secrets:
+#
+#   DIRECT_URL              the Supabase direct connection (port 5432), the
+#                           same value as in your local .env
+#   VERCEL_DEPLOY_HOOK_URL  a Deploy Hook for the production branch, created
+#                           under the Vercel project's Settings → Git
+name: Migrate and deploy
+
+on:
+  push:
+    branches: [main]
+
+# One release at a time, and never cancel one in flight: an interrupted
+# migration is far worse than a slow queue.
+concurrency:
+  group: migrate-main
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply migrations to the deployed database
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check the secret is set
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          if [ -z "$DIRECT_URL" ]; then
+            echo "The DIRECT_URL repository secret is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Apply migrations
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: pnpm db:migrate
+
+  deploy:
+    name: Trigger the Vercel production deploy
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment: production
+
+    steps:
+      - name: Call the deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            echo "The VERCEL_DEPLOY_HOOK_URL repository secret is not set. Create a Deploy Hook for main under the Vercel project's Settings → Git, and add its URL as a secret."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "$VERCEL_DEPLOY_HOOK_URL"

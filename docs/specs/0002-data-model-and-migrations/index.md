@@ -1,7 +1,7 @@
 # 0002. Data model and migrations for the agency client portal
 
 **Date**: 2026-09-06
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -340,10 +340,10 @@ No new runtime environment variables. No third party account to create.
 
 Ordered by the project's **Tracer Bullet** approach. The thin thread here is not a user facing slice, it is one table proven all the way through generate, apply, check and CI before the other ten are written, so a broken pipe is discovered while a single table is the only thing to read.
 
-1. Add `src/lib/id.ts` (`newId()`, uuid v7) and `src/db/schema/` with shared column helpers (`id()`, `timestamps()`, `orgId()`). Point `drizzle.config.ts` `schema` at `./src/db/schema`, satisfies **AC-1**, **AC-2**
-2. Write `identity.ts` with `organizations` alone. Run `pnpm db:generate`, apply it to a local PostgreSQL, confirm `pnpm db:migrate:check` passes. This is the thread: one table, all the way through, satisfies **AC-1**, **AC-7**
-3. Add the CI job that starts a PostgreSQL service container, applies every migration from empty and asserts the expected objects exist, including every foreign key's `ON DELETE` action read from `pg_constraint.confdeltype`. That last assertion matters because the RESTRICT and CASCADE choices are the exact mechanism AC-6 rests on, and a wrong one would otherwise pass CI in silence. Match the container's major version to what the Supabase project actually runs (`select version()`), defaulting to `postgres:17`, satisfies **AC-6**, **AC-8**
-4. Add the migrate on merge CI job: `pnpm db:migrate` against `DIRECT_URL` from the repository secret, on merge to `main`, gating the deploy, satisfies **AC-13**
+1. [x] Add `src/lib/id.ts` (`newId()`, uuid v7) and `src/db/schema/` with shared column helpers (`id()`, `timestamps()`, `orgId()`). Point `drizzle.config.ts` `schema` at `./src/db/schema`, satisfies **AC-1**, **AC-2**
+2. [x] Write `identity.ts` with `organizations` alone. Run `pnpm db:generate`, apply it to a local PostgreSQL, confirm `pnpm db:migrate:check` passes. This is the thread: one table, all the way through, satisfies **AC-1**, **AC-7**
+3. [x] Add the CI job that starts a PostgreSQL service container, applies every migration from empty and asserts the expected objects exist, including every foreign key's `ON DELETE` action read from `pg_constraint.confdeltype`. That last assertion matters because the RESTRICT and CASCADE choices are the exact mechanism AC-6 rests on, and a wrong one would otherwise pass CI in silence. Match the container's major version to what the Supabase project actually runs (`select version()`), defaulting to `postgres:17`, satisfies **AC-6**, **AC-8**
+4. [x] Add the migrate on merge CI job: `pnpm db:migrate` against `DIRECT_URL` from the repository secret, on merge to `main`, gating the deploy, satisfies **AC-13**
 5. Thicken identity: `users`, `memberships`, `subscriptions` with their unique constraints, cascades, indexes and the `email = lower(email)` CHECK. Add `src/lib/scrub.ts` with `scrubUser()`. From here on use `pnpm exec drizzle-kit push` against the local database rather than generating a migration per table, and run it **without** `--force`, so it prompts before any destructive statement rather than quietly dropping and recreating a column on a type change. The single baseline is generated once at step 10, so `db:migrate:check` is expected to fail on this branch until then, satisfies **AC-2**, **AC-6**, **AC-12**
 6. Add `clients.ts`: `clients` and `client_contacts`, with `archived_at`, the (`client_id`, `email`) unique constraint, the `email = lower(email)` CHECK so case cannot split one contact into two, the non unique `user_id` index and `on delete set null`, satisfies **AC-2**, **AC-11**
 7. Add `projects.ts`: `projects` and `deliverables`, with `archived_at`, RESTRICT on `projects.client_id` and on every deliverable foreign key, the unique `r2_key` and the (`org_id`, `status`, `created_at`) sweep index, satisfies **AC-2**, **AC-6**

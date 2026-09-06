@@ -1,9 +1,12 @@
 # The gate every push and pull request goes through.
 #
-# Four checks, matching what the pre-commit hook runs locally plus the unit
-# tests and the migration check: format, lint, typecheck, tests, migrations.
-# None of them need a database or any provider credentials, which is deliberate:
-# a check that needs a secret cannot run on a fork's pull request.
+# Two jobs. The first runs what the pre-commit hook runs locally plus the unit
+# tests and the migration drift check: format, lint, typecheck, tests,
+# migrations. The second applies every migration from empty to a throwaway
+# PostgreSQL container and asserts the resulting schema matches spec 0002.
+# Neither needs a provider credential, which is deliberate: a check that needs
+# a secret cannot run on a fork's pull request. The container's password below
+# is not a secret, it lives for the length of the job.
 #
 # Preview deploys are not here. Vercel handles those on its own.
 name: CI
@@ -58,7 +61,62 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm test
 
-      # Are the committed migrations still in step with src/db/schema.ts?
+      # Are the committed migrations still in step with src/db/schema/?
       - name: Migration check
         if: ${{ !cancelled() }}
         run: pnpm db:migrate:check
+
+  # Does the migration actually apply, and does it produce the schema spec 0002
+  # describes? The drift check above cannot answer that: it compares files. This
+  # job runs the SQL against a real PostgreSQL, twice (the second run must apply
+  # nothing and exit zero), then reads the catalogue and compares every table,
+  # constraint, index and foreign key ON DELETE action with the spec.
+  #
+  # postgres:17 matches the Supabase project (`select version()` says 17.6).
+  # Bump it when the project moves.
+  migrations-apply:
+    name: Apply migrations to a fresh PostgreSQL
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clienthq
+          POSTGRES_PASSWORD: clienthq
+          POSTGRES_DB: clienthq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clienthq"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DIRECT_URL: postgresql://clienthq:clienthq@localhost:5432/clienthq
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply every migration from empty
+        run: pnpm db:migrate
+
+      - name: Apply again, expecting nothing to happen
+        run: pnpm db:migrate
+
+      - name: Assert the schema matches spec 0002
+        run: pnpm db:schema:assert

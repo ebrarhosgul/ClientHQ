@@ -1,7 +1,7 @@
 /**
  * The migration check CI runs on every push and pull request.
  *
- * Migrations are generated from `src/db/schema.ts` and committed under
+ * Migrations are generated from `src/db/schema/` and committed under
  * `drizzle/` so schema changes are reviewable. That only holds if the two never
  * drift apart, which is exactly what a reviewer cannot see by eye. This script
  * makes the drift fail a build instead.
@@ -12,7 +12,7 @@
  *      journal entry? A migration committed without its journal line is never
  *      applied, and a journal line without its file crashes the migrator.
  *   2. Would generating right now produce a new migration? If it would, someone
- *      changed `schema.ts` and did not run `pnpm db:generate`.
+ *      changed the schema and did not run `pnpm db:generate`.
  *
  * It needs no database. Generation is a diff between the schema and the
  * snapshots already in `drizzle/meta/`, so this runs anywhere, including a CI

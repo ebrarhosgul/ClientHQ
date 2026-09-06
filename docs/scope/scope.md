@@ -60,7 +60,7 @@ Every table, column, constraint, index and cascade behind the product: organizat
 **Done when:** migrations apply cleanly to a fresh database and roll forward on an existing one, every tenant scoped table carries and indexes `org_id`, money is integer cents with an explicit currency, and the invoice number uniqueness constraint holds under concurrent inserts.
 - [x] Design it (spec): `/architect data model & migrations`
 - [ ] Build it: `/develop data model & migrations`
-  - [ ] Foundations and a proven pipe: shared column helpers, `organizations`, the first migration, and both CI jobs (apply to a throwaway container, migrate on merge) · AC-1, AC-2, AC-6, AC-7, AC-8, AC-13
+  - [x] Foundations and a proven pipe: shared column helpers, `organizations`, the first migration, and both CI jobs (apply to a throwaway container, migrate on merge) · AC-1, AC-2, AC-6, AC-7, AC-8, AC-13
   - [ ] Identity and clients: `users`, `memberships`, `subscriptions`, `clients`, `client_contacts`, plus the scrub helper and the lowercase email rule · AC-2, AC-6, AC-11, AC-12
   - [ ] Delivery and invoicing: `projects`, `deliverables`, `invoices`, `invoice_line_items`, `processed_webhook_events`, the RESTRICT foreign keys, the money constraints and the relations · AC-2, AC-3, AC-4, AC-5, AC-6
   - [ ] One baseline migration: squash to a single generated migration and prove it applies to a fresh database · AC-1, AC-7, AC-8
