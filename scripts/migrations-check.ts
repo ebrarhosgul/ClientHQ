@@ -121,13 +121,21 @@ function checkForDrift(): Result {
         ...SCHEMA_PATHS.flatMap((schema) => ["--schema", schema]),
         "--dialect",
         String(drizzleConfig.dialect),
+        // Relative on purpose. drizzle-kit prefixes `--out` with `./`, so an
+        // absolute path becomes `.//var/...`, the snapshot read fails, and
+        // drizzle-kit still exits zero. That made this check pass while the
+        // schema had uncommitted tables. Never pass it an absolute path.
         "--out",
-        workspace,
+        path.relative(ROOT, workspace),
       ],
       { cwd: ROOT, encoding: "utf8" },
     );
 
-    if (generated.status !== 0) {
+    // drizzle-kit reports some failures on stderr and still exits zero (the
+    // snapshot read above is one). Treat a printed error as a failure too.
+    const printedError = /\b(ENOENT|Error)\b/.test(generated.stderr);
+
+    if (generated.status !== 0 || printedError) {
       return {
         ok: false,
         problem: `drizzle-kit could not generate:\n${generated.stderr || generated.stdout}`,
