@@ -7,3 +7,4 @@
  * `drizzle/`.
  */
 export * from "./identity";
+export * from "./clients";
