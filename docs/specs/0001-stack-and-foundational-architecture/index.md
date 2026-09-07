@@ -100,7 +100,7 @@ Clerk role mapping: `org:admin` becomes `admin`, `org:member` becomes `member`. 
 
 **Roles are read from the Clerk session claims, not from the local mirror.** `Membership.role` exists so member lists can be rendered with a join, but a role demoted in Clerk stays stale locally until a webhook lands, and an authorization check must never read a stale role. The session claim is authoritative for every permission decision.
 
-Clerk sync has a safety net for missing rows: any request that resolves a tenant context and finds no matching local row upserts it from the Clerk API on the spot, so a webhook missed during a deploy does not strand a user. This covers absence, not staleness, which is why roles come from the session.
+Clerk sync has a safety net for missing rows: any request that resolves a tenant context and finds no matching local row upserts it from the Clerk API on the spot, so a webhook missed during a deploy does not strand a user. This covers absence, not staleness, which is why roles come from the session. Amended by [spec 0003](../0003-tenant-scoping-data-access-layer/index.md): the data access layer resolves and never writes, so it raises a typed `no_mirror_row` instead and feature 6 performs the upsert. The safety net still exists, it just lives one layer up.
 
 ### Client portal access and invitation
 

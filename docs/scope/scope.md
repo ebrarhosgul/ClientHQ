@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack & architecture | Foundation | in-progress |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model & migrations | Foundation | in-progress |
-| 4 | Tenant scoping data access layer | Foundation | planned |
+| 4 | Tenant scoping data access layer | Foundation | in-progress |
 | 5 | Design system & UI foundation | Foundation | planned |
 | 6 | Agency sign in & organization | Slice 1 | planned |
 | 7 | Client records | Slice 1 | planned |
@@ -71,10 +71,21 @@ Every table, column, constraint, index and cascade behind the product: organizat
 - [x] Document it: `/document data model & migrations`
 Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/`, `drizzle/`, `src/lib/id.ts`, `src/lib/money.ts`, `src/lib/scrub.ts`, `scripts/db-schema-assert.ts`, `scripts/db-seed.ts`, `.github/workflows/migrate.yml`, `vercel.json`
 
-### 4. Tenant scoping data access layer · needs a decision
+### 4. Tenant scoping data access layer · in-progress
 The single shared layer every read and write goes through, so no screen or action can reach another agency's rows. Covers resolving tenant context from the Clerk session or the contact row, the scoped query builder, the `withTenantAction()` wrapper, and how the raw handle stays unreachable.
 **Done when:** an unscoped query against a tenant table cannot be written without deliberately bypassing the helper, tenant context resolves from the session or the contact row and never from a URL or form field, and a cross tenant access attempt is proven to fail in a test.
-- [ ] Design it (spec): `/architect tenant scoping data access layer`
+- [x] Design it (spec): `/architect tenant scoping data access layer`
+- [ ] Build it: `/develop tenant scoping data access layer`
+  - [ ] One thread end to end on `clients`: the Clerk SDK and its env vars, the single session module, staff context resolution, a scoped accessor and a minimal action wrapper, proven by the first cross tenant test on a real PostgreSQL · AC-1, AC-2, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9
+  - [ ] Generalise the accessor over all eight tenant tables: generic over any table carrying `org_id`, the full method set, and the fenced escape hatch · AC-1, AC-2, AC-3
+  - [ ] The second audience: contact resolution from the verified cookie, the client narrowing map, the split staff and contact accessor types, and the portal isolation tests · AC-4, AC-5, AC-6
+  - [ ] The full write path: role guards, declared revalidation, opt in transactions, the reserved slots for features 9 and 19, and the refusal log · AC-10, AC-11, AC-14, AC-15
+  - [ ] The fence and the proof on every push: named system access for webhooks and cron, the narrowed ESLint exemptions with their test, and the tenancy suite running in CI · AC-12, AC-13, AC-16, AC-17
+- [ ] Verify it: `/check verify tenant scoping data access layer`
+- [ ] Test it: `/test tenant scoping data access layer`
+- [ ] Review it (fresh model): `/check review tenant scoping data access layer`
+- [ ] Document it: `/document tenant scoping data access layer`
+Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic build tasks in its `## Build plan` · code will land in `src/db/tenant/`, `src/lib/env.ts`, `eslint.config.mjs`, `tools/eslint/`
 
 _This is the row that carries the most risk in the whole plan. Spec 0001 is explicit that this scoping fails open: one query that bypasses the helper leaks data across tenants and nothing in the database stops it._
 
@@ -188,7 +199,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Legal pages & cookie consent**: privacy policy, terms, consent banner. Becomes required rather than optional if real agencies ever sign up · needs a decision
 - **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up. Spec 0002 ships a guarded local seed script, which is most of the data work · needs a decision
 - **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper · from spec 0002 · needs a decision
-- **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 leaves it unblocked (`org_id` is not null on every tenant table) and records the policy shape; what remains is applying a per request setting inside each transaction on the pooler, which feature 4 must settle first · needs a decision
+- **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
