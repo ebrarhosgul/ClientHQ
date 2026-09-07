@@ -11,7 +11,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
-| 1 | Stack & architecture | Foundation | in-progress |
+| 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model & migrations | Foundation | in-progress |
 | 4 | Tenant scoping data access layer | Foundation | in-progress |
@@ -34,7 +34,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## Foundations
 
-### 1. Stack & architecture · in-progress · Beta
+### 1. Stack & architecture · done · Beta
 The stack, the tenancy model and the foundational architecture, plus a runnable project so every later slice builds on real structure. Already decided in spec 0001; what remains is the scaffold.
 **Done when:** the empty scaffold boots locally, deploys to Vercel, connects to Supabase through Drizzle, and passes a clean build.
 - [x] Decide the stack (spec): `/architect stack & architecture`
@@ -66,7 +66,7 @@ Every table, column, constraint, index and cascade behind the product: organizat
   - [x] One baseline migration: squash to a single generated migration and prove it applies to a fresh database · AC-1, AC-7, AC-8
   - [x] Money helpers, drizzle-zod schemas and the guarded seed script · AC-3, AC-5, AC-9, AC-10
 - [ ] Verify it: `/check verify data model & migrations`
-- [ ] Test it: `/test data model & migrations`
+- [x] Test it: `/test data model & migrations`
 - [ ] Review it (fresh model): `/check review data model & migrations`
 - [x] Document it: `/document data model & migrations`
 Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/`, `drizzle/`, `src/lib/id.ts`, `src/lib/money.ts`, `src/lib/scrub.ts`, `scripts/db-schema-assert.ts`, `scripts/db-seed.ts`, `.github/workflows/migrate.yml`, `vercel.json`
