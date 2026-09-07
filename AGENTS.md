@@ -42,14 +42,21 @@ corepack pnpm build
 corepack pnpm test
 corepack pnpm test:e2e
 
-# Typecheck and lint
+# Typecheck, lint and format
 corepack pnpm typecheck
 corepack pnpm lint
+corepack pnpm format
+corepack pnpm format:check
 
 # Database: generate a migration, apply it, check the connection
 corepack pnpm db:generate
 corepack pnpm db:migrate
 corepack pnpm db:check
+
+# Database: catch uncommitted schema drift, assert the live schema, seed dev data
+corepack pnpm db:migrate:check
+corepack pnpm db:schema:assert
+corepack pnpm db:seed
 ```
 
 ## Specs
@@ -80,12 +87,12 @@ Code style is functional and immutable. No classes where a plain function works.
 
 ## Tooling
 
-Chosen here, installed by `/develop tooling` (scope feature 2). None of it is in place yet.
+Chosen here, installed by `/develop tooling` (scope feature 2). All of it is in place.
 
 - **Lint and format**: keep ESLint 9 with `eslint-config-next`, add Prettier alongside it, wired so the two do not fight.
-- **Before each commit**: a hook runs lint, format and typecheck on staged files.
-- **Continuous integration**: GitHub Actions on every push and pull request, running lint, typecheck, unit tests and a migration check. Vercel handles preview deploys separately.
-- **Custom ESLint rule owed**: block importing `src/db/client.ts` from anywhere outside the data access layer. Spec 0001 treats this as required, not tidying.
+- **Before each commit**: `.githooks/pre-commit` checks formatting and lint on the staged files and typechecks the whole project. `pnpm install` points `core.hooksPath` at `.githooks/` (see `scripts/install-git-hooks.mjs`); `git commit --no-verify` skips it.
+- **Continuous integration**: `.github/workflows/ci.yml` on every push and pull request, running format, lint, typecheck, unit tests and a migration drift check, plus a second job that applies every migration to a throwaway PostgreSQL and asserts the resulting schema. `.github/workflows/migrate.yml` migrates the deployed database on merge to `main` and only then triggers the deploy, so Vercel's own git deploys for `main` are turned off in `vercel.json`.
+- **Custom ESLint rule**: `clienthq/no-raw-db-import` in `tools/eslint/no-raw-db-import.mjs` blocks importing `src/db/client.ts` from anywhere outside `src/db/`, with two named exemptions for the connection health checks. Spec 0001 treats this as required, not tidying.
 - **Testing gate**: Vitest unit tests on money, permission and tenancy logic; integration tests on the data access layer and webhooks; Playwright for sign up, invite and checkout. Written after the build.
 
 ## Git
@@ -112,7 +119,7 @@ Chosen here, installed by `/develop tooling` (scope feature 2). None of it is in
 - [sentry-nextjs-sdk](.agents/skills/sentry-nextjs-sdk/): `getsentry/sentry-for-ai`, Sentry SDK setup, tracing, session replay and source maps for Next.js
 
 Declined: lint-staged, eslint-prettier-config (`patricio0312rev/skills`), Cloudflare MCP
-MCP servers: Sentry (`getsentry/sentry-mcp`, recommended, connect by OAuth at https://mcp.sentry.dev/mcp)
+MCP servers: Sentry (`getsentry/sentry-mcp`, recommended, connect by OAuth at https://mcp.sentry.dev/mcp) · Supabase (configured in `.mcp.json` at https://mcp.supabase.com/mcp, needs an OAuth sign in before its tools work)
 
 ## Context files
 
