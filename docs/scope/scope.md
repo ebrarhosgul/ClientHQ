@@ -81,7 +81,7 @@ The single shared layer every read and write goes through, so no screen or actio
   - [x] The second audience: contact resolution from the verified cookie, the client narrowing map, the split staff and contact accessor types, and the portal isolation tests · AC-4, AC-5, AC-6
   - [x] The full write path: role guards, declared revalidation, opt in transactions, the reserved slots for features 9 and 19, and the refusal log · AC-10, AC-11, AC-14, AC-15
   - [x] The fence and the proof on every push: named system access for webhooks and cron, the narrowed ESLint exemptions with their test, and the tenancy suite running in CI · AC-12, AC-13, AC-16, AC-17
-- [ ] Verify it: `/check verify tenant scoping data access layer`
+- [x] Verify it: `/check verify tenant scoping data access layer`
 - [ ] Test it: `/test tenant scoping data access layer`
 - [ ] Review it (fresh model): `/check review tenant scoping data access layer`
 - [ ] Document it: `/document tenant scoping data access layer`
