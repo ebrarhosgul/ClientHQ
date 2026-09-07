@@ -3,39 +3,68 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierCompat from "eslint-config-prettier/flat";
 
-import { clienthqPlugin } from "./tools/eslint/no-raw-db-import.mjs";
+import { clienthqPlugin } from "./tools/eslint/plugin.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
 
-  // The load bearing rule of the whole design, from spec 0001: nothing outside
-  // the tenant scoping data access layer may import the raw database handle.
-  // Without it, "tenant safe by construction" is really just discipline.
+  // The load bearing rules of the whole design, from specs 0001 and 0003.
+  // Nothing outside the tenant scoping data access layer may import the raw
+  // database handle, and nothing outside the webhook and cron routes may import
+  // the unscoped system access door. Without these two, "tenant safe by
+  // construction" is really just discipline.
   {
     name: "clienthq/tenant-isolation",
     plugins: { clienthq: clienthqPlugin },
-    rules: { "clienthq/no-raw-db-import": "error" },
+    rules: {
+      "clienthq/no-raw-db-import": "error",
+      "clienthq/no-system-access-import": "error",
+    },
   },
 
-  // The data access layer itself. `src/db/` is where the raw handle lives and
-  // where feature 4 builds the scoping helper every other query goes through,
-  // so this is the one directory that is allowed to reach it.
+  // The data access layer itself, and nothing wider. Spec 0003 narrowed this
+  // from `src/db/**`: the schema modules never needed the handle, and leaving
+  // them exempt left a hole the rule could not see. `src/db/tenant/` is the one
+  // directory that reaches it, through `src/db/tenant/executor.ts`.
   {
     name: "clienthq/tenant-isolation-data-access-layer",
-    files: ["src/db/**"],
+    files: ["src/db/tenant/**"],
     rules: { "clienthq/no-raw-db-import": "off" },
   },
 
-  // Two sanctioned exceptions, both connection checks documented in
-  // `src/db/AGENTS.md`. Neither reads a tenant scoped table: one runs
-  // `select 1`, the other `select version()`. Adding a third entry here is a
-  // decision about the tenant boundary, so it belongs in a pull request
-  // discussion rather than a quiet edit.
+  // Three sanctioned exceptions, each an exact path. The first two are the
+  // connection checks documented in `src/db/AGENTS.md`; neither reads a tenant
+  // scoped table, one runs `select 1` and the other `select version()`. The
+  // third is the handle module's own test, which cannot test a module it may
+  // not import. Adding a fourth entry here is a decision about the tenant
+  // boundary, so it belongs in a pull request discussion rather than a quiet
+  // edit, and `tools/eslint/tenant-isolation-config.test.mts` fails if this
+  // list and spec 0003 stop agreeing.
   {
     name: "clienthq/tenant-isolation-health-checks",
-    files: ["src/app/api/health/db/route.ts", "scripts/db-check.ts"],
+    files: [
+      "src/app/api/health/db/route.ts",
+      "scripts/db-check.ts",
+      "src/db/client.test.ts",
+    ],
     rules: { "clienthq/no-raw-db-import": "off" },
+  },
+
+  // The webhook and cron routes are the two callers with no tenant to resolve:
+  // a signed provider event, and a sweep that crosses every organization by
+  // design. Spec 0001 fixes these three paths, and nothing else may reach
+  // `withSystemAccess`. The tenant layer itself is exempt so `system.ts` can be
+  // written and tested at all.
+  {
+    name: "clienthq/system-access-callers",
+    files: [
+      "src/app/api/webhooks/stripe/route.ts",
+      "src/app/api/webhooks/clerk/route.ts",
+      "src/app/api/cron/daily/route.ts",
+      "src/db/tenant/**",
+    ],
+    rules: { "clienthq/no-system-access-import": "off" },
   },
 
   // Last, so it wins: turns off every ESLint rule that would argue with

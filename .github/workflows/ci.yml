@@ -121,6 +121,16 @@ jobs:
       - name: Assert the schema matches spec 0002
         run: pnpm db:schema:assert
 
+      # The claim spec 0003 exists to make good: one agency cannot reach
+      # another's rows. This suite seeds two organizations into the container
+      # above and asks every accessor method for something it must not be able
+      # to see. Every cross tenant assertion failing fails the job. It runs here
+      # rather than in the unit job because it needs real SQL, and it is skipped
+      # without DIRECT_URL so `pnpm test` still runs without a database.
+      - name: Prove tenant scoping holds
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/db/tenant/tenancy.db.test.ts
+
       # The money helpers and the CHECK constraints must round the same way.
       # This test is skipped without a database, so it runs here, not above.
       - name: Check the TypeScript rounding agrees with PostgreSQL

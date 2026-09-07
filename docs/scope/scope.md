@@ -75,17 +75,17 @@ Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build ta
 The single shared layer every read and write goes through, so no screen or action can reach another agency's rows. Covers resolving tenant context from the Clerk session or the contact row, the scoped query builder, the `withTenantAction()` wrapper, and how the raw handle stays unreachable.
 **Done when:** an unscoped query against a tenant table cannot be written without deliberately bypassing the helper, tenant context resolves from the session or the contact row and never from a URL or form field, and a cross tenant access attempt is proven to fail in a test.
 - [x] Design it (spec): `/architect tenant scoping data access layer`
-- [ ] Build it: `/develop tenant scoping data access layer`
-  - [ ] One thread end to end on `clients`: the Clerk SDK and its env vars, the single session module, staff context resolution, a scoped accessor and a minimal action wrapper, proven by the first cross tenant test on a real PostgreSQL · AC-1, AC-2, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9
-  - [ ] Generalise the accessor over all eight tenant tables: generic over any table carrying `org_id`, the full method set, and the fenced escape hatch · AC-1, AC-2, AC-3
-  - [ ] The second audience: contact resolution from the verified cookie, the client narrowing map, the split staff and contact accessor types, and the portal isolation tests · AC-4, AC-5, AC-6
-  - [ ] The full write path: role guards, declared revalidation, opt in transactions, the reserved slots for features 9 and 19, and the refusal log · AC-10, AC-11, AC-14, AC-15
-  - [ ] The fence and the proof on every push: named system access for webhooks and cron, the narrowed ESLint exemptions with their test, and the tenancy suite running in CI · AC-12, AC-13, AC-16, AC-17
+- [x] Build it: `/develop tenant scoping data access layer`
+  - [x] One thread end to end on `clients`: the Clerk SDK and its env vars, the single session module, staff context resolution, a scoped accessor and a minimal action wrapper, proven by the first cross tenant test on a real PostgreSQL · AC-1, AC-2, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9
+  - [x] Generalise the accessor over all eight tenant tables: generic over any table carrying `org_id`, the full method set, and the fenced escape hatch · AC-1, AC-2, AC-3
+  - [x] The second audience: contact resolution from the verified cookie, the client narrowing map, the split staff and contact accessor types, and the portal isolation tests · AC-4, AC-5, AC-6
+  - [x] The full write path: role guards, declared revalidation, opt in transactions, the reserved slots for features 9 and 19, and the refusal log · AC-10, AC-11, AC-14, AC-15
+  - [x] The fence and the proof on every push: named system access for webhooks and cron, the narrowed ESLint exemptions with their test, and the tenancy suite running in CI · AC-12, AC-13, AC-16, AC-17
 - [ ] Verify it: `/check verify tenant scoping data access layer`
 - [ ] Test it: `/test tenant scoping data access layer`
 - [ ] Review it (fresh model): `/check review tenant scoping data access layer`
 - [ ] Document it: `/document tenant scoping data access layer`
-Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic build tasks in its `## Build plan` · code will land in `src/db/tenant/`, `src/lib/env.ts`, `eslint.config.mjs`, `tools/eslint/`
+Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/tenant/`, `src/lib/env.ts`, `src/db/client.ts`, `eslint.config.mjs`, `tools/eslint/`, `.github/workflows/ci.yml`
 
 _This is the row that carries the most risk in the whole plan. Spec 0001 is explicit that this scoping fails open: one query that bypasses the helper leaks data across tenants and nothing in the database stops it._
 

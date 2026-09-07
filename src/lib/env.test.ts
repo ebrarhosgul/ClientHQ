@@ -19,6 +19,10 @@ import type { ServerEnv } from "./env";
 const VALID = {
   DATABASE_URL: "postgres://user:pw@pooler.supabase.com:6543/postgres",
   DIRECT_URL: "postgres://user:pw@db.supabase.com:5432/postgres",
+  // Added by the tenant scoping layer (spec 0003): the session module reads
+  // Clerk claims, and Clerk picks these two up from the process environment.
+  CLERK_SECRET_KEY: "sk_test_not_a_real_key",
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_not_a_real_key",
 } as const;
 
 /**
@@ -30,6 +34,13 @@ const VALID = {
  */
 function setProcessEnv(vars: Record<string, string>): void {
   process.env = vars as unknown as NodeJS.ProcessEnv;
+}
+
+/** A complete environment with one variable left out. */
+function withoutKey(missing: keyof typeof VALID): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(VALID).filter(([name]) => name !== missing),
+  );
 }
 
 /** Import a fresh copy of the module, so the cache starts empty. */
@@ -63,6 +74,18 @@ describe("env", () => {
 
       expect(result.DATABASE_URL).toBe(VALID.DATABASE_URL);
       expect(result.DIRECT_URL).toBe(VALID.DIRECT_URL);
+    });
+
+    it("returns the two Clerk keys the session module needs", async () => {
+      setProcessEnv({ ...VALID });
+
+      const env = await freshEnv();
+      const result: ServerEnv = env();
+
+      expect(result.CLERK_SECRET_KEY).toBe(VALID.CLERK_SECRET_KEY);
+      expect(result.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY).toBe(
+        VALID.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      );
     });
 
     it("defaults NODE_ENV to development when it is not set", async () => {
@@ -106,7 +129,7 @@ describe("env", () => {
 
   describe("a broken environment", () => {
     it("throws when DATABASE_URL is missing", async () => {
-      setProcessEnv({ DIRECT_URL: VALID.DIRECT_URL });
+      setProcessEnv(withoutKey("DATABASE_URL"));
 
       const env = await freshEnv();
 
@@ -114,11 +137,19 @@ describe("env", () => {
     });
 
     it("throws when DIRECT_URL is missing", async () => {
-      setProcessEnv({ DATABASE_URL: VALID.DATABASE_URL });
+      setProcessEnv(withoutKey("DIRECT_URL"));
 
       const env = await freshEnv();
 
       expect(() => env()).toThrow(/DIRECT_URL/);
+    });
+
+    it("throws when a Clerk key is missing", async () => {
+      setProcessEnv(withoutKey("CLERK_SECRET_KEY"));
+
+      const env = await freshEnv();
+
+      expect(() => env()).toThrow(/CLERK_SECRET_KEY/);
     });
 
     it("treats an empty string as missing, not as a value", async () => {
