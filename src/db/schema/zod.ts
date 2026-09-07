@@ -45,9 +45,14 @@ const quantity = z
     "Quantity must be a plain decimal with at most 9 whole digits and 3 decimals",
   );
 
+// Both of these have a database default (1 and 'USD'), so the Clerk
+// `organization.created` handler has nothing to say about either. Overriding a
+// defaulted column replaces the optional schema drizzle-zod would have made, so
+// each override has to say `.optional()` again, the same as on the invoice
+// money columns below.
 export const insertOrganizationSchema = createInsertSchema(organizations, {
-  defaultCurrency: currencyCode,
-  nextInvoiceNumber: z.int().positive(),
+  defaultCurrency: currencyCode.optional(),
+  nextInvoiceNumber: z.int().positive().optional(),
 });
 export const selectOrganizationSchema = createSelectSchema(organizations);
 
