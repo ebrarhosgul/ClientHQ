@@ -1,7 +1,7 @@
 # 0003. Tenant scoping data access layer
 
 **Date**: 2026-09-07
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
