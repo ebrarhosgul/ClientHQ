@@ -13,15 +13,14 @@ import * as schema from "./schema";
  * another, and nothing in the database stops it. Spec 0001 is explicit that this
  * scoping fails open.
  *
- * Two things are still owed and are tracked in the scope:
- *
- *   - Feature 4 builds the scoping layer that takes a resolved tenant context as
- *     a required argument and hands back a scoped query builder, so an unscoped
- *     query cannot be written by accident. Once it exists, this module stops
- *     being importable from anywhere else.
- *   - Feature 2 adds the ESLint rule that makes importing this file from outside
- *     that layer fail the build. Until that rule is in place, the guarantee is
- *     discipline rather than construction.
+ * That rule is now construction rather than discipline. `src/db/tenant/` holds
+ * the scoping layer: `tenantDb(ctx)` takes a resolved tenant context and hands
+ * back an accessor that cannot emit an unscoped statement, and
+ * `src/db/tenant/executor.ts` is the single file inside it that imports this
+ * module. The `clienthq/no-raw-db-import` ESLint rule fails the build on an
+ * import from anywhere else, with the exemption list in `eslint.config.mjs`
+ * and asserted by `tools/eslint/tenant-isolation-config.test.mts`. See spec
+ * 0003.
  *
  * Connection notes: this points at the Supabase transaction mode pooler on port
  * 6543, so prepared statements are switched off. PgBouncer hands each

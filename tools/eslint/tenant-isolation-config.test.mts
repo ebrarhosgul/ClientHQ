@@ -3,7 +3,8 @@ import { ESLint, type Linter } from "eslint";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /**
- * covers: DW-3 (the raw database handle import rule actually fails a build)
+ * covers: DW-3 (the raw database handle import rule actually fails a build),
+ * spec 0003 AC-12 and AC-13 (both exemption lists match the spec)
  *
  * The wiring and the exemption list, not the rule itself.
  *
@@ -24,7 +25,14 @@ const RAW_IMPORT = [
   "",
 ].join("\n");
 
+const SYSTEM_IMPORT = [
+  'import { withSystemAccess } from "@/db/tenant/system";',
+  "export const door = withSystemAccess;",
+  "",
+].join("\n");
+
 const RULE = "clienthq/no-raw-db-import";
+const SYSTEM_RULE = "clienthq/no-system-access-import";
 
 let eslint: ESLint;
 
@@ -40,7 +48,8 @@ beforeAll(() => {
  * The file does not have to exist. Flat config picks its blocks by path, which
  * is exactly what is under test here, and linting text keeps the repo untouched.
  */
-async function tenantFindings(
+async function findingsFor(
+  rule: string,
   code: string,
   filePath: string,
 ): Promise<readonly Linter.LintMessage[]> {
@@ -49,7 +58,20 @@ async function tenantFindings(
     warnIgnored: false,
   });
 
-  return (result?.messages ?? []).filter((message) => message.ruleId === RULE);
+  return (result?.messages ?? []).filter((message) => message.ruleId === rule);
+}
+
+async function tenantFindings(
+  code: string,
+  filePath: string,
+): Promise<readonly Linter.LintMessage[]> {
+  return findingsFor(RULE, code, filePath);
+}
+
+async function systemFindings(
+  filePath: string,
+): Promise<readonly Linter.LintMessage[]> {
+  return findingsFor(SYSTEM_RULE, SYSTEM_IMPORT, filePath);
 }
 
 describe("the tenant isolation rule as this project configures it", () => {
@@ -91,23 +113,40 @@ describe("the tenant isolation rule as this project configures it", () => {
 });
 
 describe("the exemptions, which live in eslint.config.mjs and nowhere else", () => {
-  it("lets the data access layer reach the handle it owns", async () => {
-    // `src/db/` is where the handle lives and where feature 4 builds the
-    // scoping helper every other query goes through.
-    const findings = await tenantFindings(RAW_IMPORT, "src/db/scoped.ts");
+  it("lets the tenant layer reach the handle it owns", async () => {
+    // `src/db/tenant/` is the scoping layer every other query goes through, and
+    // `src/db/tenant/executor.ts` is the single file inside it that imports the
+    // handle.
+    const findings = await tenantFindings(
+      RAW_IMPORT,
+      "src/db/tenant/executor.ts",
+    );
 
     expect(findings).toEqual([]);
   });
 
-  it("lets the two sanctioned connection checks through", async () => {
+  it("no longer exempts the rest of src/db, which spec 0003 narrowed", async () => {
+    // The old exemption was `src/db/**`, which covered the schema modules too.
+    // They never needed the handle, and leaving them in left a hole the rule
+    // could not see.
+    const schema = await tenantFindings(RAW_IMPORT, "src/db/schema/clients.ts");
+    const stray = await tenantFindings(RAW_IMPORT, "src/db/scoped.ts");
+
+    expect(schema).toHaveLength(1);
+    expect(stray).toHaveLength(1);
+  });
+
+  it("lets the two sanctioned connection checks, and the handle's own test, through", async () => {
     const route = await tenantFindings(
       RAW_IMPORT,
       "src/app/api/health/db/route.ts",
     );
     const script = await tenantFindings(RAW_IMPORT, "scripts/db-check.ts");
+    const ownTest = await tenantFindings(RAW_IMPORT, "src/db/client.test.ts");
 
     expect(route).toEqual([]);
     expect(script).toEqual([]);
+    expect(ownTest).toEqual([]);
   });
 
   it("exempts those two files exactly, not the folders they sit in", async () => {
@@ -140,5 +179,49 @@ describe("the exemptions, which live in eslint.config.mjs and nowhere else", () 
     );
 
     expect(findings).toHaveLength(1);
+  });
+});
+
+describe("the second door: who may import withSystemAccess", () => {
+  it("is switched on, at error severity, for ordinary application code", async () => {
+    const [finding] = await systemFindings("src/clients/actions.ts");
+
+    expect(finding?.severity).toBe(2);
+  });
+
+  it("lets exactly the three routes spec 0001 names through", async () => {
+    // A webhook arrives with a signed event and no session; the daily cron
+    // sweeps every organization on purpose. Those are the only two callers with
+    // no tenant to resolve.
+    const stripe = await systemFindings("src/app/api/webhooks/stripe/route.ts");
+    const clerk = await systemFindings("src/app/api/webhooks/clerk/route.ts");
+    const cron = await systemFindings("src/app/api/cron/daily/route.ts");
+
+    expect(stripe).toEqual([]);
+    expect(clerk).toEqual([]);
+    expect(cron).toEqual([]);
+  });
+
+  it("lets the tenant layer import its own module", async () => {
+    const inside = await systemFindings("src/db/tenant/system.test.ts");
+
+    expect(inside).toEqual([]);
+  });
+
+  it("exempts those routes exactly, not the folders they sit in", async () => {
+    // The load bearing case, the same way it is for the handle: a second
+    // webhook or a second cron route is a new decision about the tenant
+    // boundary, so it has to be argued for rather than inherited.
+    const otherWebhook = await systemFindings(
+      "src/app/api/webhooks/resend/route.ts",
+    );
+    const otherCron = await systemFindings("src/app/api/cron/hourly/route.ts");
+    const nested = await systemFindings(
+      "src/app/api/webhooks/stripe/deep/route.ts",
+    );
+
+    expect(otherWebhook).toHaveLength(1);
+    expect(otherCron).toHaveLength(1);
+    expect(nested).toHaveLength(1);
   });
 });
