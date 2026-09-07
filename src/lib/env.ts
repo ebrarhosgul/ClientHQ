@@ -26,6 +26,17 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
 
   /**
+   * Clerk. The tenant scoping layer (feature 4) reads session claims through
+   * `@clerk/nextjs/server`, which picks these up from the process environment
+   * itself; they are declared here so a missing key fails with this message
+   * rather than somewhere inside the SDK. Feature 6 adds the sign in flow.
+   */
+  CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z
+    .string()
+    .min(1, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required"),
+
+  /**
    * Development only. A database host besides `localhost` that `pnpm db:seed`
    * may write to. Unset, the seed refuses every remote host.
    */
