@@ -68,7 +68,7 @@ Every table, column, constraint, index and cascade behind the product: organizat
 - [ ] Verify it: `/check verify data model & migrations`
 - [ ] Test it: `/test data model & migrations`
 - [ ] Review it (fresh model): `/check review data model & migrations`
-- [ ] Document it: `/document data model & migrations`
+- [x] Document it: `/document data model & migrations`
 Spec [0002](../specs/0002-data-model-and-migrations/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/`, `drizzle/`, `src/lib/id.ts`, `src/lib/money.ts`, `src/lib/scrub.ts`, `scripts/db-schema-assert.ts`, `scripts/db-seed.ts`, `.github/workflows/migrate.yml`, `vercel.json`
 
 ### 4. Tenant scoping data access layer · needs a decision
