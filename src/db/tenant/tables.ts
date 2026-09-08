@@ -178,5 +178,5 @@ export function clientPredicate(
 
 /** Whether a contact context can reach this table at all. */
 export function isContactTableKey(key: string): key is ContactTableKey {
-  return key in CLIENT_PREDICATES;
+  return Object.hasOwn(CLIENT_PREDICATES, key);
 }
