@@ -65,6 +65,24 @@ export {
 
 export { requireAdmin, requireStaff } from "./guards";
 
+/**
+ * Feature 6's two named provisioning doors. They write the three identity
+ * tables, which are not tenant scoped and so cannot go through `tenantDb()`.
+ * Narrower than `withSystemAccess` in both the tables and the columns they
+ * touch, which is why they are exported here rather than fenced (spec 0005,
+ * AC-17).
+ */
+export { agencyProfile, type AgencyProfile } from "./organization";
+
+export {
+  createAgencyRows,
+  ensureMirrorRows,
+  suggestedSlug,
+  type MirrorIds,
+  type MirrorOrganization,
+  type MirrorUser,
+} from "./provisioning";
+
 export {
   TENANT_TABLE_KEYS,
   type ContactTable,

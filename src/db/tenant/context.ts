@@ -9,7 +9,7 @@
  * Resolution never writes. Creating a missing mirror row is feature 6's job,
  * which is why `no_mirror_row` is thrown rather than repaired.
  */
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import type { MembershipRole } from "../schema";
@@ -89,11 +89,21 @@ export async function resolveStaffContext(
   // One statement, both mirror rows. The two tables are unrelated, so this is
   // a deliberate cross join filtered on both Clerk ids: either both rows exist
   // and one row comes back, or none does.
+  //
+  // `deleted_at is null` amends this query for spec 0005, AC-14: a soft deleted
+  // organization is treated as absent rather than as a live tenant, so a
+  // `organization.deleted` webhook takes effect on the next request instead of
+  // leaving a tenant that resolves but should not.
   const [row] = await db
     .select({ orgId: organizations.id, userId: users.id })
     .from(organizations)
     .innerJoin(users, eq(users.clerkUserId, claims.clerkUserId))
-    .where(eq(organizations.clerkOrgId, claims.clerkOrgId))
+    .where(
+      and(
+        eq(organizations.clerkOrgId, claims.clerkOrgId),
+        isNull(organizations.deletedAt),
+      ),
+    )
     .limit(1);
 
   if (row === undefined) {
