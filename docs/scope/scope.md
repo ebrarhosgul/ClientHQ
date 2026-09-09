@@ -125,7 +125,7 @@ Sign up, sign in, create an agency organization, and land on a dashboard shell t
 - [ ] Test it: `/test agency sign in & organization`
 - [ ] Review it (fresh model): `/check review agency sign in & organization`
 - [ ] Document it: `/document agency sign in & organization`
-Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan` · code in `src/auth/`, `src/proxy.ts`, `src/app/(auth)/`, `src/app/portal/`, `src/app/(agency)/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/organization.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`, `src/app/globals.css`, `e2e/`
+Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0005-agency-sign-in-and-organization/verify.md) · code in `src/auth/`, `src/proxy.ts`, `src/app/(auth)/`, `src/app/portal/`, `src/app/(agency)/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/organization.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`, `src/app/globals.css`, `e2e/`
 
 _This is the row that discharges spec 0004's open hazard: `src/proxy.ts` leaves every route public today, and feature 7 must not start until this has narrowed it._
 
