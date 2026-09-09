@@ -112,6 +112,25 @@ test.describe("the agency shell", () => {
     ).toBeVisible();
   });
 
+  test("asks Clerk nothing about organizations while signed out", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard");
+    // Long enough for Clerk to load and for any hook it serves to settle.
+    await page.waitForTimeout(2000);
+
+    const stray = await page.evaluate(() => ({
+      clerkModals: document.querySelectorAll('[class*="cl-modal"]').length,
+      dialogs: document.querySelectorAll('[role="dialog"]').length,
+    }));
+
+    // `useOrganizationList` must not run for a visitor who has no
+    // organizations. When it does and the Clerk instance has Organizations
+    // switched off, Clerk puts a blocking modal over the whole page, which also
+    // swallows every click the rest of this suite tries to make.
+    expect(stray).toEqual({ clerkModals: 0, dialogs: 0 });
+  });
+
   test("lands a sidebar link whose feature has not shipped on a real page", async ({
     page,
   }) => {

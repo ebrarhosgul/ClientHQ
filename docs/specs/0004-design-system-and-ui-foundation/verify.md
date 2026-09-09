@@ -122,8 +122,23 @@ AC-18 holds exactly as written.
 
 - [ ] With no Clerk keys in `.env`, `/dashboard` renders the shell, shows Sign in where the switcher and user menu would be, and logs no error → AC-18, AC-22
 - [ ] Read `src/proxy.ts` → with no key it passes every request through; with a key it is `clerkMiddleware()` with every route public → AC-18
-- [ ] **With Clerk keys in `.env`**, `/dashboard` mounts `ClerkProvider`, and signed in the top bar shows the real agency name, the real agency list and the real user. This is the half of AC-22 the automated suite cannot reach → AC-18, AC-22
+- [x] **With Clerk keys in `.env`**, `/dashboard` mounts `ClerkProvider` and the response carries Clerk's `x-clerk-auth-status` header, so the proxy ran → AC-18
+- [x] Signed out with Clerk live, the shell renders, shows Sign in, opens no Clerk modal and asks Clerk nothing about organizations. Covered by `e2e/shell.spec.ts` → AC-18, AC-22
+- [ ] **Signed in**, the top bar shows the real agency name, the real agency list and the real user. Still open: there is no sign in surface until feature 6, and the Clerk instance needs its Organizations feature switched on first (see below) → AC-22
 - [ ] Read `src/lib/env.ts` → `clerkPublishableKey()` is the only `process.env` read outside `env()`, and it says in a comment why it has to be → AC-18
+
+### Clerk's Organizations feature has to be on
+
+`AgencySwitcher` calls `useOrganizationList`, which is how this product knows
+which agency you are acting as. On a Clerk instance with Organizations switched
+off, that hook makes Clerk put a blocking modal over the whole page saying
+"Organizations feature required". The build now only calls it for a signed in
+visitor, so a signed out page is unaffected either way, but feature 6 cannot
+work without the setting.
+
+- [x] Signed out, no Clerk modal appears and no `[role="dialog"]` is mounted. `e2e/shell.spec.ts` asserts this, because the modal also swallows every click the rest of the suite makes → AC-22
+- [ ] Turn Organizations on in the Clerk dashboard, then signed in, the switcher lists your agencies and selecting one changes the active organization → AC-22
+- [ ] Read `src/ui/shell/agency-switcher.tsx` → three layers, each guarding the hooks below it: Clerk configured, somebody signed in, then the organization calls. A hook cannot be called conditionally, so the split is the only way to stop `useOrganizationList` running for a visitor with no organizations → AC-22
 
 ### `--input` and `--border` are two values, not one
 

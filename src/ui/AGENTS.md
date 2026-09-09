@@ -87,6 +87,12 @@ corepack pnpm dev                        # then open /design
   the browser suite runs in CI with no provider credential. Set
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to see the real
   agency name and user menu.
+- **Never call a Clerk organization hook for a signed out visitor.**
+  `useOrganizationList` on an instance with the Organizations feature switched
+  off makes Clerk drop a blocking modal over the entire page, which also
+  swallows every click a test tries to make. `agency-switcher.tsx` guards it
+  behind two layers for exactly that reason, and `e2e/shell.spec.ts` asserts no
+  stray dialog is ever mounted.
 - **Two dev servers cannot share `.next`.** Running `pnpm dev` while
   `pnpm test:e2e` starts its own server on port 3100 makes the second one fail
   to boot. Stop one first.
