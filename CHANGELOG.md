@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Spec 0005: Agency sign in and organization, settling how a person gets into ClientHQ and how their agency comes into existence. Clerk's sign in and sign up components are mounted on the project's own routes and themed to spec 0004, the proxy narrows to protect everything except a short public list and routes unauthenticated requests to sign in, a person with no active organization lands on onboarding to activate an existing agency, pick one, accept a client contact portal invite, or create a new one, and the system repairs missing mirror rows lazily from the Clerk backend API when the resolver detects them (see spec 0005).
 - The database schema behind the whole product: eleven tables covering organizations, users, memberships, subscriptions, clients, client contacts, projects, deliverables, invoices, invoice line items and a webhook idempotency ledger, with their relations, in `src/db/schema/` (see spec 0002).
 - Structural tenant separation. Every tenant scoped table carries an `org_id` column that cannot be null and points at `organizations(id)`, and each of those tables has at least one index whose leading column is `org_id`. This is the column the multi tenant security model rests on.
 - One baseline migration in `drizzle/` that creates all eleven tables with their constraints and indexes against an empty database.
