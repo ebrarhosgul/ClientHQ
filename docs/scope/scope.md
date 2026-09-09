@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model & migrations | Foundation | in-progress |
 | 4 | Tenant scoping data access layer | Foundation | in-progress |
-| 5 | Design system & UI foundation | Foundation | planned |
+| 5 | Design system & UI foundation | Foundation | in-progress |
 | 6 | Agency sign in & organization | Slice 1 | planned |
 | 7 | Client records | Slice 1 | planned |
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | planned |
@@ -89,12 +89,23 @@ Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic b
 
 _This is the row that carries the most risk in the whole plan. Spec 0001 is explicit that this scoping fails open: one query that bypasses the helper leaks data across tenants and nothing in the database stops it._
 
-### 5. Design system & UI foundation · needs a decision · Beta
+### 5. Design system & UI foundation · in-progress · Beta
 The visual direction, layout primitives, the agency dashboard shell and the base components every screen is assembled from, accessible by default so each later screen inherits it rather than fixing it.
 **Done when:** `design.md` covers type, color, spacing and the component set, base components handle focus and keyboard properly, and the shell renders in the real app against WCAG 2.2 AA.
-- [ ] Design it (spec): `/architect design system & UI foundation`
+- [x] Design it (spec): `/architect design system & UI foundation`
+- [ ] Build it: `/develop design system & UI foundation`
+  - [ ] One thread end to end: Inter and JetBrains Mono, the full token layer in both themes, the contrast test that enforces it, the first primitive, the theme cookie round trip, the rebuilt entry page, and axe plus a browser job in CI · AC-2, AC-3, AC-5, AC-8, AC-9, AC-15, AC-17, AC-19, AC-23
+  - [ ] The primitives and the gallery: the core set in `src/ui/primitives/`, the form field wrapper, and `/design` showing every component in every state in both themes · AC-4, AC-13, AC-16, AC-19, AC-21
+  - [ ] The patterns: status chip, empty and error states, the responsive column priority table, the skeleton convention and the toast rules · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
+  - [ ] The shell and the real route: `ClerkProvider` and a deliberately permissive `src/proxy.ts`, the sidebar and top bar, the mobile sheet, and `/dashboard` rendering it · AC-6, AC-7, AC-18, AC-22, AC-23
+  - [ ] Write it down and prove the rest by hand: `design.md`, `src/ui/AGENTS.md`, and the manual accessibility pass · AC-1, AC-5, AC-20, AC-21
+- [ ] Verify it: `/check verify design system & UI foundation`
+- [ ] Test it: `/test design system & UI foundation`
+Spec [0004](../specs/0004-design-system-and-ui-foundation/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0004-design-system-and-ui-foundation/verify.md)
 
 _Spec 0001 asks for this explicitly, so `/develop` is not left inventing a look from shadcn defaults. Tagged `Beta`: verifying it renders and passes accessibility is the valuable part; a release note is not._
+
+_Spec 0004 pulls one thing forward from feature 6: it wires `ClerkProvider` and a `src/proxy.ts` that leaves every route public, so the shell shows a real agency name. **Feature 6 must narrow that matcher before feature 7 puts real client rows behind an agency route.**_
 
 ## Slice 1: Core loop (the walking skeleton)
 
@@ -200,6 +211,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up. Spec 0002 ships a guarded local seed script, which is most of the data work · needs a decision
 - **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper · from spec 0002 · needs a decision
 - **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision
+- **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
+- **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
