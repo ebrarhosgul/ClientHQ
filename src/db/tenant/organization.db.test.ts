@@ -23,7 +23,7 @@ import * as schema from "../schema";
 import { organizations } from "../schema";
 import type { StaffContext } from "./context";
 import type { TransactionExecutor } from "./executor";
-import { agencyProfile } from "./organization";
+import { agencyProfile, deletedOrganizationClerkIds } from "./organization";
 
 loadEnvFiles();
 
@@ -123,3 +123,51 @@ describe.skipIf(!url)("agencyProfile against real PostgreSQL", () => {
     });
   });
 });
+
+describe.skipIf(!url)(
+  "deletedOrganizationClerkIds against real PostgreSQL",
+  () => {
+    it(
+      "names only the soft deleted org, not a live one or one with no local " +
+        "row at all (AC-14)",
+      async () => {
+        await inRollback(async (tx) => {
+          const liveClerkId = clerkId("org");
+          const deletedClerkId = clerkId("org");
+          const unprovisionedClerkId = clerkId("org");
+
+          await tx.insert(organizations).values([
+            {
+              id: newId(),
+              clerkOrgId: liveClerkId,
+              name: "Live Agency",
+              slug: "live-agency",
+            },
+            {
+              id: newId(),
+              clerkOrgId: deletedClerkId,
+              name: "Doomed Agency",
+              slug: "doomed-agency",
+              deletedAt: new Date(),
+            },
+          ]);
+
+          await expect(
+            deletedOrganizationClerkIds(
+              [liveClerkId, deletedClerkId, unprovisionedClerkId],
+              tx,
+            ),
+          ).resolves.toEqual(new Set([deletedClerkId]));
+        });
+      },
+    );
+
+    it("returns nothing for an empty list without querying", async () => {
+      await inRollback(async (tx) => {
+        await expect(deletedOrganizationClerkIds([], tx)).resolves.toEqual(
+          new Set(),
+        );
+      });
+    });
+  },
+);

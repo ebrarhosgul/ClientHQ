@@ -72,7 +72,11 @@ export { requireAdmin, requireStaff } from "./guards";
  * touch, which is why they are exported here rather than fenced (spec 0005,
  * AC-17).
  */
-export { agencyProfile, type AgencyProfile } from "./organization";
+export {
+  agencyProfile,
+  deletedOrganizationClerkIds,
+  type AgencyProfile,
+} from "./organization";
 
 export {
   createAgencyRows,

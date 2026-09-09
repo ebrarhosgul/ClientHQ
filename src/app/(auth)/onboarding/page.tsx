@@ -8,7 +8,7 @@ import { AgencyPicker } from "@/auth/ui/agency-picker";
 import { AuthCard } from "@/auth/ui/auth-card";
 import { AuthUnavailable } from "@/auth/ui/auth-unavailable";
 import { CreateAgencyForm } from "@/auth/ui/create-agency-form";
-import { toMembershipRole } from "@/db/tenant";
+import { deletedOrganizationClerkIds, toMembershipRole } from "@/db/tenant";
 import { sessionClaims } from "@/db/tenant/session";
 import { isClerkConfigured } from "@/lib/env";
 
@@ -28,6 +28,13 @@ export const metadata: Metadata = {
  * local column is a display mirror that a missed webhook can leave stale. The
  * one place that matters most is right here, where a stale zero would offer to
  * create a second agency for someone who already has one.
+ *
+ * One local check still applies before a Clerk membership counts: an
+ * organization Clerk still lists but whose local mirror is soft deleted
+ * (AC-14) is dropped from the list first. Otherwise the single membership
+ * branch below would "welcome back" into it, `/dashboard` would resolve it as
+ * missing (the repair deliberately never clears `deleted_at`), and the person
+ * would bounce straight back here.
  *
  * This route needs a session and nothing more. It is outside the proxy's
  * organization check by construction (AC-20), because a person who has no
@@ -50,7 +57,13 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
 
-  const memberships = await agencyMemberships(clerkUserId);
+  const allMemberships = await agencyMemberships(clerkUserId);
+  const deletedClerkOrgIds = await deletedOrganizationClerkIds(
+    allMemberships.map((membership) => membership.clerkOrgId),
+  );
+  const memberships = allMemberships.filter(
+    (membership) => !deletedClerkOrgIds.has(membership.clerkOrgId),
+  );
   const [first] = memberships;
 
   if (first !== undefined && memberships.length === 1) {
