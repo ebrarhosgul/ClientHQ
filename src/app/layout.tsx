@@ -1,8 +1,11 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { isClerkConfigured } from "@/lib/env";
 import { Toaster } from "@/ui/primitives/sonner";
+import { IdentityProvider } from "@/ui/shell/identity";
 import { readStoredTheme, THEME_COOKIE } from "@/ui/theme";
 
 import "./globals.css";
@@ -44,6 +47,14 @@ export const metadata: Metadata = {
  */
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const theme = readStoredTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const clerkLive = isClerkConfigured();
+
+  const tree = (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
 
   return (
     <html
@@ -52,8 +63,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${jetBrainsMono.variable} h-full`}
     >
       <body className="flex min-h-full flex-col">
-        {children}
-        <Toaster />
+        {/*
+          Clerk wraps the whole tree so the shell's client components can read
+          identity through its hooks. Spec 0003 keeps the server side `auth()`
+          in exactly one file, and the chrome never touches it (invariant 2).
+
+          Only when there is a publishable key: `ClerkProvider` throws without
+          one, and the browser suite in CI deliberately runs with no provider
+          credential. `IdentityProvider` carries the answer down so the shell
+          renders its signed out state instead of crashing.
+        */}
+        <IdentityProvider clerkLive={clerkLive}>
+          {clerkLive ? <ClerkProvider>{tree}</ClerkProvider> : tree}
+        </IdentityProvider>
       </body>
     </html>
   );
