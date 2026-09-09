@@ -93,15 +93,15 @@ _This is the row that carries the most risk in the whole plan. Spec 0001 is expl
 The visual direction, layout primitives, the agency dashboard shell and the base components every screen is assembled from, accessible by default so each later screen inherits it rather than fixing it.
 **Done when:** `design.md` covers type, color, spacing and the component set, base components handle focus and keyboard properly, and the shell renders in the real app against WCAG 2.2 AA.
 - [x] Design it (spec): `/architect design system & UI foundation`
-- [ ] Build it: `/develop design system & UI foundation`
-  - [ ] One thread end to end: Inter and JetBrains Mono, the full token layer in both themes, the contrast test that enforces it, the first primitive, the theme cookie round trip, the rebuilt entry page, and axe plus a browser job in CI · AC-2, AC-3, AC-5, AC-8, AC-9, AC-15, AC-17, AC-19, AC-23
-  - [ ] The primitives and the gallery: the core set in `src/ui/primitives/`, the form field wrapper, and `/design` showing every component in every state in both themes · AC-4, AC-13, AC-16, AC-19, AC-21
-  - [ ] The patterns: status chip, empty and error states, the responsive column priority table, the skeleton convention and the toast rules · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
-  - [ ] The shell and the real route: `ClerkProvider` and a deliberately permissive `src/proxy.ts`, the sidebar and top bar, the mobile sheet, and `/dashboard` rendering it · AC-6, AC-7, AC-18, AC-22, AC-23
-  - [ ] Write it down and prove the rest by hand: `design.md`, `src/ui/AGENTS.md`, and the manual accessibility pass · AC-1, AC-5, AC-20, AC-21
+- [x] Build it: `/develop design system & UI foundation`
+  - [x] One thread end to end: Inter and JetBrains Mono, the full token layer in both themes, the contrast test that enforces it, the first primitive, the theme cookie round trip, the rebuilt entry page, and axe plus a browser job in CI · AC-2, AC-3, AC-5, AC-8, AC-9, AC-15, AC-17, AC-19, AC-23
+  - [x] The primitives and the gallery: the core set in `src/ui/primitives/`, the form field wrapper, and `/design` showing every component in every state in both themes · AC-4, AC-13, AC-16, AC-19, AC-21
+  - [x] The patterns: status chip, empty and error states, the responsive column priority table, the skeleton convention and the toast rules · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
+  - [x] The shell and the real route: `ClerkProvider` and a deliberately permissive `src/proxy.ts`, the sidebar and top bar, the mobile sheet, and `/dashboard` rendering it · AC-6, AC-7, AC-18, AC-22, AC-23
+  - [x] Write it down and prove the rest by hand: `design.md`, `src/ui/AGENTS.md`, and the manual accessibility pass · AC-1, AC-5, AC-20, AC-21 · the written parts landed; the manual keyboard and screen reader pass (spec task 27) is still open and belongs to `/check verify`
 - [ ] Verify it: `/check verify design system & UI foundation`
 - [ ] Test it: `/test design system & UI foundation`
-Spec [0004](../specs/0004-design-system-and-ui-foundation/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0004-design-system-and-ui-foundation/verify.md)
+Spec [0004](../specs/0004-design-system-and-ui-foundation/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0004-design-system-and-ui-foundation/verify.md) · design system in [design.md](../../design.md) · code in `src/ui/`, `src/app/globals.css`, `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/design/`, `src/app/(agency)/`, `src/proxy.ts`, `e2e/`, `components.json`, `.github/workflows/ci.yml`
 
 _Spec 0001 asks for this explicitly, so `/develop` is not left inventing a look from shadcn defaults. Tagged `Beta`: verifying it renders and passes accessibility is the valuable part; a release note is not._
 
