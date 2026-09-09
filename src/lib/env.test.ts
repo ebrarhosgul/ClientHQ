@@ -23,6 +23,13 @@ const VALID = {
   // Clerk claims, and Clerk picks these two up from the process environment.
   CLERK_SECRET_KEY: "sk_test_not_a_real_key",
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_not_a_real_key",
+  // Added by agency sign in & organization (spec 0005): Clerk's SDK reads these
+  // four itself, and they are declared so a missing one fails here rather than
+  // by sending someone to a route that does not exist.
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
+  NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: "/onboarding",
+  NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/onboarding",
 } as const;
 
 /**

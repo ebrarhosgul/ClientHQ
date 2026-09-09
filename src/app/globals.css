@@ -318,6 +318,43 @@
 }
 
 /**
+ * Clerk's own controls, brought up to this system's boundary contrast.
+ * Added by spec 0005 (AC-3, AC-18).
+ *
+ * `src/auth/ui/clerk-appearance.ts` points every Clerk colour at a token, which
+ * covers everything Clerk exposes as a variable. What it cannot reach is how
+ * Clerk draws a control's edge: a one pixel `box-shadow` in its border colour at
+ * 11 percent alpha, roughly 1.03:1 against the card. WCAG 1.4.11 puts a control
+ * boundary at 3:1, and this system carries `--input` for exactly that, measured
+ * against every surface it sits on, while `--border` is a quiet hairline with no
+ * floor ("Measured contrast" in design.md).
+ *
+ * Three details, each of which took a wrong turn first:
+ *
+ *  - Inside `@layer base`, not unlayered. Clerk sets these `!important` inside
+ *    its own layer, and for important declarations the layer order runs the
+ *    other way: the *earliest* layer wins and unlayered ranks last. So the one
+ *    place an unlayered rule cannot reach is precisely this one.
+ *  - A `border`, not a `box-shadow`. Clerk paints the focus ring into the same
+ *    box-shadow list, so overriding that property would delete the focus
+ *    indicator to fix a border. The controls carry `border-width: 0` and
+ *    `box-sizing: border-box`, so a real border costs no layout.
+ *  - `--input` rather than `--border`, because this is a control boundary and
+ *    not a divider.
+ *
+ * Clerk's own focus ring already lands on `--ring` through the appearance
+ * variables, so it is left alone.
+ */
+@layer base {
+  .cl-input,
+  .cl-selectButton,
+  .cl-otpCodeFieldInput,
+  .cl-socialButtonsBlockButton {
+    border: 1px solid var(--input) !important;
+  }
+}
+
+/**
  * The colour transition every control uses, and the reason it is not Tailwind's
  * `transition-colors`.
  *

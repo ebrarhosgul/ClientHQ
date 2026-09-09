@@ -37,6 +37,38 @@ const serverEnvSchema = z.object({
     .min(1, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required"),
 
   /**
+   * Feature 6, the sign in flow. Clerk's own SDK reads these four straight from
+   * `process.env`, so nothing in the project calls `env()` for them; they are
+   * declared here so a missing one fails with this project's message instead of
+   * sending someone to a route that does not exist (spec 0005, AC-19).
+   *
+   * The two URL variables have to agree with the routes under `src/app`, and
+   * both fallbacks point at `/onboarding`, which is what decides where a
+   * completed sign in or sign up actually lands.
+   */
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: z
+    .string()
+    .min(1, "NEXT_PUBLIC_CLERK_SIGN_IN_URL is required"),
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: z
+    .string()
+    .min(1, "NEXT_PUBLIC_CLERK_SIGN_UP_URL is required"),
+  NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z
+    .string()
+    .min(1, "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL is required"),
+  NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z
+    .string()
+    .min(1, "NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL is required"),
+
+  /**
+   * A dedicated user in the Clerk development instance, read only by the
+   * browser suite so it has a documented way past the sign in screen. Optional
+   * because nothing the application runs needs it, and CI deliberately runs the
+   * browser suite with no Clerk credentials at all.
+   */
+  E2E_CLERK_USER_USERNAME: z.string().min(1).optional(),
+  E2E_CLERK_USER_PASSWORD: z.string().min(1).optional(),
+
+  /**
    * Development only. A database host besides `localhost` that `pnpm db:seed`
    * may write to. Unset, the seed refuses every remote host.
    */
