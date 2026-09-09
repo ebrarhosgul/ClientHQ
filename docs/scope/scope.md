@@ -82,7 +82,7 @@ The single shared layer every read and write goes through, so no screen or actio
   - [x] The full write path: role guards, declared revalidation, opt in transactions, the reserved slots for features 9 and 19, and the refusal log · AC-10, AC-11, AC-14, AC-15
   - [x] The fence and the proof on every push: named system access for webhooks and cron, the narrowed ESLint exemptions with their test, and the tenancy suite running in CI · AC-12, AC-13, AC-16, AC-17
 - [x] Verify it: `/check verify tenant scoping data access layer`
-- [ ] Test it: `/test tenant scoping data access layer`
+- [x] Test it: `/test tenant scoping data access layer`
 - [ ] Review it (fresh model): `/check review tenant scoping data access layer`
 - [ ] Document it: `/document tenant scoping data access layer`
 Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/tenant/`, `src/lib/env.ts`, `src/db/client.ts`, `eslint.config.mjs`, `tools/eslint/`, `.github/workflows/ci.yml`
