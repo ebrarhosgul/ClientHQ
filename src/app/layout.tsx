@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { Toaster } from "@/ui/primitives/sonner";
 import { readStoredTheme, THEME_COOKIE } from "@/ui/theme";
 
 import "./globals.css";
@@ -50,7 +51,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       data-theme={theme}
       className={`${inter.variable} ${jetBrainsMono.variable} h-full`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

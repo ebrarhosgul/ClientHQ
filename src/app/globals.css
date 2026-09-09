@@ -11,10 +11,15 @@
  * its own explicit background and foreground pair.
  *
  * Three states, in this order, so the user's choice wins in both directions:
- *   1. the light palette on bare `:root`
+ *   1. the light palette on bare `:root`, and on any `[data-theme="light"]`
  *   2. the dark palette in `@media (prefers-color-scheme: dark)`, guarded so an
  *      explicit light choice is not overridden by the operating system
- *   3. the dark palette again on `:root[data-theme="dark"]`
+ *   3. the dark palette again on any `[data-theme="dark"]`
+ *
+ * The two explicit blocks are attribute selectors rather than `:root[...]` so
+ * that a *nested* element can carry a theme too. That is what lets `/design`
+ * put both palettes on one screen side by side (AC-16); on the real pages the
+ * attribute only ever appears on `<html>`.
  *
  * Blocks 2 and 3 must declare the same pairs. `src/ui/contrast.test.ts` reads
  * this file, measures every text pair in both themes, and fails if the two dark
@@ -23,7 +28,8 @@
  */
 
 /* tokens:light */
-:root {
+:root,
+[data-theme="light"] {
   --radius: 0.375rem;
 
   --background: oklch(0.994 0.002 70);
@@ -65,6 +71,8 @@
 
   --info: oklch(0.52 0.13 250);
   --info-foreground: oklch(0.99 0.01 250);
+
+  --overlay: oklch(0.22 0.008 70 / 0.5);
 
   --chip-neutral: oklch(0.955 0.004 70);
   --chip-neutral-foreground: oklch(0.38 0.01 70);
@@ -121,6 +129,10 @@
     --info: oklch(0.7 0.13 250);
     --info-foreground: oklch(0.18 0.03 250);
 
+    --overlay: oklch(0.12 0.005 70 / 0.65);
+
+    --overlay: oklch(0.12 0.005 70 / 0.65);
+
     --chip-neutral: oklch(0.28 0.007 70);
     --chip-neutral-foreground: oklch(0.82 0.008 70);
     --chip-info: oklch(0.28 0.045 250);
@@ -135,7 +147,7 @@
 }
 
 /* tokens:dark-explicit */
-:root[data-theme="dark"] {
+[data-theme="dark"] {
   --background: oklch(0.175 0.006 70);
   --foreground: oklch(0.945 0.004 70);
 
@@ -175,6 +187,8 @@
 
   --info: oklch(0.7 0.13 250);
   --info-foreground: oklch(0.18 0.03 250);
+
+  --overlay: oklch(0.12 0.005 70 / 0.65);
 
   --chip-neutral: oklch(0.28 0.007 70);
   --chip-neutral-foreground: oklch(0.82 0.008 70);
@@ -238,6 +252,8 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+
+  --color-overlay: var(--overlay);
 
   --color-chip-neutral: var(--chip-neutral);
   --color-chip-neutral-foreground: var(--chip-neutral-foreground);

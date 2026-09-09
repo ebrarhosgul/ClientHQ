@@ -246,6 +246,14 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   shapePair("input border on the page", "--input", "--background"),
   shapePair("input border on a card", "--input", "--card"),
   shapePair("input border on a muted panel", "--input", "--muted"),
+  // Control states, which WCAG 1.4.11 covers the same way as an input border:
+  // the switch thumb against each track, and a ticked checkbox against the
+  // surface it sits on, are the only thing showing what the control is set to.
+  shapePair("switch thumb on the off track", "--background", "--input"),
+  shapePair("switch thumb on the on track", "--background", "--primary"),
+  shapePair("ticked checkbox on the page", "--primary", "--background"),
+  shapePair("ticked checkbox on a card", "--primary", "--card"),
+
   decorativePair("separator on the page", "--border", "--background"),
   decorativePair("separator on a card", "--border", "--card"),
 ];
