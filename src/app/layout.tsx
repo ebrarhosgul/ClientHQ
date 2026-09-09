@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+
+import { readStoredTheme, THEME_COOKIE } from "@/ui/theme";
+
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetBrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -21,13 +27,30 @@ export const metadata: Metadata = {
     "A portal where agencies manage their clients, projects, deliverables and invoices.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * The document.
+ *
+ * The theme is decided here, on the server, and painted in the first frame.
+ * There is no blocking script and no client side flash: when the cookie says
+ * light or dark, `data-theme` is stamped and the matching block in
+ * `globals.css` wins; when there is no cookie, nothing is stamped and the
+ * `prefers-color-scheme` block decides, so changing the operating system
+ * setting changes the page with no reload (AC-8, AC-9).
+ *
+ * Reading a cookie makes every route dynamic. Spec 0004 accepts that: the whole
+ * product sits behind a session anyway, so there was nothing to render at build
+ * time.
+ */
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = readStoredTheme((await cookies()).get(THEME_COOKIE)?.value);
+
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-theme={theme}
+      className={`${inter.variable} ${jetBrainsMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

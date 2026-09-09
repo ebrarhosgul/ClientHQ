@@ -1,9 +1,11 @@
 # The gate every push and pull request goes through.
 #
-# Two jobs. The first runs what the pre-commit hook runs locally plus the unit
+# Three jobs. The first runs what the pre-commit hook runs locally plus the unit
 # tests and the migration drift check: format, lint, typecheck, tests,
 # migrations. The second applies every migration from empty to a throwaway
-# PostgreSQL container and asserts the resulting schema matches spec 0002.
+# PostgreSQL container and asserts the resulting schema matches spec 0002. The
+# third runs the browser suite, which is where axe sees the application as it is
+# actually painted (spec 0004, AC-19).
 # Neither needs a provider credential, which is deliberate: a check that needs
 # a secret cannot run on a fork's pull request. The container's password below
 # is not a secret, it lives for the length of the job.
@@ -135,3 +137,46 @@ jobs:
       # This test is skipped without a database, so it runs here, not above.
       - name: Check the TypeScript rounding agrees with PostgreSQL
         run: pnpm vitest run src/lib/money.db.test.ts
+
+  # The browser half of the accessibility proof. The two jobs above run no
+  # browser, so without this the Playwright side of spec 0004's AC-19 would
+  # never run on a push and the suite would rot unnoticed.
+  #
+  # It needs no provider credential: `/` renders without a database and without
+  # a Clerk session, and the shell degrades to its signed out state.
+  browser:
+    name: Browser suite and axe
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Chromium only. The suite checks semantics, contrast and layout, none of
+      # which differ enough between engines to pay for three browsers on every
+      # push.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End to end tests
+        run: pnpm test:e2e
+
+      - name: Keep the report from a failed run
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
