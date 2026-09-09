@@ -8,6 +8,15 @@ const baseURL = `http://localhost:${PORT}`;
 // Read by the global setup, which runs before any fixture exists.
 process.env.PLAYWRIGHT_BASE_URL = baseURL;
 
+/** `process.env` with the unset entries dropped, which is the shape Playwright wants. */
+function definedEnv(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
+  );
+}
+
 /**
  * End to end tests, run against the real application.
  *
@@ -44,5 +53,30 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    /**
+     * No Clerk credentials, deliberately, so a local run behaves exactly like
+     * CI's browser job, which has none at all.
+     *
+     * Spec 0005 narrowed `src/proxy.ts` to require a session on everything
+     * outside a short public list, and without a publishable key that proxy is a
+     * pass through (see `src/lib/env.ts`). That is what keeps `/dashboard`,
+     * `/design` and the rest reachable here. With the keys a developer has in
+     * their own `.env`, every one of those routes would redirect to `/sign-in`
+     * and the suite would go red on their machine and stay green on CI, which is
+     * the worst of both.
+     *
+     * Blanking rather than removing: `next dev` reads `.env` itself, and its
+     * loader leaves a variable already present in the environment alone.
+     *
+     * Signing the suite in properly, with Clerk testing tokens and the
+     * `E2E_CLERK_USER_*` pair, is specified in spec 0005 and belongs to `/test`.
+     */
+    env: {
+      // Spread, because Playwright *replaces* the environment rather than
+      // merging into it, and the command needs PATH to find pnpm at all.
+      ...definedEnv(),
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
+      CLERK_SECRET_KEY: "",
+    },
   },
 });
