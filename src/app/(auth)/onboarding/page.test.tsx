@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   isClerkConfigured: vi.fn(),
   claims: { clerkUserId: "user_1" as string | undefined },
   agencyMemberships: vi.fn(),
+  deletedOrganizationClerkIds: vi.fn(),
   isClientContact: vi.fn(),
   redirected: [] as string[],
 }));
@@ -47,6 +48,7 @@ vi.mock("@/auth/context", () => ({
 vi.mock("@/db/tenant", () => ({
   toMembershipRole: (role: string | undefined) =>
     role === "org:admin" ? "admin" : "member",
+  deletedOrganizationClerkIds: mocks.deletedOrganizationClerkIds,
 }));
 
 vi.mock("@/auth/ui/activate-agency", () => ({
@@ -89,6 +91,7 @@ beforeEach(() => {
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.claims = { clerkUserId: "user_1" };
   mocks.agencyMemberships.mockResolvedValue([]);
+  mocks.deletedOrganizationClerkIds.mockResolvedValue(new Set());
   mocks.isClientContact.mockResolvedValue(false);
 });
 
@@ -120,6 +123,24 @@ describe("OnboardingPage", () => {
       "Northwind:org_1",
     );
     expect(screen.queryByTestId("agency-picker")).not.toBeInTheDocument();
+  });
+
+  it("does not welcome back into a membership whose local mirror is soft deleted (AC-14)", async () => {
+    // Regression: Clerk still lists the membership after the local
+    // `organizations` row is soft deleted, and `repairMirror()` deliberately
+    // never clears `deleted_at`. Auto activating here used to send the person
+    // to `/dashboard`, which resolved the org as missing and bounced them
+    // straight back, looping forever.
+    mocks.agencyMemberships.mockResolvedValue([
+      { clerkOrgId: "org_1", name: "Doomed Agency", clerkOrgRole: "org:admin" },
+    ]);
+    mocks.deletedOrganizationClerkIds.mockResolvedValue(new Set(["org_1"]));
+
+    await renderPage();
+
+    expect(screen.queryByTestId("activate-agency")).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-agency-form")).toBeInTheDocument();
+    expect(mocks.deletedOrganizationClerkIds).toHaveBeenCalledWith(["org_1"]);
   });
 
   it("offers a picker naming each role when there is more than one (AC-6)", async () => {

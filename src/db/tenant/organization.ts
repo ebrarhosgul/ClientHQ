@@ -13,7 +13,7 @@
  * the organization is right there in the call, resolved from the Clerk session,
  * never worked out by the query itself.
  */
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { organizations } from "../schema";
 import type { StaffContext } from "./context";
@@ -53,4 +53,38 @@ export async function agencyProfile(
     .limit(1);
 
   return row;
+}
+
+/**
+ * Which of these Clerk organization ids are soft deleted locally.
+ *
+ * Read by `/onboarding` before it decides whether a Clerk membership auto
+ * activates (AC-6): Clerk can still list an organization whose local mirror
+ * was soft deleted (AC-14), and `repairMirror()` deliberately never clears
+ * `deleted_at` (see `provisioning.ts`), so activating one and landing on
+ * `/dashboard` would resolve as missing and bounce straight back here. An id
+ * with no local row at all (never provisioned, or not yet repaired) is not
+ * included, since that is the ordinary first repair, not a deletion.
+ */
+export async function deletedOrganizationClerkIds(
+  clerkOrgIds: readonly string[],
+  executor?: Executor,
+): Promise<ReadonlySet<string>> {
+  if (clerkOrgIds.length === 0) {
+    return new Set();
+  }
+
+  const db = executor ?? (await pooledDb());
+
+  const rows = await db
+    .select({ clerkOrgId: organizations.clerkOrgId })
+    .from(organizations)
+    .where(
+      and(
+        inArray(organizations.clerkOrgId, clerkOrgIds),
+        isNotNull(organizations.deletedAt),
+      ),
+    );
+
+  return new Set(rows.map((row) => row.clerkOrgId));
 }
