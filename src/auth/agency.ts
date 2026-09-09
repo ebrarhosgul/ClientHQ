@@ -20,6 +20,7 @@ import { flattenError, z } from "zod";
 
 import {
   createAgencyRows,
+  deletedOrganizationClerkIds,
   failure,
   ok,
   suggestedSlug,
@@ -99,7 +100,18 @@ export async function createAgency(
     // the membership its first attempt created and activates that agency
     // instead of minting a second one. Read from Clerk, never from the local
     // `memberships` table, which may not have been written yet.
-    const [existing] = await agencyMemberships(clerkUserId);
+    //
+    // A membership Clerk still lists but whose local mirror is soft deleted
+    // (AC-14) does not count as existing, the same amendment `/onboarding`
+    // makes: `repairMirror()` never clears `deleted_at`, so activating it
+    // would resolve as missing on `/dashboard` and bounce back here forever.
+    const memberships = await agencyMemberships(clerkUserId);
+    const deletedClerkOrgIds = await deletedOrganizationClerkIds(
+      memberships.map((membership) => membership.clerkOrgId),
+    );
+    const [existing] = memberships.filter(
+      (membership) => !deletedClerkOrgIds.has(membership.clerkOrgId),
+    );
 
     if (existing !== undefined) {
       return { kind: "existing" as const, clerkOrgId: existing.clerkOrgId };
