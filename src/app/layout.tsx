@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { clerkAppearance } from "@/auth/ui/clerk-appearance";
 import { isClerkConfigured } from "@/lib/env";
 import { Toaster } from "@/ui/primitives/sonner";
 import { IdentityProvider } from "@/ui/shell/identity";
@@ -72,9 +73,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           one, and the browser suite in CI deliberately runs with no provider
           credential. `IdentityProvider` carries the answer down so the shell
           renders its signed out state instead of crashing.
+
+          The appearance is set here rather than on each component so every
+          Clerk surface, including ones later features mount, wears this
+          product's tokens without being told to (spec 0005, AC-3).
         */}
         <IdentityProvider clerkLive={clerkLive}>
-          {clerkLive ? <ClerkProvider>{tree}</ClerkProvider> : tree}
+          {clerkLive ? (
+            <ClerkProvider appearance={clerkAppearance}>{tree}</ClerkProvider>
+          ) : (
+            tree
+          )}
         </IdentityProvider>
       </body>
     </html>
