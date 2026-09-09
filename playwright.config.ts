@@ -26,7 +26,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "list",
+  // On CI, the GitHub reporter annotates the diff and the HTML report is
+  // uploaded as an artifact when the run fails, so a red build can be read
+  // without rerunning it locally.
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   // The dev server compiles a route the first time it is asked for it, which
   // can outrun the default on a cold start.
   timeout: 60_000,

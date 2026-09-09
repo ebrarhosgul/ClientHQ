@@ -5,9 +5,12 @@ import { expect, test } from "@playwright/test";
  *
  * Spec 0001's "done when" for this feature is that the scaffold boots, serves a
  * page, and can reach the database. These specs check exactly that and no more.
- * The page is a placeholder feature 5 replaces, so the assertions stay on
- * structure and on the health route's contract, both of which outlive the
- * current wording.
+ *
+ * Feature 5 has now replaced the placeholder page, so two of these moved with
+ * it: the font variable is Inter's rather than Geist's, and the health route is
+ * reached directly rather than through a link the entry card no longer carries.
+ * What the entry page itself must hold is checked in `accessibility.spec.ts`,
+ * against spec 0004.
  */
 
 test.describe("the entry page", () => {
@@ -38,13 +41,13 @@ test.describe("the entry page", () => {
   }) => {
     await page.goto("/");
 
-    // Deliberately not a check on a particular weight or colour: the visual
-    // direction is feature 5's to settle. What has to hold today is that the
-    // Tailwind pipeline runs at all and the font variables reach the document.
+    // Still not a check on a particular weight or colour: those belong to spec
+    // 0004's own suite. What has to hold here is that the Tailwind pipeline
+    // runs at all and the font variables reach the document.
     const styling = await page.evaluate(() => ({
       sheets: document.styleSheets.length,
       fontVariable: getComputedStyle(document.documentElement).getPropertyValue(
-        "--font-geist-sans",
+        "--font-inter",
       ),
     }));
 
@@ -88,19 +91,14 @@ test.describe("the entry page", () => {
     expect(overflows).toBe(false);
   });
 
-  test("reaches the health check from the link on the page", async ({
+  test("still serves the health check, which the entry page no longer links", async ({
     page,
   }) => {
-    await page.goto("/");
+    // Spec 0004 pins what `/` holds, and an operational health link is not on
+    // it. The route is unchanged and is still reachable on its own.
+    const response = await page.goto("/api/health/db");
 
-    // Wait on the navigation the click starts, rather than on the click alone:
-    // otherwise the URL is read before the browser has committed the new page.
-    await Promise.all([
-      page.waitForURL(/\/api\/health\/db$/),
-      page.getByRole("link", { name: "/api/health/db" }).click(),
-    ]);
-
-    await expect(page).toHaveURL(/\/api\/health\/db$/);
+    expect([200, 503]).toContain(response?.status());
   });
 });
 

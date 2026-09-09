@@ -1,7 +1,7 @@
 # 0004. Design system and UI foundation
 
 **Date**: 2026-09-09
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -263,45 +263,45 @@ Tracer Bullet, so the first slice runs the whole chain thin: one token layer, on
 
 **Milestone 1: one thread end to end**
 
-1. Install the dependencies above and run the shadcn tool's initialisation, pointing its aliases at `src/ui/primitives` and `src/ui/lib`, so `components.json` matches the chosen layout rather than the default, satisfies **AC-3**
-2. Swap the fonts in `src/app/layout.tsx` to Inter and JetBrains Mono through `next/font/google`, and replace the starter tokens in `src/app/globals.css` with the full palette for both themes plus the spacing, radius, and status tokens, in the three state pattern above, satisfies **AC-2**, **AC-3**
-3. Write `src/ui/contrast.ts` and `src/ui/contrast.test.ts`: read the token declarations out of `globals.css`, convert with `culori`, and assert 4.5:1 on every text pair in both themes and 3:1 on the focus ring and on meaningful borders. Adjust the palette until it passes; the test is authoritative, not the drafted values, satisfies **AC-2**
-4. Generate the `button` primitive, convert it to named exports, and give it every state including a pending state driven by `useFormStatus`, satisfies **AC-4**
-5. Add the reduced motion rule and the focus visible ring rule to `globals.css` as global rules, so no component has to remember them, satisfies **AC-5**, **AC-15**
-6. Build `setThemeAction` (Zod parsed, `Result` returning, cookie writing) and the `ThemeControl` pattern as a form that posts to it, working without JavaScript. Read the cookie in the root layout and stamp `data-theme`, satisfies **AC-8**, **AC-9**
-7. Rebuild `src/app/page.tsx` as the entry card on the real tokens, with Sign in linking to `/sign-in` and Create an agency linking to `/sign-up`, the exact paths feature 6 must then use, plus the theme control, satisfies **AC-17**, **AC-23**
-8. Add the axe helper for Vitest (`src/ui/test/axe.ts`) and an `@axe-core/playwright` check in `e2e/`, both configured with the same rule tags (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), pointed at what exists so far in both themes, satisfies **AC-19**
-9. Add a third job to `.github/workflows/ci.yml` for the browser suite: `pnpm exec playwright install --with-deps chromium` then `pnpm test:e2e`. The two existing jobs run no browser, so without this the Playwright half of AC-19 never runs on a push, satisfies **AC-19**
-10. Update the two tests this slice breaks: `src/app/layout.test.tsx` mocks `Geist` and asserts `--font-geist-sans`, and `src/app/page.test.tsx` asserts the `/api/health/db` link and the Foundation region that the new entry card removes. Change them alongside the code, not afterwards, satisfies **AC-17**
+1. [x] Install the dependencies above and run the shadcn tool's initialisation, pointing its aliases at `src/ui/primitives` and `src/ui/lib`, so `components.json` matches the chosen layout rather than the default, satisfies **AC-3**
+2. [x] Swap the fonts in `src/app/layout.tsx` to Inter and JetBrains Mono through `next/font/google`, and replace the starter tokens in `src/app/globals.css` with the full palette for both themes plus the spacing, radius, and status tokens, in the three state pattern above, satisfies **AC-2**, **AC-3**
+3. [x] Write `src/ui/contrast.ts` and `src/ui/contrast.test.ts`: read the token declarations out of `globals.css`, convert with `culori`, and assert 4.5:1 on every text pair in both themes and 3:1 on the focus ring and on meaningful borders. Adjust the palette until it passes; the test is authoritative, not the drafted values, satisfies **AC-2**
+4. [x] Generate the `button` primitive, convert it to named exports, and give it every state including a pending state driven by `useFormStatus`, satisfies **AC-4**
+5. [x] Add the reduced motion rule and the focus visible ring rule to `globals.css` as global rules, so no component has to remember them, satisfies **AC-5**, **AC-15**
+6. [x] Build `setThemeAction` (Zod parsed, `Result` returning, cookie writing) and the `ThemeControl` pattern as a form that posts to it, working without JavaScript. Read the cookie in the root layout and stamp `data-theme`, satisfies **AC-8**, **AC-9**
+7. [x] Rebuild `src/app/page.tsx` as the entry card on the real tokens, with Sign in linking to `/sign-in` and Create an agency linking to `/sign-up`, the exact paths feature 6 must then use, plus the theme control, satisfies **AC-17**, **AC-23**
+8. [x] Add the axe helper for Vitest (`src/ui/test/axe.ts`) and an `@axe-core/playwright` check in `e2e/`, both configured with the same rule tags (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), pointed at what exists so far in both themes, satisfies **AC-19**
+9. [x] Add a third job to `.github/workflows/ci.yml` for the browser suite: `pnpm exec playwright install --with-deps chromium` then `pnpm test:e2e`. The two existing jobs run no browser, so without this the Playwright half of AC-19 never runs on a push, satisfies **AC-19**
+10. [x] Update the two tests this slice breaks: `src/app/layout.test.tsx` mocks `Geist` and asserts `--font-geist-sans`, and `src/app/page.test.tsx` asserts the `/api/health/db` link and the Foundation region that the new entry card removes. Change them alongside the code, not afterwards, satisfies **AC-17**
 
 **Milestone 2: the primitives and the gallery**
 
-11. Generate the rest of the core set into `src/ui/primitives/`: `input`, `textarea`, `label`, `select`, `checkbox`, `switch`, `card`, `badge`, `table`, `dialog`, `sheet`, `dropdown-menu`, `alert`, `skeleton`, `tooltip`, `separator`, `avatar`, `breadcrumb`, `pagination`, plus the `sonner` toaster host. Convert each to named exports and check each state applies, satisfies **AC-4**
-12. Build the `field` wrapper: label, control, optional description, error slot, wiring `aria-invalid` and `aria-describedby` from a `Result` field error, satisfies **AC-13**
-13. Build `/design` as a gallery of every primitive in every state, in both themes side by side, returning `notFound()` in production, satisfies **AC-16**
-14. Point both axe suites at `/design` and at each primitive, and add a target size check on the densest example, satisfies **AC-19**, **AC-21**
+11. [x] Generate the rest of the core set into `src/ui/primitives/`: `input`, `textarea`, `label`, `select`, `checkbox`, `switch`, `card`, `badge`, `table`, `dialog`, `sheet`, `dropdown-menu`, `alert`, `skeleton`, `tooltip`, `separator`, `avatar`, `breadcrumb`, `pagination`, plus the `sonner` toaster host. Convert each to named exports and check each state applies, satisfies **AC-4**
+12. [x] Build the `field` wrapper: label, control, optional description, error slot, wiring `aria-invalid` and `aria-describedby` from a `Result` field error, satisfies **AC-13**
+13. [x] Build `/design` as a gallery of every primitive in every state, in both themes side by side, returning `notFound()` in production, satisfies **AC-16**
+14. [x] Point both axe suites at `/design` and at each primitive, and add a target size check on the densest example, satisfies **AC-19**, **AC-21**
 
 **Milestone 3: the patterns**
 
-15. `status-chip`: the word plus a tint, with the full map for invoices, projects and deliverables taken from the real schema enums, plus the subscription access levels marked provisional in a comment naming feature 9 as their owner, satisfies **AC-11**
-16. `empty-state` and `error-state`, plus `error-messages.ts` mapping the closed `ACTION_ERROR_CODES` to plain sentences, then wire `error.tsx`, `not-found.tsx` and `global-error.tsx` to the error state. `global-error.tsx` supplies its own `html` and `body`, imports `globals.css` directly, stamps no theme, and uses the system font stack, because the root layout has not run when it renders, satisfies **AC-12**
-17. The `data-table` pattern over the `table` primitive: each column declares `priority: "high" | "low"`, low priority columns are removed from both the layout and the accessibility tree below `md`, and the row is made clickable by the stretched link technique in invariant 12 rather than by wrapping the row. Ship a fixture column set on `/design` shaped like a real invoice list (invoice number, client, amount and status high; issued date and created by low) so the behaviour is provable before feature 13 exists. Prove it at 320px, satisfies **AC-10**, **AC-21**
-18. The skeleton convention: a skeleton variant exported beside each component it stands in for, plus the `Suspense` and `loading.tsx` rules and the busy announcement, satisfies **AC-14**
-19. Mount the toaster host in the root layout and settle the toast rules: outcome only, dismissible, never the sole home of an error, satisfies **AC-13**
+15. [x] `status-chip`: the word plus a tint, with the full map for invoices, projects and deliverables taken from the real schema enums, plus the subscription access levels marked provisional in a comment naming feature 9 as their owner, satisfies **AC-11**
+16. [x] `empty-state` and `error-state`, plus `error-messages.ts` mapping the closed `ACTION_ERROR_CODES` to plain sentences, then wire `error.tsx`, `not-found.tsx` and `global-error.tsx` to the error state. `global-error.tsx` supplies its own `html` and `body`, imports `globals.css` directly, stamps no theme, and uses the system font stack, because the root layout has not run when it renders, satisfies **AC-12**
+17. [x] The `data-table` pattern over the `table` primitive: each column declares `priority: "high" | "low"`, low priority columns are removed from both the layout and the accessibility tree below `md`, and the row is made clickable by the stretched link technique in invariant 12 rather than by wrapping the row. Ship a fixture column set on `/design` shaped like a real invoice list (invoice number, client, amount and status high; issued date and created by low) so the behaviour is provable before feature 13 exists. Prove it at 320px, satisfies **AC-10**, **AC-21**
+18. [x] The skeleton convention: a skeleton variant exported beside each component it stands in for, plus the `Suspense` and `loading.tsx` rules and the busy announcement, satisfies **AC-14**
+19. [x] Mount the toaster host in the root layout and settle the toast rules: outcome only, dismissible, never the sole home of an error, satisfies **AC-13**
 
 **Milestone 4: the shell and the real route**
 
-20. Wrap the app in `ClerkProvider` and add `src/proxy.ts` (the Next.js 16 name for what used to be `middleware.ts`) containing `export default clerkMiddleware()` with every route public, carrying a comment naming feature 6 as the owner of the matcher, satisfies **AC-18**
-21. Build `src/ui/shell/`: `app-shell`, `skip-link`, `sidebar-nav` with both groups, `aria-current` and the pinned paths from AC-23, `top-bar` with the breadcrumb slot and theme control, `agency-switcher` and `user-menu` as client components on Clerk's hooks with a skeleton while loading and a sign in prompt when signed out, satisfies **AC-6**, **AC-22**, **AC-23**
-22. Add the mobile sheet: labelled menu button below `md`, focus kept inside while open, `Escape` closes and returns focus, satisfies **AC-7**
-23. Create `src/app/(agency)/layout.tsx` rendering the shell, `src/app/(agency)/dashboard/page.tsx` with an empty dashboard body, and `src/app/(agency)/not-found.tsx` rendering the shared error state, so a sidebar link to a section that has not shipped yet lands on a proper page inside the shell rather than a bare 404. The route group keeps the flat paths spec 0001 fixed, satisfies **AC-22**, **AC-23**
-24. Point the Playwright axe suite at `/dashboard` in both themes, signed out, satisfies **AC-19**
+20. [x] Wrap the app in `ClerkProvider` and add `src/proxy.ts` (the Next.js 16 name for what used to be `middleware.ts`) containing `export default clerkMiddleware()` with every route public, carrying a comment naming feature 6 as the owner of the matcher, satisfies **AC-18**
+21. [x] Build `src/ui/shell/`: `app-shell`, `skip-link`, `sidebar-nav` with both groups, `aria-current` and the pinned paths from AC-23, `top-bar` with the breadcrumb slot and theme control, `agency-switcher` and `user-menu` as client components on Clerk's hooks with a skeleton while loading and a sign in prompt when signed out, satisfies **AC-6**, **AC-22**, **AC-23**
+22. [x] Add the mobile sheet: labelled menu button below `md`, focus kept inside while open, `Escape` closes and returns focus, satisfies **AC-7**
+23. [x] Create `src/app/(agency)/layout.tsx` rendering the shell, `src/app/(agency)/dashboard/page.tsx` with an empty dashboard body, and `src/app/(agency)/not-found.tsx` rendering the shared error state, so a sidebar link to a section that has not shipped yet lands on a proper page inside the shell rather than a bare 404. The route group keeps the flat paths spec 0001 fixed, satisfies **AC-22**, **AC-23**
+24. [x] Point the Playwright axe suite at `/dashboard` in both themes, signed out, satisfies **AC-19**
 
 **Milestone 5: write it down and prove the rest by hand**
 
-25. Write `design.md` at the repository root: the register and why, the type usage rules, both palettes with the ratios the contrast test computed, spacing and radius, the status tint map, every component and its states, the responsive rule, the accessibility rules, and the client portal chrome rules feature 15 builds to, satisfies **AC-1**
-26. Write `src/ui/AGENTS.md` as a thin pointer to `design.md` plus the area's own conventions and the relevant skills, satisfies **AC-1**
-27. Complete the manual pass in `verify.md`: keyboard, screen reader, zoom to 200 percent, 320px reflow, and each WCAG 2.2 addition, recording the result, satisfies **AC-5**, **AC-20**, **AC-21**
+25. [x] Write `design.md` at the repository root: the register and why, the type usage rules, both palettes with the ratios the contrast test computed, spacing and radius, the status tint map, every component and its states, the responsive rule, the accessibility rules, and the client portal chrome rules feature 15 builds to, satisfies **AC-1**
+26. [x] Write `src/ui/AGENTS.md` as a thin pointer to `design.md` plus the area's own conventions and the relevant skills, satisfies **AC-1**
+27. [ ] Complete the manual pass in `verify.md`: keyboard, screen reader, zoom to 200 percent, 320px reflow, and each WCAG 2.2 addition, recording the result, satisfies **AC-5**, **AC-20**, **AC-21**
 
 ## Consequences
 
