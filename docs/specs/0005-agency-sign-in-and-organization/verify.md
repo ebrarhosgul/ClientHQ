@@ -1,4 +1,4 @@
-# Verify: agency sign in & organization · spec 0005 · updated 2026-09-09
+# Verify: agency sign in & organization · spec 0005 · updated 2026-09-10
 
 _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
@@ -59,7 +59,21 @@ below the first heading is what nobody has walked yet.
       `provisioning.db.test.ts`, not repeated here with a second live account
 - [ ] Double click **Create agency**, or submit and immediately retry: exactly
       one Clerk organization exists afterwards, and the second attempt activates
-      rather than creating another → AC-9
+      rather than creating another → AC-9 · not walked live this session
+      (needs the one real Clerk account); the normal-membership case of this
+      guard is unit tested (`src/auth/agency.test.ts`, "activates the existing
+      agency instead of creating a second one"). The fresh model
+      `/check review` on 2026-09-10 found this same guard let a person with
+      only a soft-deleted membership through uncaught, dead-ending them on the
+      create form forever (no error, typed name lost each round). Fixed
+      2026-09-10 in `src/auth/agency.ts`: `createAgency()` now filters
+      `deletedOrganizationClerkIds()` out of the Clerk membership list the
+      same way `/onboarding` does, before deciding "existing" vs "create".
+      Three new cases in `src/auth/agency.test.ts` cover it (only membership
+      soft deleted → creates new; one of several soft deleted → picks the
+      surviving one; all soft deleted → creates new), run clean this session
+      (`corepack pnpm vitest run src/auth/agency.test.ts` → 13/13 passed) →
+      AC-9, AC-14
 
 ### The repair path
 
@@ -68,23 +82,20 @@ below the first heading is what nobody has walked yet.
       three rows are back, and you saw no redirect → AC-12
 - [x] Do it again and reload two browser tabs at the same moment: still exactly
       one row in each table → AC-13
-- [ ] Set `deleted_at` on your `organizations` row and reload `/dashboard` → you
+- [x] Set `deleted_at` on your `organizations` row and reload `/dashboard` → you
       land on `/onboarding` rather than on an error page, and the row is still
-      there → AC-14 · **FAILS as specced.** You do land on `/onboarding`, but
-      Clerk still reports one membership (only the local mirror was soft
-      deleted, which is all this step can do without also deleting the Clerk
-      organization), so `/onboarding` auto activates and sends you straight
-      back to `/dashboard`, which bounces you straight back to `/onboarding`.
-      An infinite redirect loop between the two, confirmed live and reproduced
-      twice. Root cause: `repairMirror()` in `src/auth/context.ts` deliberately
-      never clears `deleted_at` on repair (by design, per the comment in
-      `src/db/tenant/provisioning.ts`), so `/dashboard` correctly keeps
-      bouncing to `/onboarding`; but `/onboarding`
-      (`src/app/(auth)/onboarding/page.tsx`) decides its branch from Clerk's
-      live membership count alone, with nothing checking whether the
-      organization it is about to activate is the one that was just found
-      soft deleted. Clearing `deleted_at` restores normal behaviour
-      immediately, confirmed live. → `/debug`
+      there → AC-14 · **Resolved, re-checked 2026-09-10.** Fixed in `ed0088f`:
+      `deletedOrganizationClerkIds()` now filters Clerk's membership list
+      against the local mirror before `/onboarding` decides its branch, so a
+      soft deleted org falls through to create/join instead of auto
+      reactivating and bouncing back to `/dashboard`. Not re-walked live in a
+      browser this session (would need the one real Clerk account, and
+      nothing in this diff touches the Clerk-facing side of that path); the
+      evidence is `src/app/(auth)/onboarding/page.test.tsx` (the regression
+      case added in `ed0088f`) and `src/db/tenant/organization.db.test.ts`
+      (`deletedOrganizationClerkIds()` against real PostgreSQL), both run
+      clean this session (`corepack pnpm vitest run "src/app/(auth)/onboarding/page.test.tsx" src/db/tenant/organization.db.test.ts`
+      → 2 files, tests passed).
 - [ ] Delete the organization in the Clerk dashboard while signed in, then
       reload `/dashboard` → `/onboarding`, not an error page → AC-21 · not run,
       would delete the one real Clerk organization this session has
@@ -203,11 +214,48 @@ below the first heading is what nobody has walked yet.
   instead of a stable landing on `/onboarding`.** See the repair path section
   above for the root cause and the exact files. Route to `/debug`. Confirmed
   live, reproduced twice, resolved immediately by clearing `deleted_at`, so
-  nothing was left broken.
+  nothing was left broken. **Fixed in `ed0088f`, re-checked 2026-09-10 (see
+  below).**
 - Deleting only the local `memberships` row (org and user rows intact) is
   invisible to staff resolution and never gets repaired, because
   `resolveStaffContext()` does not read that table at all. Not a spec
   violation today; flagged for when feature 16 renders a member list from it.
+
+## Found by /check verify (2026-09-10)
+
+- **`ed0088f`'s AC-14 fix only closed the `/onboarding` ↔ `/dashboard` loop
+  on the read side; the fresh model `/check review` the same day found the
+  other half: `createAgency()`'s double-submit guard did the same Clerk
+  membership read with no soft-deleted filter, so a person whose only
+  membership is soft deleted locally could still get dead-ended, this time
+  from the create form (no error shown, typed name lost each round). Now
+  fixed** in `src/auth/agency.ts` (uncommitted at time of this check):
+  `createAgency()` filters `deletedOrganizationClerkIds()` before picking
+  `existing`, exactly mirroring the `/onboarding` fix. Confirmed by:
+  - `corepack pnpm typecheck` → clean
+  - `corepack pnpm lint` → clean
+  - `corepack pnpm vitest run src/auth/agency.test.ts` → 13/13 passed
+    (3 new cases for the soft-deleted-membership branches)
+  - `corepack pnpm test` (full suite) → 63 files / 1483 tests passed,
+    including the real-PostgreSQL integration suites
+    (`organization.db.test.ts`, `provisioning.db.test.ts`)
+  - `corepack pnpm build` → clean
+  - Live smoke check: signed out, `/dashboard` still redirects to `/sign-in`
+    rendering Clerk's card inside the ClientHQ frame ("Sign in to ClientHQ",
+    not "My Application"), theme toggle and Google/email options present —
+    no regression to the fence or front door from this change.
+  - Not walked live end to end in a browser (would need the one real Clerk
+    account and setting `deleted_at` mid-session); the underlying logic is
+    unit tested directly per the note under "Double click **Create agency**"
+    above. This is the same evidence standard this file already applies to
+    AC-10's slug-suffix case, which also relies on `provisioning.db.test.ts`
+    rather than a live second account.
+  - Four Minor findings and a handful of Nits from the same review (a
+    swallowed activation failure on `CreateAgencyForm`, a Playwright `env`
+    override that makes one e2e assertion unreachable, a discarded slug
+    computation on the repair's hot path, and the agency picker losing the
+    list on a failed pick) are **not** addressed by this diff and remain
+    open — see `docs/reviews/2026-09-10-feat-agency-sign-in-and-organization.md`.
 
 ## Still open from the build
 
