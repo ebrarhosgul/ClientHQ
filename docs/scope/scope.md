@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model & migrations | Foundation | in-progress |
 | 4 | Tenant scoping data access layer | Foundation | in-progress |
-| 5 | Design system & UI foundation | Foundation | in-progress |
+| 5 | Design system & UI foundation | Foundation | done |
 | 6 | Agency sign in & organization | Slice 1 | planned |
 | 7 | Client records | Slice 1 | planned |
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | planned |
@@ -89,7 +89,7 @@ Spec [0003](../specs/0003-tenant-scoping-data-access-layer/index.md) · atomic b
 
 _This is the row that carries the most risk in the whole plan. Spec 0001 is explicit that this scoping fails open: one query that bypasses the helper leaks data across tenants and nothing in the database stops it._
 
-### 5. Design system & UI foundation · in-progress · Beta
+### 5. Design system & UI foundation · done · Beta
 The visual direction, layout primitives, the agency dashboard shell and the base components every screen is assembled from, accessible by default so each later screen inherits it rather than fixing it.
 **Done when:** `design.md` covers type, color, spacing and the component set, base components handle focus and keyboard properly, and the shell renders in the real app against WCAG 2.2 AA.
 - [x] Design it (spec): `/architect design system & UI foundation`
@@ -100,7 +100,7 @@ The visual direction, layout primitives, the agency dashboard shell and the base
   - [x] The shell and the real route: `ClerkProvider` and a deliberately permissive `src/proxy.ts`, the sidebar and top bar, the mobile sheet, and `/dashboard` rendering it · AC-6, AC-7, AC-18, AC-22, AC-23
   - [x] Write it down and prove the rest by hand: `design.md`, `src/ui/AGENTS.md`, and the manual accessibility pass · AC-1, AC-5, AC-20, AC-21 · the written parts landed; the manual keyboard and screen reader pass (spec task 27) is still open and belongs to `/check verify`
 - [ ] Verify it: `/check verify design system & UI foundation`
-- [ ] Test it: `/test design system & UI foundation`
+- [x] Test it: `/test design system & UI foundation`
 Spec [0004](../specs/0004-design-system-and-ui-foundation/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0004-design-system-and-ui-foundation/verify.md) · design system in [design.md](../../design.md) · code in `src/ui/`, `src/app/globals.css`, `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/design/`, `src/app/(agency)/`, `src/proxy.ts`, `e2e/`, `components.json`, `.github/workflows/ci.yml`
 
 _Spec 0001 asks for this explicitly, so `/develop` is not left inventing a look from shadcn defaults. Tagged `Beta`: verifying it renders and passes accessibility is the valuable part; a release note is not._
