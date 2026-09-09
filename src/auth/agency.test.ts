@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   createClerkOrganization: vi.fn(),
   createAgencyRows: vi.fn(),
   suggestedSlug: vi.fn(),
+  deletedOrganizationClerkIds: vi.fn(),
 }));
 
 vi.mock("@/db/tenant/session", () => ({
@@ -36,6 +37,7 @@ vi.mock("@/db/tenant", async () => {
     ...errors,
     createAgencyRows: mocks.createAgencyRows,
     suggestedSlug: mocks.suggestedSlug,
+    deletedOrganizationClerkIds: mocks.deletedOrganizationClerkIds,
   };
 });
 
@@ -58,6 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.claims = { clerkUserId: "user_1" };
   mocks.agencyMemberships.mockResolvedValue([]);
+  mocks.deletedOrganizationClerkIds.mockResolvedValue(new Set());
   mocks.clerkUser.mockResolvedValue({ ok: true, data: USER });
   mocks.suggestedSlug.mockResolvedValue("northwind-studio");
   mocks.createClerkOrganization.mockResolvedValue({ clerkOrgId: "org_new" });
@@ -121,6 +124,94 @@ describe("createAgency", () => {
     expect(mocks.clerkUser).not.toHaveBeenCalled();
     expect(mocks.createClerkOrganization).not.toHaveBeenCalled();
     expect(mocks.createAgencyRows).not.toHaveBeenCalled();
+  });
+
+  it("falls through to creating a new agency when the only membership is soft deleted locally (AC-9, AC-14)", async () => {
+    mocks.agencyMemberships.mockResolvedValue([
+      {
+        clerkOrgId: "org_deleted",
+        name: "Doomed Agency",
+        clerkOrgRole: "org:admin",
+      },
+    ]);
+    mocks.deletedOrganizationClerkIds.mockResolvedValue(
+      new Set(["org_deleted"]),
+    );
+
+    const result = await createAgency({ name: "Northwind Studio" });
+
+    expect(mocks.deletedOrganizationClerkIds).toHaveBeenCalledWith([
+      "org_deleted",
+    ]);
+    expect(mocks.createClerkOrganization).toHaveBeenCalledWith({
+      name: "Northwind Studio",
+      slug: "northwind-studio",
+      createdBy: "user_1",
+    });
+    expect(result).toEqual({
+      ok: true,
+      data: { clerkOrgId: "org_new", alreadyExisted: false },
+    });
+  });
+
+  it("picks the surviving membership when only some of several are soft deleted locally (AC-9, AC-14)", async () => {
+    mocks.agencyMemberships.mockResolvedValue([
+      {
+        clerkOrgId: "org_deleted",
+        name: "Doomed Agency",
+        clerkOrgRole: "org:admin",
+      },
+      {
+        clerkOrgId: "org_kept",
+        name: "Kept Agency",
+        clerkOrgRole: "org:admin",
+      },
+    ]);
+    mocks.deletedOrganizationClerkIds.mockResolvedValue(
+      new Set(["org_deleted"]),
+    );
+
+    const result = await createAgency({ name: "Northwind Studio" });
+
+    expect(mocks.deletedOrganizationClerkIds).toHaveBeenCalledWith([
+      "org_deleted",
+      "org_kept",
+    ]);
+    expect(mocks.createClerkOrganization).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      data: { clerkOrgId: "org_kept", alreadyExisted: true },
+    });
+  });
+
+  it("falls through to creating a new agency when every membership is soft deleted locally (AC-9, AC-14)", async () => {
+    mocks.agencyMemberships.mockResolvedValue([
+      {
+        clerkOrgId: "org_deleted_1",
+        name: "Doomed Agency",
+        clerkOrgRole: "org:admin",
+      },
+      {
+        clerkOrgId: "org_deleted_2",
+        name: "Also Doomed Agency",
+        clerkOrgRole: "org:admin",
+      },
+    ]);
+    mocks.deletedOrganizationClerkIds.mockResolvedValue(
+      new Set(["org_deleted_1", "org_deleted_2"]),
+    );
+
+    const result = await createAgency({ name: "Northwind Studio" });
+
+    expect(mocks.createClerkOrganization).toHaveBeenCalledWith({
+      name: "Northwind Studio",
+      slug: "northwind-studio",
+      createdBy: "user_1",
+    });
+    expect(result).toEqual({
+      ok: true,
+      data: { clerkOrgId: "org_new", alreadyExisted: false },
+    });
   });
 
   it("creates the Clerk organization and the local rows on the normal path (AC-9)", async () => {

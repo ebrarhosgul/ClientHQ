@@ -121,9 +121,9 @@ Sign up, sign in, create an agency organization, and land on a dashboard shell t
   - [x] The other branches: the membership count branch and its picker, the client contact redirect, the `/portal` placeholder, and the redirects for a signed in visitor and for sign out · AC-6, AC-7, AC-16, AC-20
   - [x] Theming and accessibility: Clerk's appearance mapped onto the spec 0004 tokens in both themes, the onboarding loading, empty and error states, and axe plus the manual pass on the new routes · AC-3, AC-18 · the mapping, the states and the axe run landed; the manual keyboard and screen reader pass (spec task 22) is still open and belongs to `/check verify`
   - [x] The fence and the test seam: proving neither ESLint exemption list grew, the tests pinning both proxy matchers, and the documented way in for the browser suite · AC-4, AC-5, AC-17, AC-19, AC-20
-- [ ] Verify it: `/check verify agency sign in & organization`
+- [x] Verify it: `/check verify agency sign in & organization`
 - [x] Test it: `/test agency sign in & organization`
-- [ ] Review it (fresh model): `/check review agency sign in & organization`
+- [x] Review it (fresh model): `/check review agency sign in & organization`
 - [ ] Document it: `/document agency sign in & organization`
 Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0005-agency-sign-in-and-organization/verify.md) · code in `src/auth/`, `src/proxy.ts`, `src/app/(auth)/`, `src/app/portal/`, `src/app/(agency)/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/organization.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`, `src/app/globals.css`, `e2e/`
 
