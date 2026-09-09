@@ -65,7 +65,7 @@ Every table, column, constraint, index and cascade behind the product: organizat
   - [x] Delivery and invoicing: `projects`, `deliverables`, `invoices`, `invoice_line_items`, `processed_webhook_events`, the RESTRICT foreign keys, the money constraints and the relations · AC-2, AC-3, AC-4, AC-5, AC-6
   - [x] One baseline migration: squash to a single generated migration and prove it applies to a fresh database · AC-1, AC-7, AC-8
   - [x] Money helpers, drizzle-zod schemas and the guarded seed script · AC-3, AC-5, AC-9, AC-10
-- [ ] Verify it: `/check verify data model & migrations`
+- [x] Verify it: `/check verify data model & migrations`
 - [x] Test it: `/test data model & migrations`
 - [ ] Review it (fresh model): `/check review data model & migrations`
 - [x] Document it: `/document data model & migrations`
