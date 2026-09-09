@@ -115,17 +115,17 @@ _The thinnest real thread through every layer: real auth, real database, real te
 Sign up, sign in, create an agency organization, and land on a dashboard shell that knows which organization you are acting as. The local mirror rows are upserted on demand so a user is never stranded.
 **Done when:** a new person can sign up, create an agency, and land on a dashboard whose tenant context resolves from the Clerk session, with the local organization, user and membership rows present, all on the deployed app.
 - [x] Design it (spec): `/architect agency sign in & organization`
-- [ ] Build it: `/develop agency sign in & organization`
-  - [ ] One thread end to end: the Clerk application configured, the four URL variables, the two auth routes, the fails closed proxy with its agency organization check, the provisioning functions inside the tenant layer, the slug helper, the create action, `/onboarding`, and `/dashboard` naming the agency from your own row · AC-1, AC-2, AC-4, AC-5, AC-8, AC-9, AC-10, AC-13, AC-15, AC-17, AC-19, AC-20
-  - [ ] The repair path and the deleted filter: the Clerk backend wrapper, the lazy catch in the agency layout, the `deleted_at` predicate amending spec 0003, the retry message, and the proof on a real PostgreSQL · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
-  - [ ] The other branches: the membership count branch and its picker, the client contact redirect, the `/portal` placeholder, and the redirects for a signed in visitor and for sign out · AC-6, AC-7, AC-16, AC-20
-  - [ ] Theming and accessibility: Clerk's appearance mapped onto the spec 0004 tokens in both themes, the onboarding loading, empty and error states, and axe plus the manual pass on the new routes · AC-3, AC-18
-  - [ ] The fence and the test seam: proving neither ESLint exemption list grew, the tests pinning both proxy matchers, and the documented way in for the browser suite · AC-4, AC-5, AC-17, AC-19, AC-20
+- [x] Build it: `/develop agency sign in & organization`
+  - [x] One thread end to end: the Clerk application configured, the four URL variables, the two auth routes, the fails closed proxy with its agency organization check, the provisioning functions inside the tenant layer, the slug helper, the create action, `/onboarding`, and `/dashboard` naming the agency from your own row · AC-1, AC-2, AC-4, AC-5, AC-8, AC-9, AC-10, AC-13, AC-15, AC-17, AC-19, AC-20 · all the code landed; the Clerk dashboard settings (spec task 1) are a change only you can make, so AC-2 is unconfirmed until you switch Organizations on
+  - [x] The repair path and the deleted filter: the Clerk backend wrapper, the lazy catch in the agency layout, the `deleted_at` predicate amending spec 0003, the retry message, and the proof on a real PostgreSQL · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
+  - [x] The other branches: the membership count branch and its picker, the client contact redirect, the `/portal` placeholder, and the redirects for a signed in visitor and for sign out · AC-6, AC-7, AC-16, AC-20
+  - [x] Theming and accessibility: Clerk's appearance mapped onto the spec 0004 tokens in both themes, the onboarding loading, empty and error states, and axe plus the manual pass on the new routes · AC-3, AC-18 · the mapping, the states and the axe run landed; the manual keyboard and screen reader pass (spec task 22) is still open and belongs to `/check verify`
+  - [x] The fence and the test seam: proving neither ESLint exemption list grew, the tests pinning both proxy matchers, and the documented way in for the browser suite · AC-4, AC-5, AC-17, AC-19, AC-20
 - [ ] Verify it: `/check verify agency sign in & organization`
 - [ ] Test it: `/test agency sign in & organization`
 - [ ] Review it (fresh model): `/check review agency sign in & organization`
 - [ ] Document it: `/document agency sign in & organization`
-Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan`
+Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan` · code in `src/auth/`, `src/proxy.ts`, `src/app/(auth)/`, `src/app/portal/`, `src/app/(agency)/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/organization.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`, `src/app/globals.css`, `e2e/`
 
 _This is the row that discharges spec 0004's open hazard: `src/proxy.ts` leaves every route public today, and feature 7 must not start until this has narrowed it._
 

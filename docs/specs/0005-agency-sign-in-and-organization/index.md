@@ -1,7 +1,7 @@
 # 0005. Agency sign in and organization
 
 **Date**: 2026-09-09
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -175,43 +175,43 @@ Ordered as a Tracer Bullet, the project's approach: task 1 through 9 stand up on
 
 **Milestone 1: one thread end to end**
 
-1. Configure the Clerk application: Organizations on, email with password and Google enabled, and record the settings in the spec's prerequisites so `/check verify` can confirm them, satisfies **AC-2**
-2. Declare the four `NEXT_PUBLIC_CLERK_*` URL variables in the Zod schema in `src/lib/env.ts` and add them to `.env.example`. Clerk's SDK reads them from `process.env` itself, so the declaration is there to fail fast with the project's message, satisfies **AC-19**
-3. Build `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]` as catch all routes rendering `<SignIn />` and `<SignUp />` inside a centred frame matching `/`, satisfies **AC-1**
-4. Rewrite the `src/proxy.ts` matcher to fail closed: a `createRouteMatcher` public list of `/`, `/sign-in(.*)`, `/sign-up(.*)`, `/api/webhooks/(.*)` and `/api/cron/(.*)`, everything else protected, satisfies **AC-4**
-5. Add a second matcher for the agency paths only, and redirect a signed in request to one of them with no `orgId` claim to `/onboarding`, decided from the session claims alone with no database call. `/onboarding` and `/portal` are outside that matcher by construction, satisfies **AC-5**, **AC-20**
-6. Write `src/db/tenant/provisioning.ts`: `createAgencyRows()` and `ensureMirrorRows()`, both inside the layer, both touching only the three identity tables, both upserting on their unique keys, exported from `src/db/tenant/index.ts`, satisfies **AC-13**, **AC-17**
-7. Write `src/auth/slug.ts`: one `uniqueSlug()` helper that derives a kebab slug from a name and suffixes it until free against `organizations.slug`. Both agency creation and the repair call it; neither ever reads Clerk's stored slug, satisfies **AC-10**
-8. Write `src/auth/agency.ts`: the `createAgency` Server Action, Zod parsed, re reading Clerk's membership count as a double submit guard, then calling Clerk and `createAgencyRows()` in one transaction and returning a `Result`, satisfies **AC-8**, **AC-9**, **AC-11**
-9. Build `/onboarding` with the create form only for now, plus the client side activation that awaits `setActive` before navigating, and add the welcome panel to `/dashboard` reading the agency name through `tenantDb(ctx)`. The thread now walks: sign up, create, land, see your own row, satisfies **AC-9**, **AC-15**
+1. [ ] Configure the Clerk application: Organizations on, email with password and Google enabled, and record the settings in the spec's prerequisites so `/check verify` can confirm them, satisfies **AC-2**
+2. [x] Declare the four `NEXT_PUBLIC_CLERK_*` URL variables in the Zod schema in `src/lib/env.ts` and add them to `.env.example`. Clerk's SDK reads them from `process.env` itself, so the declaration is there to fail fast with the project's message, satisfies **AC-19**
+3. [x] Build `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]` as catch all routes rendering `<SignIn />` and `<SignUp />` inside a centred frame matching `/`, satisfies **AC-1**
+4. [x] Rewrite the `src/proxy.ts` matcher to fail closed: a `createRouteMatcher` public list of `/`, `/sign-in(.*)`, `/sign-up(.*)`, `/api/webhooks/(.*)` and `/api/cron/(.*)`, everything else protected, satisfies **AC-4**
+5. [x] Add a second matcher for the agency paths only, and redirect a signed in request to one of them with no `orgId` claim to `/onboarding`, decided from the session claims alone with no database call. `/onboarding` and `/portal` are outside that matcher by construction, satisfies **AC-5**, **AC-20**
+6. [x] Write `src/db/tenant/provisioning.ts`: `createAgencyRows()` and `ensureMirrorRows()`, both inside the layer, both touching only the three identity tables, both upserting on their unique keys, exported from `src/db/tenant/index.ts`, satisfies **AC-13**, **AC-17**
+7. [x] Write `src/auth/slug.ts`: one `uniqueSlug()` helper that derives a kebab slug from a name and suffixes it until free against `organizations.slug`. Both agency creation and the repair call it; neither ever reads Clerk's stored slug, satisfies **AC-10**
+8. [x] Write `src/auth/agency.ts`: the `createAgency` Server Action, Zod parsed, re reading Clerk's membership count as a double submit guard, then calling Clerk and `createAgencyRows()` in one transaction and returning a `Result`, satisfies **AC-8**, **AC-9**, **AC-11**
+9. [x] Build `/onboarding` with the create form only for now, plus the client side activation that awaits `setActive` before navigating, and add the welcome panel to `/dashboard` reading the agency name through `tenantDb(ctx)`. The thread now walks: sign up, create, land, see your own row, satisfies **AC-9**, **AC-15**
 
 **Milestone 2: the repair path and the deleted filter**
 
-10. Write `src/auth/clerk.ts`: a thin wrapper over the Clerk backend API returning the organization and user records the mirror needs, with the email lowercased at that boundary and a 404 surfaced as its own distinct outcome rather than a generic failure, satisfies **AC-12**, **AC-21**
-11. Catch `no_mirror_row` in `src/app/(agency)/layout.tsx`, call `ensureMirrorRows()` (role from the session claim, slug from `uniqueSlug()`, all three writes `onConflictDoUpdate`), resolve again, and render; on a Clerk 404 redirect to `/onboarding` instead, and leave the normal path untouched, satisfies **AC-12**, **AC-13**, **AC-21**
-12. Add `deleted_at is null` to the staff resolution query in `src/db/tenant/context.ts` and note the amendment in spec 0003, satisfies **AC-14**
-13. Give `createAgency`'s failure path a retry message on the onboarding form that names the healing behaviour rather than showing an error page, satisfies **AC-11**
-14. Test the repair on a real PostgreSQL: missing rows repaired, concurrent repair idempotent, soft deleted organization treated as absent, a slug collision healed rather than repeated, and a Clerk 404 routed rather than thrown, satisfies **AC-10**, **AC-12**, **AC-13**, **AC-14**, **AC-21**
+10. [x] Write `src/auth/clerk.ts`: a thin wrapper over the Clerk backend API returning the organization and user records the mirror needs, with the email lowercased at that boundary and a 404 surfaced as its own distinct outcome rather than a generic failure, satisfies **AC-12**, **AC-21**
+11. [x] Catch `no_mirror_row` in `src/app/(agency)/layout.tsx`, call `ensureMirrorRows()` (role from the session claim, slug from `uniqueSlug()`, all three writes `onConflictDoUpdate`), resolve again, and render; on a Clerk 404 redirect to `/onboarding` instead, and leave the normal path untouched, satisfies **AC-12**, **AC-13**, **AC-21**
+12. [x] Add `deleted_at is null` to the staff resolution query in `src/db/tenant/context.ts` and note the amendment in spec 0003, satisfies **AC-14**
+13. [x] Give `createAgency`'s failure path a retry message on the onboarding form that names the healing behaviour rather than showing an error page, satisfies **AC-11**
+14. [x] Test the repair on a real PostgreSQL: missing rows repaired, concurrent repair idempotent, soft deleted organization treated as absent, a slug collision healed rather than repeated, and a Clerk 404 routed rather than thrown, satisfies **AC-10**, **AC-12**, **AC-13**, **AC-14**, **AC-21**
 
 **Milestone 3: the other branches**
 
-15. Read the membership count from Clerk in `/onboarding` and branch: one activates and continues, several render a picker, none renders the create form. A membership always wins over a contact row, satisfies **AC-6**
-16. Add the client contact branch: call `contactContext()`, and on success redirect to `/portal`, satisfies **AC-7**
-17. Add a minimal `/portal` placeholder page inside the protected area but outside the agency organization check, clearly marked as owned by feature 15, and confirm a contact reloading it is not bounced to `/onboarding`, satisfies **AC-7**, **AC-20**
-18. Redirect a signed in person with an active organization away from `/sign-in` and `/sign-up` to `/dashboard`, and point sign out at `/`, satisfies **AC-16**
+15. [x] Read the membership count from Clerk in `/onboarding` and branch: one activates and continues, several render a picker, none renders the create form. A membership always wins over a contact row, satisfies **AC-6**
+16. [x] Add the client contact branch: call `contactContext()`, and on success redirect to `/portal`, satisfies **AC-7**
+17. [x] Add a minimal `/portal` placeholder page inside the protected area but outside the agency organization check, clearly marked as owned by feature 15, and confirm a contact reloading it is not bounced to `/onboarding`, satisfies **AC-7**, **AC-20**
+18. [x] Redirect a signed in person with an active organization away from `/sign-in` and `/sign-up` to `/dashboard`, and point sign out at `/`, satisfies **AC-16**
 
 **Milestone 4: theming and accessibility**
 
-19. Map Clerk's `appearance` variables onto the spec 0004 tokens, defined once and shared by both components, satisfies **AC-3**
-20. Make the mapping follow the theme cookie in both directions with no flash of the wrong theme on load, satisfies **AC-3**
-21. Give `/onboarding` its loading, empty and error states, with the form's validation error tied to the field and announced, satisfies **AC-18**
-22. Extend the axe run to `/sign-in`, `/sign-up` and `/onboarding` in both themes, and do the manual keyboard pass on the new routes, satisfies **AC-3**, **AC-18**
+19. [x] Map Clerk's `appearance` variables onto the spec 0004 tokens, defined once and shared by both components, satisfies **AC-3**
+20. [x] Make the mapping follow the theme cookie in both directions with no flash of the wrong theme on load, satisfies **AC-3**
+21. [x] Give `/onboarding` its loading, empty and error states, with the form's validation error tied to the field and announced, satisfies **AC-18**
+22. [ ] Extend the axe run to `/sign-in`, `/sign-up` and `/onboarding` in both themes, and do the manual keyboard pass on the new routes, satisfies **AC-3**, **AC-18**
 
 **Milestone 5: the fence and the test seam**
 
-23. Prove the fence holds: no new file imports `src/db/client.ts`, `withSystemAccess` is not imported anywhere new, and neither exemption list in `eslint.config.mjs` has grown, satisfies **AC-17**
-24. Keep `tools/eslint/tenant-isolation-config.test.mts` in step with the unchanged lists, and add a test asserting both proxy matchers match AC-4 and AC-5 exactly, including that `/onboarding` and `/portal` sit outside the organization check, satisfies **AC-4**, **AC-5**, **AC-17**, **AC-20**
-25. Add `@clerk/testing` as a dev dependency and document the browser suite's way in (Clerk testing tokens plus the dedicated development instance user and its two environment variables), without writing the test, satisfies **AC-19**
+23. [x] Prove the fence holds: no new file imports `src/db/client.ts`, `withSystemAccess` is not imported anywhere new, and neither exemption list in `eslint.config.mjs` has grown, satisfies **AC-17**
+24. [x] Keep `tools/eslint/tenant-isolation-config.test.mts` in step with the unchanged lists, and add a test asserting both proxy matchers match AC-4 and AC-5 exactly, including that `/onboarding` and `/portal` sit outside the organization check, satisfies **AC-4**, **AC-5**, **AC-17**, **AC-20**
+25. [x] Add `@clerk/testing` as a dev dependency and document the browser suite's way in (Clerk testing tokens plus the dedicated development instance user and its two environment variables), without writing the test, satisfies **AC-19**
 
 ## Consequences
 
