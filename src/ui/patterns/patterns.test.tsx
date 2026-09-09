@@ -10,6 +10,7 @@ import {
 import { Button } from "@/ui/primitives/button";
 import { Skeleton, SkeletonRegion } from "@/ui/primitives/skeleton";
 
+import { BrandMark, Wordmark } from "./brand";
 import { DataTable, type Column } from "./data-table";
 import { EmptyState } from "./empty-state";
 import { errorMessage, messageForCode } from "./error-messages";
@@ -331,6 +332,23 @@ describe("DataTable", () => {
   });
 });
 
+describe("brand", () => {
+  it("hides the decorative mark from assistive technology", () => {
+    const { container } = render(<BrandMark />);
+
+    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden");
+  });
+
+  it("leaves the icon out of what a screen reader reads, so only the word remains", () => {
+    const { container } = render(<Wordmark />);
+
+    // The mark is aria-hidden, so "ClientHQ" is the only text a screen
+    // reader has to announce here, not the icon and the word both.
+    expect(screen.getByText("ClientHQ")).toBeInTheDocument();
+    expect(container.textContent).toBe("ClientHQ");
+  });
+});
+
 describe("skeletons", () => {
   it("hides the shapes from assistive technology", () => {
     render(<Skeleton data-testid="shape" className="h-4 w-20" />);
@@ -355,6 +373,7 @@ describe.each(THEMES)("in the %s theme", (theme) => {
   it("has no axe violation across the patterns", async () => {
     const { container } = render(
       <div>
+        <Wordmark />
         <PageHeader
           title="Invoices"
           description="Everything you have billed."
