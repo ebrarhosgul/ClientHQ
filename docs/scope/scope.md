@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model & migrations | Foundation | in-progress |
 | 4 | Tenant scoping data access layer | Foundation | in-progress |
 | 5 | Design system & UI foundation | Foundation | done |
-| 6 | Agency sign in & organization | Slice 1 | planned |
+| 6 | Agency sign in & organization | Slice 1 | in-progress |
 | 7 | Client records | Slice 1 | planned |
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | planned |
 | 9 | Subscription access gate | Slice 2 | planned |
@@ -111,10 +111,23 @@ _Spec 0004 pulls one thing forward from feature 6: it wires `ClerkProvider` and 
 
 _The thinnest real thread through every layer: real auth, real database, real tenancy, real UI, really deployed. Narrow, not fake._
 
-### 6. Agency sign in & organization · needs a decision
+### 6. Agency sign in & organization · in-progress
 Sign up, sign in, create an agency organization, and land on a dashboard shell that knows which organization you are acting as. The local mirror rows are upserted on demand so a user is never stranded.
 **Done when:** a new person can sign up, create an agency, and land on a dashboard whose tenant context resolves from the Clerk session, with the local organization, user and membership rows present, all on the deployed app.
-- [ ] Design it (spec): `/architect agency sign in & organization`
+- [x] Design it (spec): `/architect agency sign in & organization`
+- [ ] Build it: `/develop agency sign in & organization`
+  - [ ] One thread end to end: the Clerk application configured, the four URL variables, the two auth routes, the fails closed proxy with its agency organization check, the provisioning functions inside the tenant layer, the slug helper, the create action, `/onboarding`, and `/dashboard` naming the agency from your own row · AC-1, AC-2, AC-4, AC-5, AC-8, AC-9, AC-10, AC-13, AC-15, AC-17, AC-19, AC-20
+  - [ ] The repair path and the deleted filter: the Clerk backend wrapper, the lazy catch in the agency layout, the `deleted_at` predicate amending spec 0003, the retry message, and the proof on a real PostgreSQL · AC-10, AC-11, AC-12, AC-13, AC-14, AC-21
+  - [ ] The other branches: the membership count branch and its picker, the client contact redirect, the `/portal` placeholder, and the redirects for a signed in visitor and for sign out · AC-6, AC-7, AC-16, AC-20
+  - [ ] Theming and accessibility: Clerk's appearance mapped onto the spec 0004 tokens in both themes, the onboarding loading, empty and error states, and axe plus the manual pass on the new routes · AC-3, AC-18
+  - [ ] The fence and the test seam: proving neither ESLint exemption list grew, the tests pinning both proxy matchers, and the documented way in for the browser suite · AC-4, AC-5, AC-17, AC-19, AC-20
+- [ ] Verify it: `/check verify agency sign in & organization`
+- [ ] Test it: `/test agency sign in & organization`
+- [ ] Review it (fresh model): `/check review agency sign in & organization`
+- [ ] Document it: `/document agency sign in & organization`
+Spec [0005](../specs/0005-agency-sign-in-and-organization/index.md) · atomic build tasks in its `## Build plan`
+
+_This is the row that discharges spec 0004's open hazard: `src/proxy.ts` leaves every route public today, and feature 7 must not start until this has narrowed it._
 
 ### 7. Client records · needs a decision
 The first real tenant scoped write and read: add a client company, list clients, open one, edit and archive it. This closes the walking skeleton thread.
@@ -213,6 +226,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision
 - **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
+- **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
