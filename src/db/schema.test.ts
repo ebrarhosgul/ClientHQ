@@ -326,6 +326,7 @@ describe("AC-8: the CHECK constraints exist, by name", () => {
     ["users", "users_email_lowercase_check"],
     ["memberships", "memberships_role_check"],
     ["client_contacts", "client_contacts_email_lowercase_check"],
+    ["clients", "clients_company_email_lowercase_check"],
     ["projects", "projects_status_check"],
     ["deliverables", "deliverables_status_check"],
     ["invoices", "invoices_status_check"],
@@ -356,6 +357,37 @@ describe("AC-8: the CHECK constraints exist, by name", () => {
     expect(
       check === undefined ? "" : dialect.sqlToQuery(check.value).sql,
     ).toContain('"subtotal_cents"::numeric');
+  });
+});
+
+/**
+ * Spec 0006, AC-1: only `name` is required on a client, so every other field
+ * spec 0006 adds has to be nullable, unlike `client_contacts.email`, which
+ * carries no such allowance.
+ */
+describe("spec 0006: a client's fields are all optional but the name", () => {
+  it("requires clients.name", () => {
+    expect(columnOf("clients", "name")?.notNull).toBe(true);
+  });
+
+  it.each([
+    "company_email",
+    "phone",
+    "industry",
+    "notes",
+    "billing_address_line1",
+    "billing_address_line2",
+    "billing_city",
+    "billing_region",
+    "billing_postal_code",
+    "billing_country",
+  ])("leaves clients.%s nullable", (column) => {
+    expect(columnOf("clients", column)?.notNull).toBe(false);
+  });
+
+  it("leaves company_email nullable, unlike client_contacts.email (a client can have none at all)", () => {
+    expect(columnOf("clients", "company_email")?.notNull).toBe(false);
+    expect(columnOf("client_contacts", "email")?.notNull).toBe(true);
   });
 });
 
