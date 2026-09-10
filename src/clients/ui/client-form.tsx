@@ -124,7 +124,7 @@ export function ClientForm({ client }: ClientFormProps) {
   const fieldErrors = state.error?.fieldErrors;
 
   return (
-    <form action={submit} className="flex flex-col gap-6">
+    <form action={submit} noValidate className="flex flex-col gap-6">
       {state.error && state.error.code !== "validation" ? (
         <Alert variant="destructive">
           <AlertTitle>That did not save</AlertTitle>
