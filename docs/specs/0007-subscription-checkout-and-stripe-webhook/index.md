@@ -1,7 +1,7 @@
 # 0007. Subscription checkout and Stripe webhook
 
 **Date**: 2026-09-10
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
