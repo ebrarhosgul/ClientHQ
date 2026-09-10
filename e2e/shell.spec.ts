@@ -138,7 +138,7 @@ test.describe("the agency shell", () => {
     await page
       .getByRole("navigation", { name: "Sections" })
       .first()
-      .getByRole("link", { name: "Clients" })
+      .getByRole("link", { name: "Projects" })
       .click();
 
     // Inside the shell, with an explanation and a way back, not a bare 404.
