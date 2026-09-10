@@ -12,7 +12,9 @@ import { z } from "zod";
 import { clients } from "@/db/schema";
 import { tenantActionError, withTenantAction } from "@/db/tenant";
 
-const clientIdInput = z.object({ id: z.string().min(1) });
+import { clientId } from "./schema";
+
+const clientIdInput = z.object({ id: clientId });
 
 export type ArchivedClient = {
   readonly archivedAt: Date;
