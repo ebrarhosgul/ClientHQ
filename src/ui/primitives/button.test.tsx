@@ -45,12 +45,12 @@ describe("Button", () => {
   it("renders its child instead when asChild is set", () => {
     render(
       <Button asChild>
-        <a href="/clients">Clients</a>
+        <a href="https://example.com">Clients</a>
       </Button>,
     );
 
     const link = screen.getByRole("link", { name: "Clients" });
-    expect(link).toHaveAttribute("href", "/clients");
+    expect(link).toHaveAttribute("href", "https://example.com");
     // No nested button: a link styled as a button is still a link.
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe("Button", () => {
   it("does not force a type onto the element it renders as", () => {
     render(
       <Button asChild>
-        <a href="/clients">Clients</a>
+        <a href="https://example.com">Clients</a>
       </Button>,
     );
 

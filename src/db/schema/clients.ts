@@ -22,8 +22,21 @@ export const clients = pgTable(
     id: id(),
     orgId: orgId("cascade"),
     name: text("name").notNull(),
+    /**
+     * Stored lowercase and CHECK constrained when present, mirroring
+     * `client_contacts.email`. Nullable, unlike that column: a client can have
+     * no company email at all (spec 0006).
+     */
     companyEmail: text("company_email"),
+    phone: text("phone"),
+    industry: text("industry"),
     notes: text("notes"),
+    billingAddressLine1: text("billing_address_line1"),
+    billingAddressLine2: text("billing_address_line2"),
+    billingCity: text("billing_city"),
+    billingRegion: text("billing_region"),
+    billingPostalCode: text("billing_postal_code"),
+    billingCountry: text("billing_country"),
     /** Replaces spec 0001's `status` column. */
     archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
     ...timestamps(),
@@ -31,6 +44,10 @@ export const clients = pgTable(
   (t) => [
     index("clients_org_id_archived_at_idx").on(t.orgId, t.archivedAt),
     index("clients_org_id_name_idx").on(t.orgId, t.name),
+    check(
+      "clients_company_email_lowercase_check",
+      sql`${t.companyEmail} is null or ${t.companyEmail} = lower(${t.companyEmail})`,
+    ),
   ],
 );
 
