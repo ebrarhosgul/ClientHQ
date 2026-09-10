@@ -4,19 +4,28 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { agencyContext } from "@/auth/context";
-import { getClient } from "@/clients/queries";
+import { getClient, type ClientRow } from "@/clients/queries";
 import { ArchiveClientButton } from "@/clients/ui/archive-client-button";
 import { RestoreClientButton } from "@/clients/ui/restore-client-button";
+import { isClerkConfigured } from "@/lib/env";
 import { Badge } from "@/ui/primitives/badge";
 import { PageHeader } from "@/ui/patterns/page-header";
 import { Button } from "@/ui/primitives/button";
+
+/**
+ * With no Clerk publishable key there is no session to resolve a tenant from,
+ * so no id can ever be this agency's (spec 0004, AC-22): `undefined`, the same
+ * as a foreign agency's id or one that never existed.
+ */
+async function findClient(id: string): Promise<ClientRow | undefined> {
+  return isClerkConfigured() ? getClient(await agencyContext(), id) : undefined;
+}
 
 export async function generateMetadata({
   params,
 }: PageProps<"/clients/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const ctx = await agencyContext();
-  const client = await getClient(ctx, id);
+  const client = await findClient(id);
 
   return { title: client?.name ?? "Client" };
 }
@@ -47,8 +56,7 @@ export default async function ClientDetailPage({
   params,
 }: PageProps<"/clients/[id]">) {
   const { id } = await params;
-  const ctx = await agencyContext();
-  const client = await getClient(ctx, id);
+  const client = await findClient(id);
 
   if (client === undefined) {
     notFound();

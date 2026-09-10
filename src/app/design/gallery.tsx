@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from "react";
 
 import type { InvoiceStatus } from "@/db/schema";
+import { AddressFields } from "@/ui/patterns/address-fields";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
@@ -408,6 +409,37 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
             <Label htmlFor={scoped("gallery-switch-off")}>Weekly digest</Label>
           </span>
         </Row>
+      </Section>
+
+      <Section
+        id={scoped("address-fields")}
+        title="Address fields"
+        description="A postal address as one fieldset, first needed for a client's billing address. The two address lines span both columns; the rest sit two to a row."
+      >
+        <div className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+          <AddressFields
+            legend="Billing address"
+            names={{
+              line1: scoped("address-line1"),
+              line2: scoped("address-line2"),
+              city: scoped("address-city"),
+              region: scoped("address-region"),
+              postalCode: scoped("address-postal-code"),
+              country: scoped("address-country"),
+            }}
+            values={{
+              line1: "148 Harbour Street",
+              line2: "",
+              city: "Halifax",
+              region: "Nova Scotia",
+              postalCode: "B3J 1V8",
+              country: "Canada",
+            }}
+            fieldErrors={{
+              postalCode: ["Use 20 characters or fewer."],
+            }}
+          />
+        </div>
       </Section>
 
       <Section

@@ -3,9 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { agencyContext } from "@/auth/context";
-import { listClients, type ClientRow } from "@/clients/queries";
+import {
+  listClients,
+  type ClientListResult,
+  type ClientRow,
+} from "@/clients/queries";
 import { ClientsFilterBar } from "@/clients/ui/clients-filter-bar";
 import { ClientsPagination } from "@/clients/ui/clients-pagination";
+import { isClerkConfigured } from "@/lib/env";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { PageHeader } from "@/ui/patterns/page-header";
@@ -41,27 +46,39 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const NO_RESULTS: ClientListResult = {
+  rows: [],
+  page: 1,
+  pageCount: 1,
+  total: 0,
+};
+
 /**
  * Every agency's client list: active by default, in pages of 25, ordered by
  * name (spec 0006, AC-4, AC-5).
  *
  * `page`, `q` and `archived` all live in the URL, so this Server Component is
  * the single source of truth for what shows; nothing here is client state.
+ *
+ * With no Clerk publishable key there is no session to scope a query to, so
+ * this renders the same empty list a brand new agency would see rather than
+ * resolving a tenant context that cannot exist (spec 0004, AC-22).
  */
 export default async function ClientsPage({
   searchParams,
 }: PageProps<"/clients">) {
-  const ctx = await agencyContext();
   const params = await searchParams;
 
   const archived = firstParam(params.archived) === "true";
   const search = firstParam(params.q);
 
-  const { rows, page, pageCount, total } = await listClients(ctx, {
-    pageParam: firstParam(params.page),
-    search,
-    archived,
-  });
+  const { rows, page, pageCount, total } = isClerkConfigured()
+    ? await listClients(await agencyContext(), {
+        pageParam: firstParam(params.page),
+        search,
+        archived,
+      })
+    : NO_RESULTS;
 
   const hasFilter = Boolean(search) || archived;
 
