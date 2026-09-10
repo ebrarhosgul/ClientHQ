@@ -9,6 +9,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_ERROR_HEADING } from "@/ui/patterns/error-state";
+import {
+  expectNoAccessibilityViolations,
+  THEMES,
+  withTheme,
+} from "@/ui/test/axe";
 
 import ClientError from "./error";
 
@@ -37,4 +42,15 @@ describe("ClientError", () => {
       screen.getByRole("link", { name: "Back to clients" }),
     ).toHaveAttribute("href", "/clients");
   });
+
+  it.each(THEMES)(
+    "has no axe violation in the %s theme (AC-13)",
+    async (theme) => {
+      const { container } = render(
+        <ClientError error={new Error("boom")} reset={vi.fn()} />,
+      );
+
+      await withTheme(theme, () => expectNoAccessibilityViolations(container));
+    },
+  );
 });
