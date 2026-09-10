@@ -30,6 +30,14 @@ const VALID = {
   NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
   NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: "/onboarding",
   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/onboarding",
+  // Added by subscription checkout & Stripe webhook (spec 0007). All four come
+  // from the Stripe dashboard. The publishable key is required while nothing
+  // reads it, which spec 0007 chose deliberately so a later embedded payment
+  // surface is a code change rather than an environment change everywhere.
+  STRIPE_SECRET_KEY: "sk_test_not_a_real_key",
+  STRIPE_WEBHOOK_SECRET: "whsec_not_a_real_secret",
+  STRIPE_PRICE_ID: "price_not_a_real_price",
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_not_a_real_key",
 } as const;
 
 /**

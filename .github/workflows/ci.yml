@@ -138,6 +138,12 @@ jobs:
       - name: Check the TypeScript rounding agrees with PostgreSQL
         run: pnpm vitest run src/lib/money.db.test.ts
 
+      # Replay, ordering, the row lock and the rollback are all claims about
+      # PostgreSQL rather than about TypeScript, so the Stripe webhook is proven
+      # here against real SQL. Stripe itself is faked; the transaction is not.
+      - name: Prove the Stripe webhook survives replay, reordering and rollback
+        run: pnpm vitest run src/payments/webhook.db.test.ts
+
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would
   # never run on a push and the suite would rot unnoticed.
