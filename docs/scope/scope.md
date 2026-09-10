@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 5 | Design system & UI foundation | Foundation | done |
 | 6 | Agency sign in & organization | Slice 1 | in-progress |
 | 7 | Client records | Slice 1 | in-progress |
-| 8 | Subscription checkout & Stripe webhook | Slice 2 | planned |
+| 8 | Subscription checkout & Stripe webhook | Slice 2 | in-progress |
 | 9 | Subscription access gate | Slice 2 | planned |
 | 10 | Client contacts & portal invitations | Slice 3 | planned |
 | 11 | Projects | Slice 4 | planned |
@@ -149,10 +149,23 @@ Spec [0006](../specs/0006-client-records/index.md) · atomic build tasks in its 
 
 _Thickening the identity segment into money. Built early because the gate constrains every screen that comes after it._
 
-### 8. Subscription checkout & Stripe webhook · needs a decision
+### 8. Subscription checkout & Stripe webhook · in-progress
 The agency subscribes: a billing page offering Stripe Checkout, the Billing Portal once a customer exists, and the verified webhook that turns Stripe events into a local subscription row without duplicating or applying them out of order.
 **Done when:** an agency can subscribe and cancel end to end, a replayed webhook event changes nothing, an out of order event still lands the correct state, and a failed state change rolls back so Stripe retries.
-- [ ] Design it (spec): `/architect subscription checkout & Stripe webhook`
+- [x] Design it (spec): `/architect subscription checkout & Stripe webhook`
+- [ ] Build it: `/develop subscription checkout & Stripe webhook`
+  - [ ] Configuration and the pinned client: the four Stripe env vars in `src/lib/env.ts`, the Stripe dashboard prerequisites (product, Price carrying the 14 day trial, Portal, webhook endpoint and secret), and one Stripe client with an explicitly pinned `apiVersion` · AC-2, AC-4, AC-5
+  - [ ] One thread end to end: `startCheckout()` behind an admin guard, the webhook route implementing the full six step order (verify, resolve, retrieve outside the transaction, conflict-do-nothing ledger insert, lock and apply, commit), and a minimal `/billing`, proven by a real test mode subscribe · AC-1, AC-2, AC-3, AC-4, AC-10, AC-11, AC-17, AC-20, AC-23, AC-24, AC-25
+  - [ ] The rest of the event set and its proofs: all six events applying retrieved state, the `metadata.org_id` fallback for an event that outran its session, the `past_due_since` rule, and the tests for replay, reordering, concurrency, rollback and poison events · AC-7, AC-8, AC-9, AC-12, AC-16, AC-22, AC-26
+  - [ ] The Portal and the duplicate customer holes: `openBillingPortal()`, the status driven action rule so a cancelled agency can resubscribe, the idempotency key, the `org_id` upsert, and the refusal of a conflicting customer id · AC-6, AC-14, AC-15, AC-18, AC-27
+  - [ ] The real billing page: the status card in plain words, the trial end or renewal date, the member read only variant, the loading, empty and error states, the structured failure logging, and the accessibility pass · AC-5, AC-13, AC-19, AC-21
+- [ ] Verify it: `/check verify subscription checkout & Stripe webhook`
+- [ ] Test it: `/test subscription checkout & Stripe webhook`
+- [ ] Review it (fresh model): `/check review subscription checkout & Stripe webhook`
+- [ ] Document it: `/document subscription checkout & Stripe webhook`
+Spec [0007](../specs/0007-subscription-checkout-and-stripe-webhook/index.md) · atomic build tasks in its `## Build plan` · code in `src/payments/`, `src/app/(agency)/billing/`, `src/app/api/webhooks/stripe/`, `src/lib/env.ts`
+
+_Ships with no migration: spec 0002 already built `subscriptions` and `processed_webhook_events`. Two Stripe fields moved to the subscription **item** in the Basil release (`current_period_end` and `price.id`), and reading the old path stores null silently rather than failing, so spec 0007 calls both out explicitly._
 
 ### 9. Subscription access gate · needs a decision
 Turning subscription state into what the agency may actually do: full access, a read only grace window, or locked out to billing only. Derived at read time so a grace window expires on its own.
@@ -238,6 +251,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
 - **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
+- **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
