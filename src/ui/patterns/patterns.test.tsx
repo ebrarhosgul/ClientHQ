@@ -1,5 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { ACTION_ERROR_CODES } from "@/db/tenant/errors";
 import {
@@ -10,12 +11,32 @@ import {
 import { Button } from "@/ui/primitives/button";
 import { Skeleton, SkeletonRegion } from "@/ui/primitives/skeleton";
 
+import { AddressFields } from "./address-fields";
 import { BrandMark, Wordmark } from "./brand";
+import { ConfirmDialog } from "./confirm-dialog";
 import { DataTable, type Column } from "./data-table";
 import { EmptyState } from "./empty-state";
 import { errorMessage, messageForCode } from "./error-messages";
 import { DEFAULT_ERROR_HEADING, ErrorState } from "./error-state";
 import { PageHeader } from "./page-header";
+
+const ADDRESS_NAMES = {
+  line1: "billingAddressLine1",
+  line2: "billingAddressLine2",
+  city: "billingCity",
+  region: "billingRegion",
+  postalCode: "billingPostalCode",
+  country: "billingCountry",
+};
+
+const EMPTY_ADDRESS = {
+  line1: "",
+  line2: "",
+  city: "",
+  region: "",
+  postalCode: "",
+  country: "",
+};
 
 type Row = {
   readonly id: string;
@@ -349,6 +370,233 @@ describe("brand", () => {
   });
 });
 
+describe("AddressFields", () => {
+  it("names the group with its legend, spec 0006", () => {
+    render(
+      <AddressFields
+        legend="Billing address"
+        names={ADDRESS_NAMES}
+        values={EMPTY_ADDRESS}
+      />,
+    );
+
+    expect(
+      screen.getByRole("group", { name: "Billing address" }),
+    ).toBeInTheDocument();
+  });
+
+  it("labels all six sub-fields", () => {
+    render(
+      <AddressFields
+        legend="Billing address"
+        names={ADDRESS_NAMES}
+        values={EMPTY_ADDRESS}
+      />,
+    );
+
+    for (const label of [
+      "Address line 1",
+      "Address line 2",
+      "City",
+      "State or province",
+      "Postal code",
+      "Country",
+    ]) {
+      expect(screen.getByRole("textbox", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it("prefills each sub-field from values", () => {
+    render(
+      <AddressFields
+        legend="Billing address"
+        names={ADDRESS_NAMES}
+        values={{ ...EMPTY_ADDRESS, city: "Portland", country: "USA" }}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "City" })).toHaveValue(
+      "Portland",
+    );
+    expect(screen.getByRole("textbox", { name: "Country" })).toHaveValue("USA");
+  });
+
+  it("shows a field error beside its own sub-field, not the others", () => {
+    render(
+      <AddressFields
+        legend="Billing address"
+        names={ADDRESS_NAMES}
+        values={EMPTY_ADDRESS}
+        fieldErrors={{ postalCode: ["Use 20 characters or fewer."] }}
+      />,
+    );
+
+    expect(screen.getByText("Use 20 characters or fewer.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Postal code" }),
+    ).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("textbox", { name: "City" })).not.toHaveAttribute(
+      "aria-invalid",
+    );
+  });
+});
+
+describe("ConfirmDialog", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it("stays closed until the trigger is activated", () => {
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={async () => ({ ok: true })}
+      />,
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens on the trigger, naming itself from title and description", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={async () => ({ ok: true })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Archive Acme?" });
+    expect(dialog).toHaveAccessibleDescription("Nothing is deleted.");
+  });
+
+  it("cancels without ever calling onConfirm", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn(async () => ({ ok: true }));
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("closes itself once onConfirm succeeds", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={async () => ({ ok: true })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the dialog open and shows the message when onConfirm fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={async () => ({ ok: false, message: "That did not work." })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That did not work.",
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("disables Cancel while the confirm action is pending, then closes once it resolves", async () => {
+    const user = userEvent.setup();
+    const { promise, resolve } = deferred<{ ok: boolean }>();
+    render(
+      <ConfirmDialog
+        trigger={<Button>Archive</Button>}
+        title="Archive Acme?"
+        description="Nothing is deleted."
+        confirmLabel="Archive"
+        pendingLabel="Archiving…"
+        onConfirm={() => promise}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+
+    expect(
+      await within(dialog).findByRole("button", { name: "Archiving…" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toBeDisabled();
+
+    resolve({ ok: true });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it.each(THEMES)(
+    "has no axe violation while open, in the %s theme",
+    async (theme) => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <ConfirmDialog
+          trigger={<Button>Archive</Button>}
+          title="Archive Acme?"
+          description="Nothing is deleted."
+          confirmLabel="Archive"
+          variant="destructive"
+          onConfirm={async () => ({ ok: true })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Archive" }));
+
+      await withTheme(theme, () => expectNoAccessibilityViolations(container));
+    },
+  );
+});
+
 describe("skeletons", () => {
   it("hides the shapes from assistive technology", () => {
     render(<Skeleton data-testid="shape" className="h-4 w-20" />);
@@ -392,6 +640,11 @@ describe.each(THEMES)("in the %s theme", (theme) => {
         />
         <EmptyState heading="No clients yet" description="Nothing here." />
         <ErrorState />
+        <AddressFields
+          legend="Billing address"
+          names={ADDRESS_NAMES}
+          values={EMPTY_ADDRESS}
+        />
         <SkeletonRegion label="Loading">
           <Skeleton className="h-4 w-20" />
         </SkeletonRegion>

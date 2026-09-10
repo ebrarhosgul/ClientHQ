@@ -140,7 +140,7 @@ The first real tenant scoped write and read: add a client company, list clients,
   - [x] Archive and restore: `archiveClient`, `restoreClient`, the confirm dialog, the active/archived toggle · AC-4, AC-8, AC-9
   - [x] Thicken the list and polish: page number pagination, name search, the empty and error states, and the accessibility pass · AC-4, AC-5, AC-13
 - [ ] Verify it: `/check verify client records`
-- [ ] Test it: `/test client records`
+- [x] Test it: `/test client records`
 - [ ] Review it (fresh model): `/check review client records`
 - [ ] Document it: `/document client records`
 Spec [0006](../specs/0006-client-records/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/clients.ts`, `src/clients/`, `src/app/(agency)/clients/`, `src/ui/patterns/confirm-dialog.tsx`, `src/ui/patterns/address-fields.tsx`
