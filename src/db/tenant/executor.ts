@@ -14,6 +14,19 @@
  */
 import type { Database } from "../client";
 
+/**
+ * The handle's type, re export only.
+ *
+ * `withSystemAccess` hands a `Database` to the webhook and cron routes, and a
+ * handler those routes call has to be able to name the thing it was given. The
+ * ESLint fence blocks every import of `src/db/client.ts` outside this folder,
+ * including a type only one, so the type is offered here instead.
+ *
+ * A type is not a capability: nothing that imports this can reach the handle,
+ * only describe one it was already handed. The fence still holds.
+ */
+export type { Database };
+
 /** An open transaction, exactly as Drizzle hands it to a `transaction()` callback. */
 export type TransactionExecutor = Parameters<
   Parameters<Database["transaction"]>[0]

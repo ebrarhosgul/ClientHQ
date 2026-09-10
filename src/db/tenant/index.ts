@@ -97,4 +97,10 @@ export {
 
 export { unsafeTenantQuery } from "./unsafe";
 
-export type { Executor, TransactionExecutor } from "./executor";
+/**
+ * The handle's *type*, for the webhook and cron routes and the handlers they
+ * call: `withSystemAccess` hands one over, and a handler has to be able to name
+ * what it was given. A type is not a capability, so the fence around
+ * `src/db/client.ts` is untouched by this.
+ */
+export type { Database, Executor, TransactionExecutor } from "./executor";
