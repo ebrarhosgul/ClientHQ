@@ -60,6 +60,29 @@ const serverEnvSchema = z.object({
     .min(1, "NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL is required"),
 
   /**
+   * Feature 8, subscription checkout and the Stripe webhook (spec 0007).
+   *
+   * Three of these come from the Stripe dashboard and cannot be invented here:
+   * the Price carries the 14 day trial, so the trial length lives in Stripe and
+   * nowhere in this repository, and the webhook secret only exists once the
+   * endpoint is registered. Spec 0007's "Stripe dashboard prerequisites" lists
+   * what has to be set up before any of this runs.
+   */
+  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
+  /** The monthly subscription price. The 14 day trial is configured on it. */
+  STRIPE_PRICE_ID: z.string().min(1, "STRIPE_PRICE_ID is required"),
+  /**
+   * Required while nothing reads it, which spec 0007 chose deliberately. Hosted
+   * Checkout redirects rather than mounting Stripe.js, so this feature never
+   * needs it; declaring it now means a later embedded payment surface is a code
+   * change rather than an environment change across every deploy target.
+   */
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z
+    .string()
+    .min(1, "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is required"),
+
+  /**
    * A dedicated user in the Clerk development instance, read only by the
    * browser suite so it has a documented way past the sign in screen. Optional
    * because nothing the application runs needs it, and CI deliberately runs the
