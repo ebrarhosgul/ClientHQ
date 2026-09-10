@@ -68,45 +68,67 @@ vi.mock("@/db/tenant", async (importActual) => {
 
 const { updateClient } = await import("./update-client");
 
+const CLIENT_ID = "11111111-1111-7111-8111-111111111111";
+const FOREIGN_ID = "99999999-9999-7999-8999-999999999999";
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("updateClient", () => {
   it("updates every editable field and returns the id (AC-7)", async () => {
-    state.update.mockResolvedValue({ id: "client-1" });
+    state.update.mockResolvedValue({ id: CLIENT_ID });
 
     const result = await updateClient({
-      id: "client-1",
+      id: CLIENT_ID,
       name: "Renamed Acme",
       companyEmail: "hello@acme.example",
     });
 
     expect(state.update).toHaveBeenCalledWith(
       expect.anything(),
-      "client-1",
+      CLIENT_ID,
       expect.objectContaining({
         name: "Renamed Acme",
         companyEmail: "hello@acme.example",
       }),
     );
-    expect(result).toStrictEqual({ ok: true, data: { id: "client-1" } });
+    expect(result).toStrictEqual({ ok: true, data: { id: CLIENT_ID } });
   });
 
   it("never sends id as part of the patch", async () => {
-    state.update.mockResolvedValue({ id: "client-1" });
+    state.update.mockResolvedValue({ id: CLIENT_ID });
 
-    await updateClient({ id: "client-1", name: "Acme" });
+    await updateClient({ id: CLIENT_ID, name: "Acme" });
 
     const patch = state.update.mock.calls[0][2] as Record<string, unknown>;
     expect(patch).not.toHaveProperty("id");
+  });
+
+  it("sends an explicit null, not a dropped key, for a field the user blanked (AC-7)", async () => {
+    state.update.mockResolvedValue({ id: CLIENT_ID });
+
+    await updateClient({
+      id: CLIENT_ID,
+      name: "Acme",
+      phone: "",
+      notes: "",
+    });
+
+    const patch = state.update.mock.calls[0][2] as Record<string, unknown>;
+    // `toHaveProperty` alone would pass even if the key were absent and read
+    // back as `undefined`; this is the distinction the bug hid.
+    expect(Object.hasOwn(patch, "phone")).toBe(true);
+    expect(patch.phone).toBeNull();
+    expect(Object.hasOwn(patch, "notes")).toBe(true);
+    expect(patch.notes).toBeNull();
   });
 
   it("returns not_found when zero rows matched, the same outcome a foreign agency's id gets (AC-11)", async () => {
     state.update.mockResolvedValue(undefined);
 
     const result = await updateClient({
-      id: "someone-elses-client",
+      id: FOREIGN_ID,
       name: "Acme",
     });
 
@@ -114,8 +136,16 @@ describe("updateClient", () => {
     expect(result.ok ? undefined : result.error.code).toBe("not_found");
   });
 
+  it("returns a validation error for an id that is not a uuid, rather than reaching the database (AC-11)", async () => {
+    const result = await updateClient({ id: "not-a-uuid", name: "Acme" });
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.ok ? undefined : result.error.code).toBe("validation");
+  });
+
   it("never updates when the name is blank", async () => {
-    const result = await updateClient({ id: "client-1", name: "   " });
+    const result = await updateClient({ id: CLIENT_ID, name: "   " });
 
     expect(state.update).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
@@ -123,10 +153,10 @@ describe("updateClient", () => {
   });
 
   it("succeeds for an archived client too, since AC-7 allows editing either state", async () => {
-    state.update.mockResolvedValue({ id: "client-1" });
+    state.update.mockResolvedValue({ id: CLIENT_ID });
 
     const result = await updateClient({
-      id: "client-1",
+      id: CLIENT_ID,
       name: "Still archived",
     });
 

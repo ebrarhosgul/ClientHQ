@@ -142,20 +142,30 @@ describe("listClients", () => {
 });
 
 describe("getClient", () => {
+  const CLIENT_ID = "11111111-1111-7111-8111-111111111111";
+  const MISSING_ID = "99999999-9999-7999-8999-999999999999";
+
   it("returns the row tenantDb finds", async () => {
-    state.findById.mockResolvedValue({ id: "client-1", name: "Acme" });
+    state.findById.mockResolvedValue({ id: CLIENT_ID, name: "Acme" });
 
-    const result = await getClient(ctx, "client-1");
+    const result = await getClient(ctx, CLIENT_ID);
 
-    expect(state.findById).toHaveBeenCalledWith(expect.anything(), "client-1");
-    expect(result).toStrictEqual({ id: "client-1", name: "Acme" });
+    expect(state.findById).toHaveBeenCalledWith(expect.anything(), CLIENT_ID);
+    expect(result).toStrictEqual({ id: CLIENT_ID, name: "Acme" });
   });
 
   it("returns undefined for a missing id, the same as a foreign agency's id (AC-11)", async () => {
     state.findById.mockResolvedValue(undefined);
 
-    const result = await getClient(ctx, "someone-elses-client");
+    const result = await getClient(ctx, MISSING_ID);
 
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined for an id that is not a uuid, without ever reaching the database (AC-11)", async () => {
+    const result = await getClient(ctx, "not-a-uuid");
+
+    expect(state.findById).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
 });

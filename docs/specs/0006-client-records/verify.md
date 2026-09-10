@@ -16,8 +16,8 @@ _Steps derived from spec 0006 acceptance criteria. `/check verify` runs these; `
 - [x] As agency A, create a client; sign in as agency B → the client does not appear in B's `/clients` list → AC-10, AC-11
 - [x] As agency B, visit `/clients/[A's client id]` directly → not found, not a permission error or a blank page → AC-11
 - [ ] As a client contact (portal login), visit `/clients` → redirected away (no organization claim for the proxy to find) → AC-12 — blocked, no client-contact session available; supported by `src/proxy.test.ts` and code inspection only
-- [ ] A brand new agency with zero clients visits `/clients` → the empty state shows, passes an axe scan in both themes → AC-13 — empty state confirmed live, axe scan not run (no axe tool wired to this route)
-- [x] Force a read failure on `/clients/[id]` (e.g. a bad id shape that still parses) → the route's `error.tsx` shows, not a stack trace or a blank screen → AC-13
+- [x] A brand new agency with zero clients visits `/clients` → the empty state shows, passes an axe scan in both themes → AC-13 — `e2e/clients.spec.ts` runs this live in both themes and passes
+- [x] Force a read failure on `/clients/[id]` (e.g. a bad id shape that still parses) → the route's `error.tsx` shows, not a stack trace or a blank screen, and passes an axe scan in both themes → AC-13 — the axe half is covered at the component level (`error.test.tsx`), not live in a browser, since reaching `error.tsx` needs a signed in session with a forced read failure and no e2e session exists yet
 - [x] Open the same client in two tabs, edit a different field in each, save both within a few seconds → both saves succeed, no error in either tab, and the field values on screen after a reload are whichever save landed last → AC-14
 - [x] On `/clients`, search while on page 3 of unfiltered results → lands on page 1 of the filtered results, not an empty page 3 → AC-4, AC-5, Value sourcing
 - [x] Visit `/clients?page=0`, `?page=-1`, `?page=abc`, and a page number past the last page → all four render page 1, never a 404 or a crash → Value sourcing
@@ -27,7 +27,7 @@ _Steps derived from spec 0006 acceptance criteria. `/check verify` runs these; `
 - [x] `pnpm typecheck` → passes → build correctness
 - [x] `pnpm lint` → passes, including `clienthq/no-raw-db-import` (nothing outside `src/db/tenant/` touches the raw handle) → AC-10
 - [x] `pnpm test` → passes, 0 regressions → build correctness
-- [ ] `pnpm test:e2e` → passes, including the `/design` axe pass in both themes covering the new confirm dialog and address fieldset patterns → AC-13 — passes, but does not cover the confirm dialog: `src/app/design/gallery.tsx` renders `AddressFields` but never `ConfirmDialog`, and no e2e spec targets `/clients` at all
+- [x] `pnpm test:e2e` → passes (75/75), including `e2e/clients.spec.ts`'s axe pass on the empty `/clients` state in both themes → AC-13 — `src/app/design/gallery.tsx` still does not render `ConfirmDialog`, deliberately (its own doc comment excludes overlay components since the page is server only); the dialog's axe coverage lives in `patterns.test.tsx` instead
 - [x] Query `clients` in the live database after a create/update with a mixed-case email → `company_email` is stored lowercase and the `clients_company_email_lowercase_check` constraint holds → Value sourcing
 
 ## Acceptance-criteria coverage

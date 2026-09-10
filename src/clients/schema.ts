@@ -34,6 +34,22 @@ const optionalCompanyEmail = z.preprocess(
     .optional(),
 );
 
+/**
+ * The same parsed value as `field`, but a blank input becomes an explicit
+ * `null` instead of `undefined`. `updateClient` sends its whole patch
+ * straight to Drizzle's `.set()`, which silently drops any key whose value
+ * is `undefined` — so on the update schema a blank field has to parse to
+ * something that actually reaches the `SET` clause and clears the column.
+ * `createClient` doesn't need this: an omitted key on insert already leaves
+ * the column at its default of `null`.
+ */
+function clearable<T>(field: z.ZodType<T | undefined>): z.ZodType<T | null> {
+  return field.transform((value) => value ?? null);
+}
+
+/** `clients.id` is a uuid column; any other shape resolves not found rather than reaching the database as a malformed query (AC-11). */
+export const clientId = z.uuid();
+
 const clientFields = {
   name: z
     .string()
@@ -55,8 +71,18 @@ const clientFields = {
 export const createClientInput = z.object(clientFields);
 
 export const updateClientInput = z.object({
-  id: z.string().min(1),
-  ...clientFields,
+  id: clientId,
+  name: clientFields.name,
+  companyEmail: clearable(clientFields.companyEmail),
+  phone: clearable(clientFields.phone),
+  industry: clearable(clientFields.industry),
+  notes: clearable(clientFields.notes),
+  billingAddressLine1: clearable(clientFields.billingAddressLine1),
+  billingAddressLine2: clearable(clientFields.billingAddressLine2),
+  billingCity: clearable(clientFields.billingCity),
+  billingRegion: clearable(clientFields.billingRegion),
+  billingPostalCode: clearable(clientFields.billingPostalCode),
+  billingCountry: clearable(clientFields.billingCountry),
 });
 
 export type CreateClientInput = z.infer<typeof createClientInput>;

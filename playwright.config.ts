@@ -49,7 +49,10 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm dev --port ${PORT}`,
+    // `corepack pnpm`, not bare `pnpm`: some environments (sandboxes, fresh
+    // machines before `corepack enable` has run) only resolve pnpm through
+    // corepack, and `next dev` doesn't care which one launched it.
+    command: `corepack pnpm dev --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

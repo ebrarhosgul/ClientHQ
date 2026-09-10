@@ -154,9 +154,11 @@ describe("createClientInput", () => {
 });
 
 describe("updateClientInput", () => {
-  it("requires a non-empty id alongside every client field", () => {
+  const VALID_ID = "11111111-1111-7111-8111-111111111111";
+
+  it("requires a uuid id alongside every client field", () => {
     const result = updateClientInput.safeParse({
-      id: "client-1",
+      id: VALID_ID,
       name: "Acme",
     });
 
@@ -169,9 +171,64 @@ describe("updateClientInput", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a blank name the same way createClientInput does (AC-2)", () => {
-    const result = updateClientInput.safeParse({ id: "client-1", name: "  " });
+  it("rejects an id that is not a uuid, so a malformed link resolves not found rather than a driver error (AC-11)", () => {
+    const result = updateClientInput.safeParse({
+      id: "not-a-uuid",
+      name: "Acme",
+    });
 
     expect(result.success).toBe(false);
+  });
+
+  it("rejects a blank name the same way createClientInput does (AC-2)", () => {
+    const result = updateClientInput.safeParse({ id: VALID_ID, name: "  " });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("parses a blanked optional field to an explicit null, not undefined, so the patch actually clears the column (AC-7)", () => {
+    const result = updateClientInput.safeParse({
+      id: VALID_ID,
+      name: "Acme",
+      companyEmail: "",
+      phone: "",
+      industry: "",
+      notes: "",
+      billingAddressLine1: "",
+      billingAddressLine2: "",
+      billingCity: "",
+      billingRegion: "",
+      billingPostalCode: "",
+      billingCountry: "",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data).toStrictEqual({
+      id: VALID_ID,
+      name: "Acme",
+      companyEmail: null,
+      phone: null,
+      industry: null,
+      notes: null,
+      billingAddressLine1: null,
+      billingAddressLine2: null,
+      billingCity: null,
+      billingRegion: null,
+      billingPostalCode: null,
+      billingCountry: null,
+    });
+  });
+
+  it("keeps a provided optional value instead of clearing it", () => {
+    const result = updateClientInput.safeParse({
+      id: VALID_ID,
+      name: "Acme",
+      phone: "555-0100",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success ? result.data.phone : undefined).toBe("555-0100");
   });
 });

@@ -9,6 +9,8 @@ import { and, asc, ilike, isNotNull, isNull, type SQL } from "drizzle-orm";
 import { clients } from "@/db/schema";
 import { tenantDb, type StaffContext } from "@/db/tenant";
 
+import { clientId } from "./schema";
+
 export const CLIENTS_PAGE_SIZE = 25;
 
 export type ClientRow = typeof clients.$inferSelect;
@@ -81,10 +83,20 @@ export async function listClients(
   };
 }
 
-/** `undefined` for a missing id and for another agency's id alike (AC-11). */
+/**
+ * `undefined` for a missing id, another agency's id, and one that isn't even
+ * a uuid alike (AC-11). `clients.id` is a uuid column, so an unparsed id
+ * would otherwise reach the database as a malformed query instead of
+ * resolving not found — this is the one place both `[id]` pages read a
+ * client, so validating here covers both without a page level check.
+ */
 export async function getClient(
   ctx: StaffContext,
   id: string,
 ): Promise<ClientRow | undefined> {
-  return tenantDb(ctx).findById(clients, id);
+  const parsed = clientId.safeParse(id);
+
+  return parsed.success
+    ? tenantDb(ctx).findById(clients, parsed.data)
+    : undefined;
 }
