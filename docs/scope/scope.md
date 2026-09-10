@@ -133,17 +133,17 @@ _This is the row that discharges spec 0004's open hazard: `src/proxy.ts` leaves 
 The first real tenant scoped write and read: add a client company, list clients, open one, edit and archive it. This closes the walking skeleton thread.
 **Done when:** a signed in agency user can create, list, open, edit and archive a client, every query runs through the scoping layer, a second agency cannot see the first agency's clients, and the list handles its empty and error states at WCAG 2.2 AA.
 - [x] Design it (spec): `/architect client records`
-- [ ] Build it: `/develop client records`
-  - [ ] The migration and the input schemas: the new columns (phone, industry, structured billing address, the lowercase email constraint) and the Zod schemas for create and update · AC-1, AC-2, AC-3
-  - [ ] One thread end to end: `createClient`, a minimal active only `/clients` list, and `/clients/new`, proving one agency's client stays invisible to another · AC-1, AC-4, AC-10, AC-11, AC-12
-  - [ ] Detail and edit: `/clients/[id]`, `updateClient`, `/clients/[id]/edit` · AC-6, AC-7, AC-11, AC-14
-  - [ ] Archive and restore: `archiveClient`, `restoreClient`, the confirm dialog, the active/archived toggle · AC-4, AC-8, AC-9
-  - [ ] Thicken the list and polish: page number pagination, name search, the empty and error states, and the accessibility pass · AC-4, AC-5, AC-13
+- [x] Build it: `/develop client records`
+  - [x] The migration and the input schemas: the new columns (phone, industry, structured billing address, the lowercase email constraint) and the Zod schemas for create and update · AC-1, AC-2, AC-3
+  - [x] One thread end to end: `createClient`, a minimal active only `/clients` list, and `/clients/new`, proving one agency's client stays invisible to another · AC-1, AC-4, AC-10, AC-11, AC-12
+  - [x] Detail and edit: `/clients/[id]`, `updateClient`, `/clients/[id]/edit` · AC-6, AC-7, AC-11, AC-14
+  - [x] Archive and restore: `archiveClient`, `restoreClient`, the confirm dialog, the active/archived toggle · AC-4, AC-8, AC-9
+  - [x] Thicken the list and polish: page number pagination, name search, the empty and error states, and the accessibility pass · AC-4, AC-5, AC-13
 - [ ] Verify it: `/check verify client records`
 - [ ] Test it: `/test client records`
 - [ ] Review it (fresh model): `/check review client records`
 - [ ] Document it: `/document client records`
-Spec [0006](../specs/0006-client-records/index.md) · atomic build tasks in its `## Build plan`
+Spec [0006](../specs/0006-client-records/index.md) · atomic build tasks in its `## Build plan` · code in `src/db/schema/clients.ts`, `src/clients/`, `src/app/(agency)/clients/`, `src/ui/patterns/confirm-dialog.tsx`, `src/ui/patterns/address-fields.tsx`
 
 ## Slice 2: Subscription & access gate
 
