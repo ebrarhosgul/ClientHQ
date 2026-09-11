@@ -11,12 +11,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  billingView,
-  formatBillingDate,
-  SUBSCRIPTION_STATUSES,
-} from "./billing-state";
+import { billingView, formatBillingDate } from "./billing-state";
 import type { SubscriptionRow } from "./queries";
+import { SUBSCRIPTION_STATUSES } from "./subscription-status";
 
 function row(patch: Partial<SubscriptionRow> = {}): SubscriptionRow {
   return {

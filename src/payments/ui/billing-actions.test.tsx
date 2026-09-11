@@ -29,7 +29,8 @@ vi.mock("@/payments/open-billing-portal", () => ({
   openBillingPortal: mocks.openBillingPortal,
 }));
 
-const { BillingActions } = await import("./billing-actions");
+const { BillingActions, OpenBillingPortalButton } =
+  await import("./billing-actions");
 
 const FORBIDDEN = {
   ok: false,
@@ -260,4 +261,57 @@ describe("accessibility (AC-19)", () => {
       await withTheme(theme, () => expectNoAccessibilityViolations(container));
     },
   );
+});
+
+describe("OpenBillingPortalButton on its own (spec 0008, AC-5)", () => {
+  it("opens the portal under the caller's label", async () => {
+    const user = userEvent.setup();
+    render(<OpenBillingPortalButton>Update your card</OpenBillingPortalButton>);
+
+    await user.click(screen.getByRole("button", { name: "Update your card" }));
+
+    expect(mocks.openBillingPortal).toHaveBeenCalledTimes(1);
+    expect(mocks.startCheckout).not.toHaveBeenCalled();
+  });
+
+  it("defaults to Manage billing", () => {
+    render(<OpenBillingPortalButton />);
+
+    expect(
+      screen.getByRole("button", { name: "Manage billing" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a refusal as an alert beside itself, not a thrown page", async () => {
+    const user = userEvent.setup();
+    mocks.openBillingPortal.mockResolvedValue(FORBIDDEN);
+    render(<OpenBillingPortalButton />);
+
+    await user.click(screen.getByRole("button", { name: "Manage billing" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      FORBIDDEN.error.message,
+    );
+  });
+
+  it("speaks its pending state", async () => {
+    const user = userEvent.setup();
+    const pending = deferred<typeof UNAVAILABLE>();
+    mocks.openBillingPortal.mockReturnValue(pending.promise);
+    render(<OpenBillingPortalButton />);
+
+    await user.click(screen.getByRole("button", { name: "Manage billing" }));
+
+    const busy = await screen.findByRole("button", { name: "Opening Stripe…" });
+    expect(busy).toHaveAttribute("aria-busy", "true");
+
+    pending.resolve(UNAVAILABLE);
+    await screen.findByRole("alert");
+  });
+
+  it.each(THEMES)("has no axe violation in the %s theme", async (theme) => {
+    const { container } = render(<OpenBillingPortalButton />);
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
 });

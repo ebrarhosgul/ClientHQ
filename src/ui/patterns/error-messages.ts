@@ -21,6 +21,8 @@ const MESSAGES: Readonly<Record<ActionErrorCode, string>> = {
     "Someone changed this while you were working. Reload and try again.",
   rate_limited: "That is a lot of requests. Wait a moment and try again.",
   unavailable: "Your account is still being set up. Try again in a moment.",
+  subscription_inactive:
+    "Your agency's subscription needs attention before changes can be saved. Open Billing to sort it out.",
 };
 
 /**

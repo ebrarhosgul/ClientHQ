@@ -1,3 +1,4 @@
+import type { AccessLevel } from "@/access/level";
 import type {
   DeliverableStatus,
   InvoiceStatus,
@@ -35,21 +36,11 @@ const TINT_CLASSES: Readonly<Record<ChipTint, string>> = {
 };
 
 /**
- * The subscription access levels feature 9 owns.
- *
- * PROVISIONAL. These four names are used here because the top bar banner needs
- * a tint before that feature exists. Feature 9 either adopts them verbatim or
- * changes this file when it lands; spec 0004's follow up says so.
+ * The subscription access levels, as `src/access/level.ts` defines them (spec
+ * 0008). Spec 0004 drafted these four names provisionally and feature 9
+ * adopted them verbatim, so the chip map is keyed by the real type.
  */
-export const SUBSCRIPTION_ACCESS_LEVELS = [
-  "full",
-  "grace",
-  "locked",
-  "unsubscribed",
-] as const;
-
-export type SubscriptionAccessLevel =
-  (typeof SUBSCRIPTION_ACCESS_LEVELS)[number];
+export type SubscriptionAccessLevel = AccessLevel;
 
 type Presentation = {
   readonly label: string;
@@ -84,7 +75,7 @@ export const DELIVERABLE_STATUS_PRESENTATION: Readonly<
   ready: { label: "Ready", tint: "success" },
 };
 
-/** Provisional, owned by feature 9. `full` shows nothing at all. */
+/** `full` shows nothing at all: good standing is not a status to display. */
 export const SUBSCRIPTION_ACCESS_PRESENTATION: Readonly<
   Record<Exclude<SubscriptionAccessLevel, "full">, Presentation>
 > = {

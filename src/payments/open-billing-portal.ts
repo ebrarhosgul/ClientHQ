@@ -30,6 +30,10 @@ const createPortalSession = withTenantAction({
   name: "openBillingPortal",
   input: noBillingInput,
   requireRole: "admin",
+  // One of the two actions the access gate exempts (spec 0008, AC-6): this is
+  // how a lapsed agency pays, so it has to work at every level. The admin
+  // guard above still applies.
+  subscription: "any",
   handler: async ({ db }): Promise<{ readonly url: string }> => {
     const existing = await db.findFirst(subscriptions);
 
