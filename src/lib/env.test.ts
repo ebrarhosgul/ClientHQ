@@ -167,6 +167,40 @@ describe("env", () => {
       expect(() => env()).toThrow(/CLERK_SECRET_KEY/);
     });
 
+    it.each([
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRICE_ID",
+      "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    ] as const)(
+      "throws when %s is missing, so a deploy without Stripe fails at boot rather than at checkout (spec 0007)",
+      async (key) => {
+        setProcessEnv(withoutKey(key));
+
+        const env = await freshEnv();
+
+        expect(() => env()).toThrow(new RegExp(key));
+      },
+    );
+
+    it("never puts the Stripe secret key or webhook secret into the error message", async () => {
+      setProcessEnv({
+        STRIPE_SECRET_KEY: VALID.STRIPE_SECRET_KEY,
+        STRIPE_WEBHOOK_SECRET: VALID.STRIPE_WEBHOOK_SECRET,
+      });
+
+      const env = await freshEnv();
+
+      expect(() => env()).toThrow();
+      try {
+        env();
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).not.toContain(VALID.STRIPE_SECRET_KEY);
+        expect(message).not.toContain(VALID.STRIPE_WEBHOOK_SECRET);
+      }
+    });
+
     it("treats an empty string as missing, not as a value", async () => {
       setProcessEnv({ ...VALID, DATABASE_URL: "" });
 

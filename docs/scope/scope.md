@@ -160,8 +160,8 @@ The agency subscribes: a billing page offering Stripe Checkout, the Billing Port
   - [x] The Portal and the duplicate customer holes: `openBillingPortal()`, the status driven action rule so a cancelled agency can resubscribe, the idempotency key, the `org_id` upsert, and the refusal of a conflicting customer id · AC-6, AC-14, AC-15, AC-18, AC-27
   - [ ] The real billing page: the status card in plain words, the trial end or renewal date, the member read only variant, the loading, empty and error states, the structured failure logging, and the accessibility pass · AC-5, AC-13, AC-19, AC-21
 - [ ] Verify it: `/check verify subscription checkout & Stripe webhook`
-- [ ] Test it: `/test subscription checkout & Stripe webhook`
-- [ ] Review it (fresh model): `/check review subscription checkout & Stripe webhook`
+- [x] Test it: `/test subscription checkout & Stripe webhook`
+- [x] Review it (fresh model): `/check review subscription checkout & Stripe webhook`
 - [ ] Document it: `/document subscription checkout & Stripe webhook`
 Spec [0007](../specs/0007-subscription-checkout-and-stripe-webhook/index.md) · atomic build tasks in its `## Build plan` · code in `src/payments/`, `src/app/(agency)/billing/`, `src/app/api/webhooks/stripe/`, `src/lib/env.ts` · webhook proven against real PostgreSQL in `src/payments/webhook.db.test.ts`, page in `e2e/billing.spec.ts` · verify steps in [its `verify.md`](../specs/0007-subscription-checkout-and-stripe-webhook/verify.md)
 
