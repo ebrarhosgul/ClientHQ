@@ -19,7 +19,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6 | Agency sign in & organization | Slice 1 | in-progress |
 | 7 | Client records | Slice 1 | in-progress |
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | in-progress |
-| 9 | Subscription access gate | Slice 2 | planned |
+| 9 | Subscription access gate | Slice 2 | in-progress |
 | 10 | Client contacts & portal invitations | Slice 3 | planned |
 | 11 | Projects | Slice 4 | planned |
 | 12 | Deliverable upload & download | Slice 5 | planned |
@@ -169,10 +169,22 @@ _**Two milestones are built but unproven, and both wait on the same thing: a Str
 
 _Ships with no migration: spec 0002 already built `subscriptions` and `processed_webhook_events`. Two Stripe fields moved to the subscription **item** in the Basil release (`current_period_end` and `price.id`), and reading the old path stores null silently rather than failing, so spec 0007 calls both out explicitly._
 
-### 9. Subscription access gate · needs a decision
+### 9. Subscription access gate · in-progress
 Turning subscription state into what the agency may actually do: full access, a read only grace window, or locked out to billing only. Derived at read time so a grace window expires on its own.
 **Done when:** each Stripe state produces the right access level, the grace window blocks writes while leaving reads working, a lapsed grace window locks without any scheduled job running, the banner links to the Billing Portal, and no data is ever deleted by the gate.
-- [ ] Design it (spec): `/architect subscription access gate`
+- [x] Design it (spec): `/architect subscription access gate`
+- [ ] Build it: `/develop subscription access gate`
+  - [ ] One thread end to end: the pure `accessVerdict` over every Stripe status, the `(gated)` route group with its redirecting layout and the `(agency)` error boundary, the `subscription_inactive` code, `requireFullAccess` wired into `withTenantAction()` before parsing with the two billing actions opted out, proven by a fresh agency reaching `/dashboard` only after subscribing and a hand set lapsed row being redirected and refused · AC-1, AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-9, AC-13
+  - [ ] The grace window: the banner in its admin and member variants with the UTC end date, the refusal shown in forms with a link to `/billing`, and the order of checks and exemption list pinned by tests · AC-5, AC-6, AC-7
+  - [ ] Locked, logging and the edges: the role aware notice on `/billing`, refusal and invariant logging, the fail closed tests, the real PostgreSQL read test, and the reachable pages test · AC-4, AC-10, AC-11, AC-12
+  - [ ] Accessibility and the seed: axe on both themes, the manual keyboard and screen reader pass, a `past_due` agency in the seed, and the new states in `/design` · AC-14
+- [ ] Verify it: `/check verify subscription access gate`
+- [ ] Test it: `/test subscription access gate`
+- [ ] Review it (fresh model): `/check review subscription access gate`
+- [ ] Document it: `/document subscription access gate`
+Spec [0008](../specs/0008-subscription-access-gate/index.md) · atomic build tasks in its `## Build plan` · code will live in `src/access/`, `src/app/(agency)/(gated)/`, `src/app/(agency)/error.tsx`, `src/db/tenant/subscription.ts`, `src/db/tenant/action.ts`, `src/db/tenant/errors.ts`, `src/payments/subscription-status.ts`
+
+_Ships with no migration and no new environment variable: the gate reads `status` and `past_due_since` from the row spec 0007 writes. `/billing` and `/settings` stay outside the gated route group on purpose, so a lapsed agency can always pay. The client portal rule (locked agency, unavailable portal) is fixed here and applied by feature 15._
 
 ## Slice 3: Client contacts & portal invitations
 
@@ -254,6 +266,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
 - **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
 - **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · needs a decision
+- **Gate re check on client side navigation**: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately by the wrapper, so the gap is read only and bounded. Worth measuring once real agencies exist; `template.tsx` in the `(gated)` group is the first thing to try if it matters · from spec 0008 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend
