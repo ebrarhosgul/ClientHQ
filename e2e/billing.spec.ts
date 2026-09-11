@@ -75,9 +75,23 @@ test.describe("the billing page, signed out", () => {
     // The skeleton itself is a state this page can render, so it is a state
     // that has to be accessible. What carries the meaning is the region's
     // label; the grey shapes inside it are hidden from assistive technology.
+    //
+    // Signed out, the page awaits nothing, so the shell (with the skeleton in
+    // it) and the resolved card stream down in one flush and React swaps them
+    // inside a single parse pass, before any locator can look. Delaying the
+    // request would not help; it holds the request before it reaches the
+    // server and slows nothing inside the render. So the response is cut at
+    // the first streamed segment instead: the shell and its fallback arrive,
+    // the card never does, which is exactly what a visitor sees while the
+    // subscription row is still being read.
     await page.route("**/billing", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      await route.continue();
+      const response = await route.fetch();
+      const html = await response.text();
+      const streamedSegment = html.indexOf('<div hidden id="S:');
+      await route.fulfill({
+        response,
+        body: streamedSegment === -1 ? html : html.slice(0, streamedSegment),
+      });
     });
 
     await page.goto("/billing", { waitUntil: "commit" });

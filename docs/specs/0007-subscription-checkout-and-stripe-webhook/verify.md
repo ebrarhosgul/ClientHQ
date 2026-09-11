@@ -33,18 +33,18 @@ Everything under **Commands** already passes today and needs none of that.
 
 ## Commands
 
-- [ ] `corepack pnpm vitest run src/payments/webhook.db.test.ts` → 19 pass against real PostgreSQL: replay, out of order delivery, the failed state change rolling the ledger back, two concurrent deliveries, the poison events, and `past_due_since` → AC-8, AC-9, AC-10, AC-12, AC-15, AC-16, AC-22, AC-23, AC-25, AC-26, AC-27
-- [ ] `corepack pnpm vitest run src/payments/events.test.ts` → the item level `current_period_end` and `price.id` are parsed rather than assumed, and a pre Basil shaped payload throws instead of storing null → AC-4
-- [ ] `corepack pnpm vitest run src/payments/billing-state.test.ts` → a cancelled agency is offered Checkout **and** the portal; an unknown status renders rather than crashing → AC-1, AC-5, AC-6
-- [ ] `corepack pnpm vitest run src/payments/idempotency.test.ts` → the key covers the agency, the attached customer and a five minute bucket → AC-18
-- [ ] `corepack pnpm vitest run src/payments/fence.test.ts` → `withSystemAccess` is imported by exactly the Stripe route and the tenant layer's own test → AC-20
-- [ ] `corepack pnpm vitest run tools/eslint/tenant-isolation-config.test.mts` → neither ESLint exemption list grew → AC-20
-- [ ] `corepack pnpm exec playwright test e2e/billing.spec.ts` → 5 pass: the no subscription state, no buttons for someone who cannot act, axe clean in light and dark, and the loading state announcing itself in words → AC-1, AC-13, AC-19
-- [ ] `curl -X POST localhost:3000/api/webhooks/stripe -H 'stripe-signature: t=1,v1=nonsense' -d '{}'` → **400**, and no row appears in `processed_webhook_events` → AC-11
-- [ ] `curl -X POST localhost:3000/api/webhooks/stripe -d '{}'` (no signature header at all) → **400** → AC-11
+- [x] `corepack pnpm vitest run src/payments/webhook.db.test.ts` → 19 pass against real PostgreSQL: replay, out of order delivery, the failed state change rolling the ledger back, two concurrent deliveries, the poison events, and `past_due_since` → AC-8, AC-9, AC-10, AC-12, AC-15, AC-16, AC-22, AC-23, AC-25, AC-26, AC-27
+- [x] `corepack pnpm vitest run src/payments/events.test.ts` → the item level `current_period_end` and `price.id` are parsed rather than assumed, and a pre Basil shaped payload throws instead of storing null → AC-4
+- [x] `corepack pnpm vitest run src/payments/billing-state.test.ts` → a cancelled agency is offered Checkout **and** the portal; an unknown status renders rather than crashing → AC-1, AC-5, AC-6
+- [x] `corepack pnpm vitest run src/payments/idempotency.test.ts` → the key covers the agency, the attached customer and a five minute bucket → AC-18
+- [x] `corepack pnpm vitest run src/payments/fence.test.ts` → `withSystemAccess` is imported by exactly the Stripe route and the tenant layer's own test → AC-20
+- [x] `corepack pnpm vitest run tools/eslint/tenant-isolation-config.test.mts` → neither ESLint exemption list grew → AC-20
+- [x] `corepack pnpm exec playwright test e2e/billing.spec.ts` → 5 pass: the no subscription state, no buttons for someone who cannot act, axe clean in light and dark, and the loading state announcing itself in words → AC-1, AC-13, AC-19
+- [x] `curl -X POST localhost:3000/api/webhooks/stripe -H 'stripe-signature: t=1,v1=nonsense' -d '{}'` → **400**, and no row appears in `processed_webhook_events` → AC-11
+- [x] `curl -X POST localhost:3000/api/webhooks/stripe -d '{}'` (no signature header at all) → **400** → AC-11
 - [ ] With `stripe listen` running: `stripe trigger checkout.session.completed`, then resend that same event from the Stripe dashboard → the second delivery returns 200 and changes no row → AC-8
 - [ ] Watch the server log during any failed delivery → exactly one JSON line carrying `event`, `outcome`, `eventId`, `eventType`, `reason` and `at`; the signature failure line names what it can and claims no event id → AC-21
-- [ ] `corepack pnpm build` → `/billing` and `/api/webhooks/stripe` both appear as dynamic routes
+- [x] `corepack pnpm build` → `/billing` and `/api/webhooks/stripe` both appear as dynamic routes
 
 ## Acceptance-criteria coverage
 
