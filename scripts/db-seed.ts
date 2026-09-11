@@ -9,6 +9,11 @@
  * items. A subscription row is included too, so the access gate has something
  * to read.
  *
+ * A second, much smaller agency sits beside it (spec 0008): one admin and a
+ * subscription in `past_due` since an hour before the seed ran, so the grace
+ * window banner is one seed away in development, and the lockout is one seed
+ * plus a week away with nothing else run.
+ *
  * Every id is a hardcoded constant, and every row is written with "insert, or
  * update on conflict", which is what makes running it twice an update rather
  * than a duplicate.
@@ -78,14 +83,22 @@ const fixedId = (block: number, n: number): string =>
   `0190a000-0000-7000-8000-${block.toString(16).padStart(4, "0")}${n.toString(16).padStart(8, "0")}`;
 
 const ORG = fixedId(1, 1);
+/** The agency in its grace window. */
+const PAST_DUE_ORG = fixedId(1, 2);
 const USER = {
   admin: fixedId(2, 1),
   member: fixedId(2, 2),
   contactPriya: fixedId(2, 3),
   contactMarcus: fixedId(2, 4),
+  pastDueAdmin: fixedId(2, 5),
 };
-const MEMBERSHIP = { admin: fixedId(3, 1), member: fixedId(3, 2) };
+const MEMBERSHIP = {
+  admin: fixedId(3, 1),
+  member: fixedId(3, 2),
+  pastDueAdmin: fixedId(3, 3),
+};
 const SUBSCRIPTION = fixedId(4, 1);
+const PAST_DUE_SUBSCRIPTION = fixedId(4, 2);
 const CLIENT = {
   northwind: fixedId(5, 1),
   lumen: fixedId(5, 2),
@@ -288,6 +301,13 @@ function dataset() {
         nextInvoiceNumber: 5,
         defaultCurrency: "USD",
       },
+      {
+        id: PAST_DUE_ORG,
+        clerkOrgId: "org_seed_harbor_lane",
+        name: "Harbor Lane",
+        slug: "harbor-lane",
+        defaultCurrency: "USD",
+      },
     ] satisfies (typeof schema.organizations.$inferInsert)[],
 
     users: [
@@ -315,6 +335,12 @@ function dataset() {
         email: "marcus.lindqvist@lumen.example",
         name: "Marcus Lindqvist",
       },
+      {
+        id: USER.pastDueAdmin,
+        clerkUserId: "user_seed_harbor_admin",
+        email: "dana.reyes@harbor-lane.example",
+        name: "Dana Reyes",
+      },
     ] satisfies (typeof schema.users.$inferInsert)[],
 
     memberships: [
@@ -324,6 +350,12 @@ function dataset() {
         orgId: ORG,
         userId: USER.member,
         role: "member",
+      },
+      {
+        id: MEMBERSHIP.pastDueAdmin,
+        orgId: PAST_DUE_ORG,
+        userId: USER.pastDueAdmin,
+        role: "admin",
       },
     ] satisfies (typeof schema.memberships.$inferInsert)[],
 
@@ -337,6 +369,19 @@ function dataset() {
         status: "active",
         currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
         cancelAtPeriodEnd: false,
+      },
+      {
+        id: PAST_DUE_SUBSCRIPTION,
+        orgId: PAST_DUE_ORG,
+        stripeCustomerId: "cus_seed_harbor_lane",
+        stripeSubscriptionId: "sub_seed_harbor_lane",
+        stripePriceId: "price_seed_monthly",
+        status: "past_due",
+        currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
+        cancelAtPeriodEnd: false,
+        // Relative to the seed, so the window is open now and lapses on its
+        // own in a week: `grace` today, `locked` after 7 days, no job needed.
+        pastDueSince: new Date(Date.now() - 60 * 60 * 1000),
       },
     ] satisfies (typeof schema.subscriptions.$inferInsert)[],
 
