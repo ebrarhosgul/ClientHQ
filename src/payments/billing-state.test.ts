@@ -11,7 +11,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { billingView, formatBillingDate } from "./billing-state";
+import {
+  billingView,
+  formatBillingDate,
+  SUBSCRIPTION_STATUSES,
+} from "./billing-state";
 import type { SubscriptionRow } from "./queries";
 
 function row(patch: Partial<SubscriptionRow> = {}): SubscriptionRow {
@@ -71,6 +75,29 @@ describe("what the billing page offers", () => {
     // Never offer Checkout to an agency that might already be paying.
     expect(view.canSubscribe).toBe(false);
     expect(view.canOpenPortal).toBe(true);
+  });
+});
+
+describe("the words on the chip (AC-19)", () => {
+  it.each(SUBSCRIPTION_STATUSES)(
+    "gives %s its own label and sentence, so the tint is never the only signal",
+    (status) => {
+      const view = billingView(row({ status }));
+
+      expect(view.label).not.toBe("");
+      // "Subscription" is the fallback for a status nobody has seen; a known
+      // one must say something more specific than that.
+      expect(view.label).not.toBe("Subscription");
+      expect(view.description).not.toBe("");
+    },
+  );
+
+  it("calls a failed payment a failed payment, and says what to do about it", () => {
+    const view = billingView(row({ status: "past_due" }));
+
+    expect(view.label).toBe("Payment failed");
+    expect(view.tint).toBe("warning");
+    expect(view.description).toMatch(/updating your card/i);
   });
 });
 
