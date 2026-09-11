@@ -32,10 +32,13 @@ export type ConfirmDialogProps = {
   readonly confirmLabel: string;
   readonly pendingLabel?: string;
   readonly variant?: "default" | "destructive";
-  /** Runs the action and returns whether it succeeded. Throwing is not caught. */
+  /**
+   * Runs the action and returns whether it succeeded. Throwing is not caught.
+   * The message is inline content: a sentence, or one with a link in it.
+   */
   readonly onConfirm: () => Promise<{
     readonly ok: boolean;
-    readonly message?: string;
+    readonly message?: ReactNode;
   }>;
 };
 
@@ -51,7 +54,7 @@ export function ConfirmDialog({
   const [open, setOpen] = useState(false);
 
   const [state, submit, pending] = useActionState<
-    { readonly error?: string },
+    { readonly error?: ReactNode },
     FormData
   >(async () => {
     const result = await onConfirm();

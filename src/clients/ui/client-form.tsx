@@ -7,8 +7,8 @@ import { createClient } from "@/clients/create-client";
 import type { ClientRow } from "@/clients/queries";
 import { updateClient } from "@/clients/update-client";
 import type { ActionError } from "@/db/tenant";
+import { ActionErrorMessage } from "@/ui/patterns/action-error";
 import { AddressFields } from "@/ui/patterns/address-fields";
-import { errorMessage } from "@/ui/patterns/error-messages";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/primitives/alert";
 import { Field } from "@/ui/primitives/field";
 import { Input } from "@/ui/primitives/input";
@@ -129,7 +129,9 @@ export function ClientForm({ client }: ClientFormProps) {
         <Alert variant="destructive">
           <AlertTitle>That did not save</AlertTitle>
           <AlertDescription>
-            <p>{errorMessage(state.error)}</p>
+            <p>
+              <ActionErrorMessage error={state.error} />
+            </p>
           </AlertDescription>
         </Alert>
       ) : undefined}

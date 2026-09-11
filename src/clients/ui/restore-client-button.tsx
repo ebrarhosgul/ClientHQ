@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useActionState } from "react";
 
 import { restoreClient } from "@/clients/archive-client";
-import { errorMessage } from "@/ui/patterns/error-messages";
+import type { ActionError } from "@/db/tenant";
+import { ActionErrorMessage } from "@/ui/patterns/action-error";
 import { SubmitButton } from "@/ui/primitives/submit-button";
 
 /** No confirmation needed to bring a client back (spec 0006, AC-9). */
@@ -16,20 +17,20 @@ export function RestoreClientButton({
 }) {
   const router = useRouter();
 
-  const [state, submit] = useActionState<{ readonly error?: string }, FormData>(
-    async () => {
-      const result = await restoreClient({ id: clientId });
+  const [state, submit] = useActionState<
+    { readonly error?: ActionError },
+    FormData
+  >(async () => {
+    const result = await restoreClient({ id: clientId });
 
-      if (!result.ok) {
-        return { error: errorMessage(result.error) };
-      }
+    if (!result.ok) {
+      return { error: result.error };
+    }
 
-      router.refresh();
+    router.refresh();
 
-      return {};
-    },
-    {},
-  );
+    return {};
+  }, {});
 
   return (
     <form action={submit} className="flex flex-col items-start gap-2">
@@ -39,7 +40,7 @@ export function RestoreClientButton({
       </SubmitButton>
       {state.error ? (
         <p role="alert" className="text-sm text-destructive">
-          {state.error}
+          <ActionErrorMessage error={state.error} />
         </p>
       ) : undefined}
     </form>

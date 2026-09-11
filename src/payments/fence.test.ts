@@ -1,9 +1,10 @@
 // @vitest-environment node
 
 /**
- * covers: spec 0007 AC-20
+ * covers: spec 0007 AC-20 · spec 0008 AC-6
  *
- * The fence, checked against the repository rather than against the config.
+ * Two fences, both checked against the repository rather than against the
+ * config: the unscoped database door, and the access gate's opt out.
  *
  * `tools/eslint/tenant-isolation-config.test.mts` already proves the ESLint
  * rule is switched on, at error severity, and exempts exactly the files spec
@@ -14,6 +15,11 @@
  * catch, or to widen the list, which it would not.
  *
  * So: one importer, and the exemption list is not this feature's to grow.
+ *
+ * Spec 0008 adds the second fence. `subscription: "any"` on a wrapped action
+ * skips the subscription gate, and exactly two actions may say it: the ones
+ * that let a lapsed agency pay. A third would be a write that works while
+ * unpaid, which is the thing the gate exists to make impossible by default.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -80,5 +86,37 @@ describe("the second door stays shut", () => {
     for (const importer of importers) {
       expect(ALLOWED).toContain(importer);
     }
+  });
+});
+
+/**
+ * Every spelling of the opt out: the key, optional quotes, the colon, and the
+ * value in either quote style. Comments and docs mention it too, which is why
+ * the search is for the config line and not the bare phrase.
+ */
+const OPTS_OUT_OF_GATE =
+  /^\s*(?:"subscription"|subscription)\s*:\s*["']any["']\s*,?\s*$/m;
+
+describe("the subscription gate's opt out stays with the two billing actions", () => {
+  it("is set by startCheckout and openBillingPortal and nothing else", async () => {
+    const files = await fastGlob("src/**/*.{ts,tsx}", {
+      cwd: ROOT,
+      ignore: ["src/**/*.test.{ts,tsx}"],
+    });
+
+    const optedOut = (
+      await Promise.all(
+        files.map(async (file) => {
+          const source = await readFile(path.join(ROOT, file), "utf8");
+
+          return OPTS_OUT_OF_GATE.test(source) ? file : undefined;
+        }),
+      )
+    ).filter((file): file is string => file !== undefined);
+
+    expect(optedOut.sort()).toEqual([
+      "src/payments/open-billing-portal.ts",
+      "src/payments/start-checkout.ts",
+    ]);
   });
 });

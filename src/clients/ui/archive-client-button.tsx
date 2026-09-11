@@ -4,7 +4,7 @@ import { Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { archiveClient } from "@/clients/archive-client";
-import { errorMessage } from "@/ui/patterns/error-messages";
+import { ActionErrorMessage } from "@/ui/patterns/action-error";
 import { ConfirmDialog } from "@/ui/patterns/confirm-dialog";
 import { Button } from "@/ui/primitives/button";
 
@@ -38,7 +38,10 @@ export function ArchiveClientButton({
         const result = await archiveClient({ id: clientId });
 
         if (!result.ok) {
-          return { ok: false, message: errorMessage(result.error) };
+          return {
+            ok: false,
+            message: <ActionErrorMessage error={result.error} />,
+          };
         }
 
         router.refresh();
