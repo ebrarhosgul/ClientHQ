@@ -41,10 +41,11 @@ const COLUMNS: readonly Column<ContactSummary>[] = [
     key: "contact",
     header: "Contact",
     priority: "high",
+    cellClassName: "whitespace-normal",
     cell: (contact) => (
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-w-40 flex-col">
         <span className="font-medium">{contact.name}</span>
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="text-xs wrap-anywhere text-muted-foreground">
           {contact.email}
         </span>
       </div>
@@ -54,22 +55,22 @@ const COLUMNS: readonly Column<ContactSummary>[] = [
     key: "status",
     header: "Status",
     priority: "high",
-    cell: (contact) => (
-      <ContactStatusChip
-        status={contact.status}
-        inviteExpiresAt={contact.inviteExpiresAt}
-      />
-    ),
-  },
-  {
-    key: "invited",
-    header: "Invitation",
-    priority: "low",
-    cell: (contact) => (
-      <span className="text-xs text-muted-foreground">
-        {invitedLine(contact) ?? "—"}
-      </span>
-    ),
+    cellClassName: "whitespace-normal",
+    cell: (contact) => {
+      const line = invitedLine(contact);
+
+      return (
+        <div className="flex flex-col items-start gap-1">
+          <ContactStatusChip
+            status={contact.status}
+            inviteExpiresAt={contact.inviteExpiresAt}
+          />
+          {line ? (
+            <span className="text-xs text-muted-foreground">{line}</span>
+          ) : undefined}
+        </div>
+      );
+    },
   },
 ];
 

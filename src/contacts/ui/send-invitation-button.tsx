@@ -49,7 +49,7 @@ export function SendInvitationButton({
   }, {});
 
   return (
-    <form action={submit} className="inline-flex flex-col items-end gap-1">
+    <form action={submit} className="inline-flex flex-col items-start gap-1">
       <SubmitButton
         size="sm"
         variant="outline"
@@ -62,7 +62,7 @@ export function SendInvitationButton({
       {state.error ? (
         <p
           role="alert"
-          className="max-w-xs text-right text-xs text-destructive"
+          className="w-56 text-left text-xs whitespace-normal text-destructive"
         >
           <ActionErrorMessage error={state.error} />
         </p>
