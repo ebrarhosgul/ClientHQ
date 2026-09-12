@@ -28,6 +28,10 @@ vi.mock("@/clients/ui/archive-client-button", () => ({
 vi.mock("@/clients/ui/restore-client-button", () => ({
   RestoreClientButton: () => <button type="button">Restore</button>,
 }));
+// The Contacts section runs its own scoped query and has its own tests.
+vi.mock("@/contacts/ui/contacts-section", () => ({
+  ContactsSection: () => <section aria-label="Contacts" />,
+}));
 
 const { default: ClientDetailPage } = await import("./page");
 

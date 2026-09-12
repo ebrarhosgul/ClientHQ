@@ -143,6 +143,40 @@ export async function clerkUser(
   }
 }
 
+/**
+ * Every verified email address on this account, lowercased (spec 0009, AC-10).
+ *
+ * Verified means Clerk has confirmed it, by a code, a magic link or an OAuth
+ * provider that vouches for it. An address merely typed in, or one whose
+ * verification is still pending, is not in this list, and so cannot bind an
+ * invitation. `not_found` when Clerk 404s, thrown for anything else, exactly
+ * as `clerkUser()` does.
+ */
+export async function clerkVerifiedEmails(
+  clerkUserId: string,
+): Promise<Result<readonly string[]>> {
+  const clerk = await clerkClient();
+
+  try {
+    const user = await clerk.users.getUser(clerkUserId);
+
+    return ok(
+      user.emailAddresses
+        .filter((address) => address.verification?.status === "verified")
+        .map((address) => address.emailAddress.trim().toLowerCase()),
+    );
+  } catch (error) {
+    if (isNotFound(error)) {
+      return failure({
+        code: "not_found",
+        message: "That account no longer exists.",
+      });
+    }
+
+    throw error;
+  }
+}
+
 /** Clerk rejects a payload it understands but will not accept, a taken slug included. */
 function isUnprocessable(error: unknown): boolean {
   return (

@@ -15,6 +15,13 @@
       "when": 1788998163601,
       "tag": "0001_new_brother_voodoo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789239049250,
+      "tag": "0002_faithful_marauders",
+      "breakpoints": true
     }
   ]
 }

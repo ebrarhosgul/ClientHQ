@@ -38,6 +38,9 @@ const VALID = {
   STRIPE_WEBHOOK_SECRET: "whsec_not_a_real_secret",
   STRIPE_PRICE_ID: "price_not_a_real_price",
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_not_a_real_key",
+  // Added by client contacts & portal invitations (spec 0009): the sending
+  // address is required everywhere; the Resend key only in production.
+  EMAIL_FROM: "invites@example.com",
 } as const;
 
 /**
@@ -133,7 +136,13 @@ describe("env", () => {
     it.each(["development", "test", "production"] as const)(
       "accepts NODE_ENV=%s",
       async (nodeEnv) => {
-        setProcessEnv({ ...VALID, NODE_ENV: nodeEnv });
+        // Production also needs the Resend key (spec 0009); see the email
+        // cases below for the rule itself.
+        setProcessEnv({
+          ...VALID,
+          NODE_ENV: nodeEnv,
+          RESEND_API_KEY: "re_not_a_real_key",
+        });
 
         const env = await freshEnv();
 
@@ -182,6 +191,52 @@ describe("env", () => {
         expect(() => env()).toThrow(new RegExp(key));
       },
     );
+
+    describe("email (spec 0009)", () => {
+      it("throws when EMAIL_FROM is missing", async () => {
+        setProcessEnv(withoutKey("EMAIL_FROM"));
+
+        const env = await freshEnv();
+
+        expect(() => env()).toThrow(/EMAIL_FROM/);
+      });
+
+      it("throws when EMAIL_FROM is not a bare address", async () => {
+        setProcessEnv({ ...VALID, EMAIL_FROM: "Acme <invites@example.com>" });
+
+        const env = await freshEnv();
+
+        expect(() => env()).toThrow(/EMAIL_FROM/);
+      });
+
+      it("accepts a missing RESEND_API_KEY outside production, so the console transport can run", async () => {
+        setProcessEnv({ ...VALID, NODE_ENV: "development" });
+
+        const env = await freshEnv();
+
+        expect(env().RESEND_API_KEY).toBeUndefined();
+      });
+
+      it("requires RESEND_API_KEY in production", async () => {
+        setProcessEnv({ ...VALID, NODE_ENV: "production" });
+
+        const env = await freshEnv();
+
+        expect(() => env()).toThrow(/RESEND_API_KEY is required in production/);
+      });
+
+      it("accepts RESEND_API_KEY in production when it is set", async () => {
+        setProcessEnv({
+          ...VALID,
+          NODE_ENV: "production",
+          RESEND_API_KEY: "re_not_a_real_key",
+        });
+
+        const env = await freshEnv();
+
+        expect(env().RESEND_API_KEY).toBe("re_not_a_real_key");
+      });
+    });
 
     it("never puts the Stripe secret key or webhook secret into the error message", async () => {
       setProcessEnv({

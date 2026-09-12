@@ -81,11 +81,26 @@ export {
 export {
   createAgencyRows,
   ensureMirrorRows,
+  ensureUserRow,
   suggestedSlug,
   type MirrorIds,
   type MirrorOrganization,
   type MirrorUser,
 } from "./provisioning";
+
+/**
+ * Feature 10's acceptance door (spec 0009, AC-13). The one place a
+ * `client_contacts` row is read with no tenant context: it takes a token, and
+ * the row it fetches by primary key names the organization. Narrower than
+ * `withSystemAccess`, so exported here rather than fenced.
+ */
+export {
+  acceptInvitation,
+  inspectInvitation,
+  type AcceptOutcome,
+  type InspectOutcome,
+  type InvitationIdentity,
+} from "./invitation";
 
 export {
   TENANT_TABLE_KEYS,

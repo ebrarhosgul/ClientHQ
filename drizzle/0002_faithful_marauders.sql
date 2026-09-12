@@ -1,0 +1,3 @@
+ALTER TABLE "client_contacts" ADD COLUMN "invited_by_user_id" uuid;--> statement-breakpoint
+ALTER TABLE "client_contacts" ADD CONSTRAINT "client_contacts_invited_by_user_id_users_id_fk" FOREIGN KEY ("invited_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "client_contacts_invited_by_user_id_idx" ON "client_contacts" USING btree ("invited_by_user_id");
