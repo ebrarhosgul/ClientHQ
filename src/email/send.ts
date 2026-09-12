@@ -16,7 +16,7 @@
  * This module is a side effect on purpose and lives at the edge: nothing in
  * `src/contacts/` composes HTML or talks to Resend directly.
  */
-import { render } from "react-email";
+import { render } from "@react-email/render";
 import { Resend } from "resend";
 import type { ReactElement } from "react";
 

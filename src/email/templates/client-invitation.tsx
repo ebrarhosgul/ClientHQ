@@ -10,7 +10,7 @@ import {
   Preview,
   Section,
   Text,
-} from "react-email";
+} from "@react-email/components";
 
 /**
  * The invitation a client contact receives (spec 0009, AC-5).

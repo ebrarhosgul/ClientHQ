@@ -38,6 +38,13 @@ export const revokeInvitation = withTenantAction({
     }
 
     if (existing.inviteTokenHash === null) {
+      logContactEvent({
+        operation: "revoke",
+        outcome: "already_gone",
+        orgId: ctx.orgId,
+        contactId: existing.id,
+      });
+
       return { id: existing.id };
     }
 

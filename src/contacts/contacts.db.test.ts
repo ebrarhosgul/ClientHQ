@@ -121,7 +121,7 @@ const { removeContact } = await import("./remove-contact");
 const { inspectInvitation, acceptInvitation } =
   await import("@/db/tenant/invitation");
 const { acceptInvitation: acceptAction } = await import("./accept-invitation");
-const { render } = await import("react-email");
+const { render } = await import("@react-email/render");
 const { hashToken, parseToken } = await import("./token");
 const { contactStatus } = await import("./status");
 

@@ -7,7 +7,7 @@
  * link with the token URL encoded, the expiry as a UTC calendar date, the
  * idempotency key convention, and a plain text part that carries the link too.
  */
-import { render } from "react-email";
+import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
 
 import { formatAddress, renderEmail } from "@/email/send";
