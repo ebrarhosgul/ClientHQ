@@ -423,7 +423,6 @@ function mirrorOf(
 }
 
 const logged: string[] = [];
-let infoSpy: ReturnType<typeof vi.spyOn> | undefined;
 
 beforeEach(() => {
   state.sent.length = 0;
@@ -433,7 +432,7 @@ beforeEach(() => {
   state.clerk.user = undefined;
   state.clerk.emails = [];
   logged.length = 0;
-  infoSpy = vi.spyOn(console, "info").mockImplementation((line: unknown) => {
+  vi.spyOn(console, "info").mockImplementation((line: unknown) => {
     if (typeof line === "string") {
       logged.push(line);
     }

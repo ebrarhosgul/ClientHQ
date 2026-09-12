@@ -21,6 +21,8 @@ export type ContactsSectionViewProps = {
    */
   readonly addForm?: ReactNode;
   readonly actions?: (contact: ContactSummary) => ReactNode;
+  /** Only `/design` sets this, because it renders the section twice on one page. */
+  readonly headingId?: string;
 };
 
 /** "Invited by Ada on 12 September 2026 (UTC)", or "Invited on ..." with no inviter. */
@@ -87,20 +89,18 @@ export function ContactsSectionView({
   contacts,
   addForm,
   actions,
+  headingId = "contacts-heading",
 }: ContactsSectionViewProps) {
   const count = contacts.length;
 
   return (
     <section
-      aria-labelledby="contacts-heading"
+      aria-labelledby={headingId}
       className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h2
-            id="contacts-heading"
-            className="text-base font-semibold tracking-tight"
-          >
+          <h2 id={headingId} className="text-base font-semibold tracking-tight">
             Contacts
           </h2>
           <p className="text-xs text-muted-foreground">

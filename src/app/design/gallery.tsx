@@ -8,8 +8,15 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { GraceBanner } from "@/access/ui/grace-banner";
+import { AcceptInvitationCard } from "@/contacts/ui/accept-invitation-card";
+import { ContactsSectionView } from "@/contacts/ui/contacts-section-view";
+import {
+  ACCEPT_STATE_FIXTURES,
+  CONTACT_FIXTURES,
+} from "@/contacts/ui/fixtures";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
 import { AddressFields } from "@/ui/patterns/address-fields";
@@ -681,6 +688,87 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
             </>
           )}
         />
+      </Section>
+
+      <Section
+        id={scoped("contacts")}
+        title="Client contacts"
+        description="The Contacts section of a client page in every invitation status, then empty. The word carries the status; the tint only reinforces it. Controls here are inert stand ins, since the page has no session to act with."
+      >
+        <div className="flex flex-col gap-4">
+          <ContactsSectionView
+            headingId={scoped("contacts-heading")}
+            clientId={CONTACT_FIXTURES[0].clientId}
+            clientName="Northwind Coffee"
+            archived={false}
+            contacts={CONTACT_FIXTURES}
+            addForm={
+              <p className="text-xs text-muted-foreground">
+                The inline add form (name, email, Add contact) sits here on the
+                real page.
+              </p>
+            }
+            actions={(contact) => (
+              <div className="flex justify-end gap-1 whitespace-nowrap">
+                {contact.status === "accepted" ? undefined : (
+                  <Button size="sm" variant="outline" type="button">
+                    {contact.status === "not_invited"
+                      ? "Send invitation"
+                      : contact.status === "unsent"
+                        ? "Send again"
+                        : "Resend"}
+                  </Button>
+                )}
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  type="button"
+                  aria-label={`Edit ${contact.name}`}
+                >
+                  <Pencil />
+                </Button>
+              </div>
+            )}
+          />
+          <ContactsSectionView
+            headingId={scoped("contacts-empty-heading")}
+            clientId={CONTACT_FIXTURES[0].clientId}
+            clientName="Northwind Coffee"
+            archived={false}
+            contacts={[]}
+            addForm={
+              <p className="text-xs text-muted-foreground">
+                The inline add form sits here on the real page.
+              </p>
+            }
+          />
+        </div>
+      </Section>
+
+      <Section
+        id={scoped("accept-invitation")}
+        title="Accept invitation"
+        description="The four states of /portal/accept, with the copy fixed by spec 0009. The wrong account state names only the signed in address, and the invalid state is one sentence for every cause."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          {ACCEPT_STATE_FIXTURES.map(({ label, state }) => (
+            <div key={label} className="flex flex-col gap-2">
+              <p className="font-mono text-xs text-muted-foreground">{label}</p>
+              <AcceptInvitationCard
+                state={state}
+                signOutControl={
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="h-auto min-h-9 w-full whitespace-normal"
+                  >
+                    <Link href="/sign-in">Sign out and switch account</Link>
+                  </Button>
+                }
+              />
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section

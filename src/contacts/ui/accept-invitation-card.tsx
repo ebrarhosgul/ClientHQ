@@ -79,7 +79,10 @@ export function AcceptInvitationCard({
         >
           {signOutControl ?? (
             <SignOutButton redirectUrl={state.switchAccountUrl}>
-              <Button variant="outline" className="w-full">
+              <Button
+                variant="outline"
+                className="h-auto min-h-9 w-full whitespace-normal"
+              >
                 Sign out and switch account
               </Button>
             </SignOutButton>
