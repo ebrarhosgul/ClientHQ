@@ -2,11 +2,11 @@
  * covers: spec 0007 AC-1, AC-5, AC-7, AC-13, AC-17, AC-19, spec 0004 AC-22,
  * spec 0008 AC-4, AC-10
  *
- * `subscriptionForAgency`, `agencyAccess` and `BillingActions` are mocked
- * (each has its own tests); `billingView` and `LockedNotice` are real, so the
- * words on the page are the words the product shows. This file is about what
- * the page reads, who it offers the buttons to, the promise that no Stripe
- * call happens on render, and the notice a locked agency lands on.
+ * `subscriptionForAgency`, `agencyAccessFromRow` and `BillingActions` are
+ * mocked (each has its own tests); `billingView` and `LockedNotice` are real,
+ * so the words on the page are the words the product shows. This file is
+ * about what the page reads, who it offers the buttons to, the promise that
+ * no Stripe call happens on render, and the notice a locked agency lands on.
  */
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +21,7 @@ import {
 const mocks = vi.hoisted(() => ({
   isClerkConfigured: vi.fn(),
   agencyContext: vi.fn(),
-  agencyAccess: vi.fn(),
+  agencyAccessFromRow: vi.fn(),
   subscriptionForAgency: vi.fn(),
   stripeClient: vi.fn(),
   billingActionsProps: [] as Record<string, unknown>[],
@@ -29,7 +29,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
 vi.mock("@/auth/context", () => ({ agencyContext: mocks.agencyContext }));
-vi.mock("@/access/gate", () => ({ agencyAccess: mocks.agencyAccess }));
+vi.mock("@/access/gate", () => ({
+  agencyAccessFromRow: mocks.agencyAccessFromRow,
+}));
 vi.mock("@/payments/queries", () => ({
   subscriptionForAgency: mocks.subscriptionForAgency,
 }));
@@ -88,7 +90,7 @@ beforeEach(() => {
   mocks.billingActionsProps.length = 0;
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.agencyContext.mockResolvedValue(ADMIN);
-  mocks.agencyAccess.mockResolvedValue({
+  mocks.agencyAccessFromRow.mockReturnValue({
     level: "unsubscribed",
     role: "admin",
   });
@@ -113,7 +115,7 @@ describe("what the page reads", () => {
 
     expect(mocks.agencyContext).not.toHaveBeenCalled();
     expect(mocks.subscriptionForAgency).not.toHaveBeenCalled();
-    expect(mocks.agencyAccess).not.toHaveBeenCalled();
+    expect(mocks.agencyAccessFromRow).not.toHaveBeenCalled();
     expect(screen.getByText("No subscription")).toBeInTheDocument();
   });
 });
@@ -121,7 +123,7 @@ describe("what the page reads", () => {
 describe("the locked notice (spec 0008, AC-4, AC-10)", () => {
   it("renders at every level: the page is outside the gate, so it never redirects", async () => {
     for (const level of ["unsubscribed", "full", "grace", "locked"]) {
-      mocks.agencyAccess.mockResolvedValue({ level, role: "admin" });
+      mocks.agencyAccessFromRow.mockReturnValue({ level, role: "admin" });
 
       const { unmount } = await renderPage();
 
@@ -133,7 +135,10 @@ describe("the locked notice (spec 0008, AC-4, AC-10)", () => {
   });
 
   it("opens with the notice when the level is locked, and tells an admin what restores access", async () => {
-    mocks.agencyAccess.mockResolvedValue({ level: "locked", role: "admin" });
+    mocks.agencyAccessFromRow.mockReturnValue({
+      level: "locked",
+      role: "admin",
+    });
     mocks.subscriptionForAgency.mockResolvedValue(row({ status: "unpaid" }));
 
     await renderPage();
@@ -145,7 +150,10 @@ describe("the locked notice (spec 0008, AC-4, AC-10)", () => {
 
   it("tells a member that only an admin can fix it", async () => {
     mocks.agencyContext.mockResolvedValue(MEMBER);
-    mocks.agencyAccess.mockResolvedValue({ level: "locked", role: "member" });
+    mocks.agencyAccessFromRow.mockReturnValue({
+      level: "locked",
+      role: "member",
+    });
     mocks.subscriptionForAgency.mockResolvedValue(row({ status: "canceled" }));
 
     await renderPage();
@@ -158,7 +166,7 @@ describe("the locked notice (spec 0008, AC-4, AC-10)", () => {
   it.each(["unsubscribed", "full", "grace"])(
     "shows no notice on %s",
     async (level) => {
-      mocks.agencyAccess.mockResolvedValue({ level, role: "admin" });
+      mocks.agencyAccessFromRow.mockReturnValue({ level, role: "admin" });
 
       await renderPage();
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { agencyAccess } from "@/access/gate";
+import { agencyAccessFromRow } from "@/access/gate";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import { agencyContext } from "@/auth/context";
 import { billingView, type BillingView } from "@/payments/billing-state";
@@ -54,14 +54,18 @@ export default async function BillingPage() {
   // context that cannot exist (spec 0004, AC-22).
   const ctx = isClerkConfigured() ? await agencyContext() : undefined;
 
-  const view: BillingView = billingView(
-    ctx === undefined ? undefined : await subscriptionForAgency(ctx),
-  );
+  // The one read behind this page (spec 0007, AC-17): both the view and the
+  // access level are derived from this same row, so it is fetched once.
+  const subscriptionRow =
+    ctx === undefined ? undefined : await subscriptionForAgency(ctx);
+
+  const view: BillingView = billingView(subscriptionRow);
 
   const isAdmin = ctx?.role === "admin";
 
   // The level and the role, never anything in the URL.
-  const access = ctx === undefined ? undefined : await agencyAccess();
+  const access =
+    ctx === undefined ? undefined : agencyAccessFromRow(ctx, subscriptionRow);
 
   return (
     <div className="flex flex-col gap-6">

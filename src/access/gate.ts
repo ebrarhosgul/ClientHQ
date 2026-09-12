@@ -18,7 +18,11 @@ import { subscriptions } from "@/db/schema";
 import { tenantDb, type StaffContext } from "@/db/tenant";
 import { logGateInvariant } from "@/db/tenant/log";
 
-import { accessVerdict, type AccessLevel } from "./level";
+import {
+  accessVerdict,
+  type AccessLevel,
+  type SubscriptionAccessRow,
+} from "./level";
 
 export type AgencyAccess = {
   readonly level: AccessLevel;
@@ -28,16 +32,11 @@ export type AgencyAccess = {
   readonly role: StaffContext["role"];
 };
 
-export const agencyAccess = cache(async (): Promise<AgencyAccess> => {
-  const ctx = await agencyContext();
-  const row = await tenantDb(ctx).findFirst(subscriptions);
-
-  const verdict = accessVerdict(
-    row === undefined
-      ? undefined
-      : { status: row.status, pastDueSince: row.pastDueSince },
-    new Date(),
-  );
+function accessFromRow(
+  ctx: StaffContext,
+  row: SubscriptionAccessRow | undefined,
+): AgencyAccess {
+  const verdict = accessVerdict(row, new Date());
 
   if (verdict.invariantBreak !== undefined) {
     logGateInvariant({ orgId: ctx.orgId, reason: verdict.invariantBreak });
@@ -50,4 +49,29 @@ export const agencyAccess = cache(async (): Promise<AgencyAccess> => {
       : { graceEndsAt: verdict.graceEndsAt }),
     role: ctx.role,
   };
+}
+
+export const agencyAccess = cache(async (): Promise<AgencyAccess> => {
+  const ctx = await agencyContext();
+  const row = await tenantDb(ctx).findFirst(subscriptions);
+
+  return accessFromRow(
+    ctx,
+    row === undefined
+      ? undefined
+      : { status: row.status, pastDueSince: row.pastDueSince },
+  );
 });
+
+/**
+ * Same verdict as `agencyAccess()`, from a row the caller already has. For a
+ * page that also needs the full subscription row for its own purposes (e.g.
+ * `/billing`, spec 0007) so it doesn't cause a second `select` for the same
+ * row `agencyAccess()` would otherwise fetch on its own.
+ */
+export function agencyAccessFromRow(
+  ctx: StaffContext,
+  row: SubscriptionAccessRow | undefined,
+): AgencyAccess {
+  return accessFromRow(ctx, row);
+}
