@@ -28,6 +28,7 @@ import {
 import { pooledDb } from "./executor";
 import { requireAdmin, requireStaff } from "./guards";
 import { logRefusal } from "./log";
+import { requireFullAccess } from "./subscription";
 
 /** A path to revalidate. The `type` form is required for a dynamic segment. */
 export type RevalidateTarget =
@@ -61,12 +62,19 @@ export type ActionConfig<TSchema extends ZodType, TData> = {
   ) => Promise<TData>;
 
   /**
-   * Reserved for feature 9, the subscription access gate. Typed `never` on
-   * purpose: the slot is named so the shape does not change when it lands, and
-   * setting it today is a compile error rather than a silent no-op.
+   * The access gate (spec 0008, AC-6). Unset means the agency must have full
+   * access, so a write is refused with `subscription_inactive` in the grace
+   * window, when locked, and before subscribing. `"any"` skips that check and
+   * is set by exactly two actions, the ones that let an agency pay:
+   * `startCheckout` and `openBillingPortal`. Opting out of this gate does not
+   * relax `requireRole`.
    */
-  readonly subscription?: never;
-  /** Reserved for feature 19, the rate limiter. Same reasoning as above. */
+  readonly subscription?: "any";
+  /**
+   * Reserved for feature 19, the rate limiter. Typed `never` on purpose: the
+   * slot is named so the shape does not change when it lands, and setting it
+   * today is a compile error rather than a silent no-op.
+   */
   readonly rateLimit?: never;
 };
 
@@ -154,9 +162,12 @@ function toActionError(
 /**
  * Wrap a handler into a Server Action.
  *
- * Resolution comes first, so an expired session is refused before anything is
- * parsed, and the person who is signed out never learns whether their input was
- * valid.
+ * The order of the checks is the contract: resolution, then the role guard,
+ * then the subscription gate, then parsing. An expired session is refused
+ * before anything is parsed, so the person who is signed out never learns
+ * whether their input was valid; a member with a lapsed subscription gets
+ * `forbidden` rather than a hint about billing; and a locked admin gets
+ * `subscription_inactive` before their input is looked at (spec 0008, AC-6).
  */
 export function withTenantAction<TSchema extends ZodType, TData>(
   config: ActionConfig<TSchema, TData>,
@@ -171,6 +182,12 @@ export function withTenantAction<TSchema extends ZodType, TData>(
         requireAdmin(ctx);
       } else {
         requireStaff(ctx);
+      }
+
+      // On the pooled executor, before any transaction opens: the transaction
+      // below wraps the handler only.
+      if (config.subscription !== "any") {
+        await requireFullAccess(ctx, operation);
       }
 
       const parsed = config.input.safeParse(input);

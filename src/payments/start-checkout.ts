@@ -49,6 +49,10 @@ const createCheckoutSession = withTenantAction({
   // The Clerk session's organization role claim, not `memberships.role`, which
   // is a display mirror and can be stale (AC-13).
   requireRole: "admin",
+  // One of the two actions the access gate exempts (spec 0008, AC-6): this is
+  // how a lapsed agency pays, so it has to work at every level. The admin
+  // guard above still applies.
+  subscription: "any",
   handler: async ({ ctx, db }): Promise<{ readonly url: string }> => {
     const existing = await db.findFirst(subscriptions);
     const appUrl = env().NEXT_PUBLIC_APP_URL;

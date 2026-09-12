@@ -7,6 +7,7 @@
  * callback that calls `archiveClient` and refreshes on success.
  */
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -77,12 +78,16 @@ describe("ArchiveClientButton", () => {
 
     const onConfirm = mocks.confirmDialogProps[0].onConfirm as () => Promise<{
       readonly ok: boolean;
-      readonly message?: string;
+      readonly message?: ReactNode;
     }>;
     const result = await onConfirm();
 
     expect(mocks.refresh).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
-    expect(result.message).toEqual(expect.any(String));
+
+    // The message is rendered content rather than a bare string, so a code
+    // that earns a link (spec 0008, AC-7) can carry one into the dialog.
+    render(<p role="alert">{result.message}</p>);
+    expect(screen.getByRole("alert").textContent).not.toBe("");
   });
 });

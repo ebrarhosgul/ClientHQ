@@ -13,7 +13,10 @@
 
 export type TenantLogLine = {
   readonly event:
-    "tenant.refusal" | "tenant.system_access" | "tenant.escape_hatch";
+    | "tenant.refusal"
+    | "tenant.system_access"
+    | "tenant.escape_hatch"
+    | "access.invariant";
   /** The call site's own name, e.g. `update:clients` or `tenantContext.staff`. */
   readonly operation: string;
   /** Why it was refused, or why unscoped access was granted. */
@@ -46,6 +49,26 @@ export function logSystemAccess(reason: string): void {
     event: "tenant.system_access",
     operation: "withSystemAccess",
     reason,
+    at: new Date().toISOString(),
+  });
+}
+
+/** The one state the gate can see that the webhook should never write. */
+export type GateInvariantDetails = {
+  readonly orgId: string;
+  readonly reason: "past_due_without_since";
+};
+
+/**
+ * Record a subscription row the access gate had to treat as locked because it
+ * broke an invariant (spec 0008, AC-3). One line per request and no dedupe on
+ * purpose: the state is a webhook bug, and loud is right.
+ */
+export function logGateInvariant(details: GateInvariantDetails): void {
+  emit({
+    event: "access.invariant",
+    operation: "accessVerdict",
+    ...details,
     at: new Date().toISOString(),
   });
 }

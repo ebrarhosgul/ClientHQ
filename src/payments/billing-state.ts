@@ -14,29 +14,15 @@
  *    statuses are exhaustive over Stripe's own union, and anything else falls
  *    back to plain wording rather than an error.
  *
- * Interpreting these statuses as *access levels* is feature 9's job, not this
- * one. Nothing here gates anything; it only says what is true.
+ * Interpreting these statuses as *access levels* is `src/access/level.ts`'s
+ * job (spec 0008), not this one. Nothing here gates anything; it only says
+ * what is true. The status list itself lives in `subscription-status.ts` so
+ * both readers share it without either importing the other.
  */
 import type { ChipTint } from "@/ui/patterns/status-chip";
 
 import type { SubscriptionRow } from "./queries";
-
-/**
- * Stripe's subscription statuses, as the pinned API version documents them.
- * Exhaustive over the SDK's union; `unknown` covers a future addition.
- */
-export const SUBSCRIPTION_STATUSES = [
-  "trialing",
-  "active",
-  "past_due",
-  "canceled",
-  "incomplete",
-  "incomplete_expired",
-  "unpaid",
-  "paused",
-] as const;
-
-export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+import { isKnownStatus, type SubscriptionStatus } from "./subscription-status";
 
 /**
  * The statuses that mean "there is nothing live to manage", so Checkout is
@@ -47,10 +33,6 @@ const ENDED_STATUSES: readonly SubscriptionStatus[] = [
   "incomplete_expired",
   "unpaid",
 ];
-
-function isKnownStatus(status: string): status is SubscriptionStatus {
-  return (SUBSCRIPTION_STATUSES as readonly string[]).includes(status);
-}
 
 export type BillingView = {
   /** A few words for the badge, e.g. "Free trial". */
@@ -80,6 +62,27 @@ export function formatBillingDate(date: Date): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+  }).format(date);
+
+  return `${formatted} (UTC)`;
+}
+
+/**
+ * The same, with the time of day, for a moment that matters to the hour.
+ *
+ * The grace window closes at `past_due_since` plus 7 days, not at midnight, so
+ * a banner saying only the date would be wrong for most of that day (spec
+ * 0008, AC-5). Twenty four hour clock, because it is unambiguous in UTC.
+ */
+export function formatBillingDateTime(date: Date): string {
+  const formatted = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).format(date);
 
   return `${formatted} (UTC)`;

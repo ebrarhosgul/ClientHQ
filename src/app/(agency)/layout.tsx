@@ -1,5 +1,3 @@
-import { agencyContext } from "@/auth/context";
-import { isClerkConfigured } from "@/lib/env";
 import { AppShell } from "@/ui/shell/app-shell";
 
 /**
@@ -9,10 +7,18 @@ import { AppShell } from "@/ui/shell/app-shell";
  * `/invoices` and the rest, exactly as spec 0001 fixed them and spec 0004's
  * AC-23 pins them. The parentheses keep `(agency)` out of the URL.
  *
- * Resolving the context here is what anchors the mirror repair to the whole
- * agency area rather than to one page (spec 0005, AC-12). It costs nothing on
- * the normal path: `agencyContext()` is cached for the request, so the page
- * below reads the same resolution rather than running a second query.
+ * This layout reads nothing, and that is load bearing. Next lets a segment's
+ * `error.tsx` catch a throw from that segment's page and children, never from
+ * the segment's own layout, so a database read up here that failed would skip
+ * `./error.tsx` and land on the root boundary with no shell around it. The
+ * first read in the agency area is therefore one segment lower: the `(gated)`
+ * layout resolves the context and the access level for every gated page, and
+ * `/billing` resolves them itself. A read that fails there renders inside the
+ * shell with a way to billing (spec 0008, AC-12).
+ *
+ * The mirror repair (spec 0005, AC-12) lives inside `agencyContext()`, not
+ * here, so it still runs on the first read of every request that touches
+ * agency data, and it still costs nothing on the normal path.
  *
  * `src/proxy.ts` is what guarantees there is a session and an active
  * organization by the time this renders. With no Clerk publishable key the
@@ -23,10 +29,6 @@ import { AppShell } from "@/ui/shell/app-shell";
 // `LayoutProps<"/">`, not `<"/dashboard">`: a route group adds no path
 // segment, so as far as Next's generated types are concerned this layout sits
 // at the root alongside the one in `src/app/layout.tsx`.
-export default async function AgencyLayout({ children }: LayoutProps<"/">) {
-  if (isClerkConfigured()) {
-    await agencyContext();
-  }
-
+export default function AgencyLayout({ children }: LayoutProps<"/">) {
   return <AppShell>{children}</AppShell>;
 }

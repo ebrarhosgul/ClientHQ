@@ -173,16 +173,16 @@ _Ships with no migration: spec 0002 already built `subscriptions` and `processed
 Turning subscription state into what the agency may actually do: full access, a read only grace window, or locked out to billing only. Derived at read time so a grace window expires on its own.
 **Done when:** each Stripe state produces the right access level, the grace window blocks writes while leaving reads working, a lapsed grace window locks without any scheduled job running, the banner links to the Billing Portal, and no data is ever deleted by the gate.
 - [x] Design it (spec): `/architect subscription access gate`
-- [ ] Build it: `/develop subscription access gate`
-  - [ ] One thread end to end: the pure `accessVerdict` over every Stripe status, the `(gated)` route group with its redirecting layout and the `(agency)` error boundary, the `subscription_inactive` code, `requireFullAccess` wired into `withTenantAction()` before parsing with the two billing actions opted out, proven by a fresh agency reaching `/dashboard` only after subscribing and a hand set lapsed row being redirected and refused · AC-1, AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-9, AC-13
-  - [ ] The grace window: the banner in its admin and member variants with the UTC end date, the refusal shown in forms with a link to `/billing`, and the order of checks and exemption list pinned by tests · AC-5, AC-6, AC-7
-  - [ ] Locked, logging and the edges: the role aware notice on `/billing`, refusal and invariant logging, the fail closed tests, the real PostgreSQL read test, and the reachable pages test · AC-4, AC-10, AC-11, AC-12
-  - [ ] Accessibility and the seed: axe on both themes, the manual keyboard and screen reader pass, a `past_due` agency in the seed, and the new states in `/design` · AC-14
-- [ ] Verify it: `/check verify subscription access gate`
-- [ ] Test it: `/test subscription access gate`
-- [ ] Review it (fresh model): `/check review subscription access gate`
+- [x] Build it: `/develop subscription access gate`
+  - [x] One thread end to end: the pure `accessVerdict` over every Stripe status, the `(gated)` route group with its redirecting layout and the `(agency)` error boundary, the `subscription_inactive` code, `requireFullAccess` wired into `withTenantAction()` before parsing with the two billing actions opted out, proven by a fresh agency reaching `/dashboard` only after subscribing and a hand set lapsed row being redirected and refused · AC-1, AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-9, AC-13
+  - [x] The grace window: the banner in its admin and member variants with the UTC end date, the refusal shown in forms with a link to `/billing`, and the order of checks and exemption list pinned by tests · AC-5, AC-6, AC-7
+  - [x] Locked, logging and the edges: the role aware notice on `/billing`, refusal and invariant logging, the fail closed tests, the real PostgreSQL read test, and the reachable pages test · AC-4, AC-10, AC-11, AC-12
+  - [x] Accessibility and the seed: axe on both themes, the manual keyboard and screen reader pass, a `past_due` agency in the seed, and the new states in `/design` · AC-14
+- [x] Verify it: `/check verify subscription access gate`
+- [x] Test it: `/test subscription access gate`
+- [x] Review it (fresh model): `/check review subscription access gate`
 - [ ] Document it: `/document subscription access gate`
-Spec [0008](../specs/0008-subscription-access-gate/index.md) · atomic build tasks in its `## Build plan` · code will live in `src/access/`, `src/app/(agency)/(gated)/`, `src/app/(agency)/error.tsx`, `src/db/tenant/subscription.ts`, `src/db/tenant/action.ts`, `src/db/tenant/errors.ts`, `src/payments/subscription-status.ts`
+Spec [0008](../specs/0008-subscription-access-gate/index.md) · atomic build tasks in its `## Build plan` · code in `src/access/`, `src/app/(agency)/(gated)/`, `src/app/(agency)/error.tsx`, `src/db/tenant/subscription.ts`, `src/db/tenant/action.ts`, `src/db/tenant/errors.ts`, `src/payments/subscription-status.ts`, `src/ui/patterns/action-error.tsx` · gate proven against real PostgreSQL in `src/access/gate.db.test.ts`, route tree pinned in `src/app/(agency)/(gated)/routes.test.ts` · verify steps in [its `verify.md`](../specs/0008-subscription-access-gate/verify.md)
 
 _Ships with no migration and no new environment variable: the gate reads `status` and `past_due_since` from the row spec 0007 writes. `/billing` and `/settings` stay outside the gated route group on purpose, so a lapsed agency can always pay. The client portal rule (locked agency, unavailable portal) is fixed here and applied by feature 15._
 

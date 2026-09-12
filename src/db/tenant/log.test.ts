@@ -13,7 +13,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { logEscapeHatch, logRefusal, logSystemAccess } from "./log";
+import {
+  logEscapeHatch,
+  logGateInvariant,
+  logRefusal,
+  logSystemAccess,
+} from "./log";
 
 const AT = "2026-09-08T10:30:00.000Z";
 
@@ -223,5 +228,32 @@ describe("the three events together", () => {
       "tenant.system_access",
       "tenant.escape_hatch",
     ]);
+  });
+});
+
+describe("logGateInvariant (spec 0008, AC-3)", () => {
+  it("emits one access.invariant line carrying the organization and the reason", () => {
+    logGateInvariant({ orgId: "org-row-1", reason: "past_due_without_since" });
+
+    expect(warned).toHaveLength(1);
+    expect(lines()[0]).toStrictEqual({
+      event: "access.invariant",
+      operation: "accessVerdict",
+      reason: "past_due_without_since",
+      orgId: "org-row-1",
+      at: AT,
+    });
+  });
+
+  it("has no room for a user or for row data, by type", () => {
+    logGateInvariant({
+      orgId: "org-row-1",
+      reason: "past_due_without_since",
+      // @ts-expect-error the break is about the row, not about who asked, and
+      // the row's contents never belong in a log line.
+      status: "past_due",
+    });
+
+    expect(warned).toHaveLength(1);
   });
 });

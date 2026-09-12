@@ -1,10 +1,15 @@
 /**
- * covers: spec 0005 AC-12
+ * covers: spec 0008 AC-12, spec 0005 AC-12
  *
- * Every agency section resolves its context here, once, before the shell
- * renders. `AppShell` is stubbed (it has its own tests); this file is about
- * whether `agencyContext()` runs at all, and only when Clerk is configured
- * (spec 0004, AC-22: a build with no Clerk key must still render).
+ * The agency layout renders the shell and reads nothing. That is the fail
+ * closed half of the gate: Next never routes a layout's own throw to the
+ * `error.tsx` beside it, so the first database read of the agency area has to
+ * sit one segment lower (the `(gated)` layout, or the `/billing` page) for a
+ * failed read to render inside the shell with a way to billing. Regression
+ * test for the outage that rendered the root boundary instead: putting
+ * `agencyContext()` back up here fails the first case.
+ *
+ * `AppShell` is stubbed (it has its own tests).
  */
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,7 +39,7 @@ const { default: AgencyLayout } = await import("./layout");
 async function renderLayout(children: React.ReactNode) {
   const Layout = AgencyLayout as unknown as (props: {
     children: React.ReactNode;
-  }) => Promise<React.ReactElement>;
+  }) => React.ReactElement | Promise<React.ReactElement>;
   return render(await Layout({ children }));
 }
 
@@ -45,16 +50,16 @@ beforeEach(() => {
 });
 
 describe("AgencyLayout", () => {
-  it("resolves the agency context before rendering the shell (AC-12)", async () => {
+  it("never resolves the context itself, even with Clerk configured, so a failed read lands below its error boundary (spec 0008, AC-12)", async () => {
     await renderLayout(<p>page content</p>);
 
-    expect(mocks.agencyContext).toHaveBeenCalledTimes(1);
+    expect(mocks.agencyContext).not.toHaveBeenCalled();
     expect(screen.getByTestId("app-shell")).toContainElement(
       screen.getByText("page content"),
     );
   });
 
-  it("skips context resolution entirely with no Clerk key (spec 0004, AC-22)", async () => {
+  it("renders the shell with no Clerk key (spec 0004, AC-22)", async () => {
     mocks.isClerkConfigured.mockReturnValue(false);
 
     await renderLayout(<p>page content</p>);

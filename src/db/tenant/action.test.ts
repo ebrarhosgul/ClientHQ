@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0003 AC-8, AC-9, AC-10, AC-11, AC-14
+ * covers: spec 0003 AC-8, AC-9, AC-10, AC-11, AC-14 · spec 0008 AC-6, AC-12
  *
  * The write path's contract: parsed before the handler runs, a closed set of
  * error codes, revalidation only after success, and a role guard that refuses
@@ -26,6 +26,9 @@ const state = vi.hoisted(() => ({
   revalidatedPaths: [] as string[],
   updatedTags: [] as string[],
   transactionsOpened: 0,
+  /** What the access gate's read returns. Active unless a test says otherwise. */
+  subscriptionRow: { status: "active", pastDueSince: null } as unknown,
+  subscriptionReads: 0,
 }));
 
 vi.mock("./context", async (importActual) => {
@@ -44,7 +47,21 @@ vi.mock("./context", async (importActual) => {
 });
 
 vi.mock("./accessor", () => ({
-  tenantDb: () => ({ marker: "scoped accessor" }),
+  tenantDb: () => ({
+    marker: "scoped accessor",
+    // The access gate reads the subscription row through the same accessor.
+    // Active by default so the rest of this file is about the wrapper alone;
+    // `subscription.test.ts` covers the gate itself.
+    findFirst: async () => {
+      state.subscriptionReads += 1;
+
+      if (state.subscriptionRow instanceof Error) {
+        throw state.subscriptionRow;
+      }
+
+      return state.subscriptionRow;
+    },
+  }),
 }));
 
 vi.mock("./executor", () => ({
@@ -84,6 +101,8 @@ beforeEach(() => {
   state.revalidatedPaths = [];
   state.updatedTags = [];
   state.transactionsOpened = 0;
+  state.subscriptionRow = { status: "active", pastDueSince: null };
+  state.subscriptionReads = 0;
 });
 
 describe("input is parsed before anything runs", () => {
@@ -227,6 +246,8 @@ describe("the error codes are a closed union", () => {
           return "slow down";
         case "unavailable":
           return "try again";
+        case "subscription_inactive":
+          return "open billing";
         default: {
           const unreachable: never = code;
 
@@ -363,5 +384,116 @@ describe("a declared transaction", () => {
     await action({ name: "Acme" });
 
     expect(state.transactionsOpened).toBe(0);
+  });
+});
+
+describe("the subscription gate (spec 0008, AC-6)", () => {
+  const LOCKED = { status: "canceled", pastDueSince: null };
+
+  it("refuses a write with subscription_inactive when the level is not full, before the handler runs", async () => {
+    state.subscriptionRow = LOCKED;
+    const handler = vi.fn(async () => "done");
+    const action = withTenantAction({ name: "x", input, handler });
+
+    const result = await action({ name: "Acme" });
+
+    expect(result).toStrictEqual({
+      ok: false,
+      error: { code: "subscription_inactive", message: expect.any(String) },
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("runs after the role guard: a locked member gets forbidden, not a hint about billing", async () => {
+    state.ctx = { ...state.ctx, role: "member" };
+    state.subscriptionRow = LOCKED;
+    const action = withTenantAction({
+      name: "invite",
+      input,
+      requireRole: "admin",
+      handler: async () => "done",
+    });
+
+    const result = await action({ name: "Acme" });
+
+    expect(result.ok ? undefined : result.error.code).toBe("forbidden");
+    expect(state.subscriptionReads).toBe(0);
+  });
+
+  it("runs before parsing: a locked admin sending invalid input gets subscription_inactive, not validation", async () => {
+    state.subscriptionRow = LOCKED;
+    const action = withTenantAction({
+      name: "x",
+      input,
+      handler: async () => "done",
+    });
+
+    const result = await action({ name: "" });
+
+    expect(result.ok ? undefined : result.error.code).toBe(
+      "subscription_inactive",
+    );
+  });
+
+  it("runs outside any transaction: a refused write opens none", async () => {
+    state.subscriptionRow = LOCKED;
+    const action = withTenantAction({
+      name: "x",
+      input,
+      transaction: true,
+      handler: async () => "done",
+    });
+
+    await action({ name: "Acme" });
+
+    expect(state.transactionsOpened).toBe(0);
+    expect(state.subscriptionReads).toBe(1);
+  });
+
+  it('is skipped by subscription: "any", which does not relax the role guard', async () => {
+    state.subscriptionRow = LOCKED;
+    const handler = vi.fn(async () => "portal url");
+    const action = withTenantAction({
+      name: "openBillingPortal",
+      input,
+      requireRole: "admin",
+      subscription: "any",
+      handler,
+    });
+
+    await expect(action({ name: "Acme" })).resolves.toStrictEqual({
+      ok: true,
+      data: "portal url",
+    });
+    expect(state.subscriptionReads).toBe(0);
+
+    state.ctx = { ...state.ctx, role: "member" };
+
+    const asMember = await action({ name: "Acme" });
+
+    expect(asMember.ok ? undefined : asMember.error.code).toBe("forbidden");
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the row exactly once per call on the normal path", async () => {
+    const action = withTenantAction({
+      name: "x",
+      input,
+      handler: async () => "done",
+    });
+
+    await action({ name: "Acme" });
+
+    expect(state.subscriptionReads).toBe(1);
+  });
+
+  it("rethrows when the subscription read fails, rather than returning a Result (AC-12)", async () => {
+    const outage = new Error("database unreachable");
+    state.subscriptionRow = outage;
+    const handler = vi.fn(async () => "done");
+    const action = withTenantAction({ name: "x", input, handler });
+
+    await expect(action({ name: "Acme" })).rejects.toBe(outage);
+    expect(handler).not.toHaveBeenCalled();
   });
 });

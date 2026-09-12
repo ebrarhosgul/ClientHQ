@@ -46,6 +46,7 @@ describe("ACTION_ERROR_CODES", () => {
       "conflict",
       "rate_limited",
       "unavailable",
+      "subscription_inactive",
     ]);
   });
 
@@ -68,6 +69,8 @@ describe("ACTION_ERROR_CODES", () => {
           return "too many attempts";
         case "unavailable":
           return "the mirror row has not landed";
+        case "subscription_inactive":
+          return "the agency is not paid up";
         default: {
           const exhaustive: never = code;
           return exhaustive;

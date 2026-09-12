@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { GraceBanner } from "@/access/ui/grace-banner";
+import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
 import { AddressFields } from "@/ui/patterns/address-fields";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
@@ -464,7 +466,7 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
           <DeliverableStatusChip status="pending" />
           <DeliverableStatusChip status="ready" />
         </Row>
-        <Row label="subscription access (provisional, owned by feature 9)">
+        <Row label="subscription access (full shows no chip)">
           {Object.entries(SUBSCRIPTION_ACCESS_PRESENTATION).map(
             ([level, { label, tint }]) => (
               <StatusChip key={level} tint={tint}>
@@ -586,6 +588,41 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               It has no line items. Add at least one and try again.
             </AlertDescription>
           </Alert>
+        </div>
+      </Section>
+
+      <Section
+        id={scoped("subscription-access")}
+        title="Subscription access"
+        description="The grace banner sits above every gated page for 7 days after a failed payment; the locked notice opens /billing once the window has closed. Each is a region landmark, and the meaning is in the words and the icon, never the tint alone."
+      >
+        <div className="flex flex-col gap-3">
+          <Row label="grace · admin">
+            <div className="w-full">
+              <GraceBanner
+                graceEndsAt={new Date("2026-09-18T09:05:00Z")}
+                role="admin"
+              />
+            </div>
+          </Row>
+          <Row label="grace · member">
+            <div className="w-full">
+              <GraceBanner
+                graceEndsAt={new Date("2026-09-18T09:05:00Z")}
+                role="member"
+              />
+            </div>
+          </Row>
+          <Row label="locked · admin">
+            <div className="w-full">
+              <LockedNotice role="admin" />
+            </div>
+          </Row>
+          <Row label="locked · member">
+            <div className="w-full">
+              <LockedNotice role="member" />
+            </div>
+          </Row>
         </div>
       </Section>
 

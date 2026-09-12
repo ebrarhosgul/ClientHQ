@@ -56,6 +56,8 @@ export function isTenantResolutionError(
  *
  * `rate_limited` is reserved for feature 19 and `unavailable` covers the case
  * where the local mirror row a signed in person needs has not landed yet.
+ * `subscription_inactive` is the access gate's refusal (spec 0008, AC-6): the
+ * agency's subscription does not allow a write right now, whoever is asking.
  */
 export const ACTION_ERROR_CODES = [
   "validation",
@@ -65,6 +67,7 @@ export const ACTION_ERROR_CODES = [
   "conflict",
   "rate_limited",
   "unavailable",
+  "subscription_inactive",
 ] as const;
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number];

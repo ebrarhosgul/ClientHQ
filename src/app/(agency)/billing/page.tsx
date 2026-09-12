@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { agencyAccessFromRow } from "@/access/gate";
+import { LockedNotice } from "@/access/ui/locked-notice";
 import { agencyContext } from "@/auth/context";
 import { billingView, type BillingView } from "@/payments/billing-state";
 import { subscriptionForAgency } from "@/payments/queries";
@@ -41,6 +43,10 @@ export const metadata: Metadata = {
  *   here as soon as Stripe is done, and the webhook may land a second later, so
  *   an agency can briefly see the pre subscription state. A refresh fixes it,
  *   nothing is wrong, and spec 0007 accepted that rather than polling.
+ * - **This page is outside the access gate on purpose** (spec 0008, AC-4). A
+ *   locked agency is sent here from everywhere else, so the page opens with a
+ *   notice saying so when the level is `locked` (AC-10). `unsubscribed` needs
+ *   nothing extra: the "No subscription" card already explains it.
  */
 export default async function BillingPage() {
   // With no Clerk publishable key there is no session to scope a read to, so
@@ -48,14 +54,25 @@ export default async function BillingPage() {
   // context that cannot exist (spec 0004, AC-22).
   const ctx = isClerkConfigured() ? await agencyContext() : undefined;
 
-  const view: BillingView = billingView(
-    ctx === undefined ? undefined : await subscriptionForAgency(ctx),
-  );
+  // The one read behind this page (spec 0007, AC-17): both the view and the
+  // access level are derived from this same row, so it is fetched once.
+  const subscriptionRow =
+    ctx === undefined ? undefined : await subscriptionForAgency(ctx);
+
+  const view: BillingView = billingView(subscriptionRow);
 
   const isAdmin = ctx?.role === "admin";
 
+  // The level and the role, never anything in the URL.
+  const access =
+    ctx === undefined ? undefined : agencyAccessFromRow(ctx, subscriptionRow);
+
   return (
     <div className="flex flex-col gap-6">
+      {access?.level === "locked" ? (
+        <LockedNotice role={access.role} />
+      ) : undefined}
+
       <PageHeader
         title="Billing"
         description="Your agency's subscription to this product. Nothing your own clients pay you passes through here."
