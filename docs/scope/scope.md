@@ -20,7 +20,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 7 | Client records | Slice 1 | in-progress |
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | in-progress |
 | 9 | Subscription access gate | Slice 2 | in-progress |
-| 10 | Client contacts & portal invitations | Slice 3 | planned |
+| 10 | Client contacts & portal invitations | Slice 3 | in-progress |
 | 11 | Projects | Slice 4 | planned |
 | 12 | Deliverable upload & download | Slice 5 | planned |
 | 13 | Invoice authoring & lifecycle | Slice 6 | planned |
@@ -188,10 +188,22 @@ _Ships with no migration and no new environment variable: the gate reads `status
 
 ## Slice 3: Client contacts & portal invitations
 
-### 10. Client contacts & portal invitations · needs a decision
+### 10. Client contacts & portal invitations · in-progress
 Add named contacts to a client and invite them to the portal by email. Introduces transactional email to the product, which later features reuse. Includes the acceptance flow that binds a contact to a real signed in user.
 **Done when:** staff can add a contact and send an invitation, the emailed link expires, only a hash of the token is stored, acceptance requires the signed in user's verified email to match the contact, and a forwarded link cannot be used to claim someone else's contact.
-- [ ] Design it (spec): `/architect client contacts & portal invitations`
+- [x] Design it (spec): `/architect client contacts & portal invitations`
+- [x] Build it: `/develop client contacts & portal invitations`
+  - [x] One thread end to end: the `invited_by_user_id` migration, the email transport with its console fallback, the pure token, limits and status modules, `addContact` and a minimal `sendInvitation`, a bare Contacts section, the acceptance door in `src/db/tenant/invitation.ts`, the `/portal/accept` page and the accept action that binds, sets the contact cookie and lands on `/portal`, proven on a second Clerk account through the brand new account path · AC-1, AC-3, AC-5, AC-9, AC-10, AC-13
+  - [x] The invitation lifecycle: cooldown and daily cap, resend and revoke, the send failure path and the `unsent` status, edit with the pending clear and the accepted email lock, remove with its confirm dialog, and the five status badges with their action sets · AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-14
+  - [x] Acceptance edges and the fence: the already yours and wrong account states, the unverified email and archived client refusals, the concurrent accept, cross tenant and contact context refusals, the subscription gate on staff writes with acceptance left open, and the structured log lines · AC-9, AC-10, AC-11, AC-12, AC-13, AC-15
+  - [x] The email and the screens: the finished React Email template with plain text, envelope and idempotency key, the production key requirement, empty and error states, `/design` entries, axe in both themes, and the Playwright walk · AC-5, AC-12, AC-14
+- [x] Verify it: `/check verify client contacts & portal invitations`
+- [x] Test it: `/test client contacts & portal invitations`
+- [x] Review it (fresh model): `/check review client contacts & portal invitations`
+- [ ] Document it: `/document client contacts & portal invitations`
+Spec [0009](../specs/0009-client-contacts-portal-invitations/index.md) · atomic build tasks in its `## Build plan` · code in `src/contacts/`, `src/email/`, `src/db/tenant/invitation.ts`, `src/app/portal/accept/`, `src/app/(agency)/(gated)/clients/[id]/page.tsx` (the Contacts section), `drizzle/0002_faithful_marauders.sql` · actions and the acceptance door proven against real PostgreSQL in `src/contacts/contacts.db.test.ts`, the screens in `src/contacts/ui/*.test.tsx` and `e2e/contacts.spec.ts`
+
+_Settles the invitation send half of feature 19 (a per contact cooldown and a per agency daily cap counted from `invited_at`, no Upstash), drops the `INVITE_TOKEN_SECRET` spec 0001 planned in favour of a hashed random token, and stands up `src/email/` for features 13 and 18 to reuse._
 
 ## Slice 4: Projects
 

@@ -89,6 +89,47 @@ export async function suggestedSlug(name: string): Promise<string> {
   return freeSlug(db, name);
 }
 
+/**
+ * The `users` half of the mirror on its own, upserted on `clerk_user_id`.
+ *
+ * Invitation acceptance (spec 0009, AC-10) needs a local user row for a person
+ * who belongs to no agency, so the organization and membership halves do not
+ * apply. Same statement the full mirror runs, so the two can never disagree
+ * about what Clerk owns.
+ */
+export async function ensureUserRow(
+  user: MirrorUser,
+  executor?: Executor,
+): Promise<{ readonly userId: string }> {
+  const db = executor ?? (await pooledDb());
+
+  const [userRow] = await db
+    .insert(users)
+    .values({
+      id: newId(),
+      clerkUserId: user.clerkUserId,
+      email: user.email,
+      name: user.name,
+      imageUrl: user.imageUrl,
+    })
+    .onConflictDoUpdate({
+      target: users.clerkUserId,
+      set: {
+        email: user.email,
+        name: user.name,
+        imageUrl: user.imageUrl,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ id: users.id });
+
+  if (userRow === undefined) {
+    throw new Error("Provisioning wrote no user row.");
+  }
+
+  return { userId: userRow.id };
+}
+
 /** All three rows, upserted on their unique keys. Always inside a transaction. */
 async function upsertMirror(
   executor: Executor,
@@ -116,28 +157,10 @@ async function upsertMirror(
     })
     .returning({ id: organizations.id });
 
-  const [userRow] = await executor
-    .insert(users)
-    .values({
-      id: newId(),
-      clerkUserId: user.clerkUserId,
-      email: user.email,
-      name: user.name,
-      imageUrl: user.imageUrl,
-    })
-    .onConflictDoUpdate({
-      target: users.clerkUserId,
-      set: {
-        email: user.email,
-        name: user.name,
-        imageUrl: user.imageUrl,
-        updatedAt: now,
-      },
-    })
-    .returning({ id: users.id });
+  const userRow = await ensureUserRow(user, executor);
 
-  if (orgRow === undefined || userRow === undefined) {
-    throw new Error("Provisioning wrote no organization or user row.");
+  if (orgRow === undefined) {
+    throw new Error("Provisioning wrote no organization row.");
   }
 
   await executor
@@ -145,7 +168,7 @@ async function upsertMirror(
     .values({
       id: newId(),
       orgId: orgRow.id,
-      userId: userRow.id,
+      userId: userRow.userId,
       role,
     })
     .onConflictDoUpdate({
@@ -153,7 +176,7 @@ async function upsertMirror(
       set: { role, updatedAt: now },
     });
 
-  return { orgId: orgRow.id, userId: userRow.id };
+  return { orgId: orgRow.id, userId: userRow.userId };
 }
 
 /**

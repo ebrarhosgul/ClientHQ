@@ -27,7 +27,10 @@ export const organizationsRelations = relations(
 
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(memberships),
-  clientContacts: many(clientContacts),
+  // Two paths from a contact to a user, so each pair is named (spec 0009): the
+  // portal login the row binds to, and the staff member who invited them.
+  clientContacts: many(clientContacts, { relationName: "portalLogin" }),
+  invitedContacts: many(clientContacts, { relationName: "invitedBy" }),
   uploadedDeliverables: many(deliverables),
 }));
 
@@ -65,7 +68,16 @@ export const clientContactsRelations = relations(clientContacts, ({ one }) => ({
     fields: [clientContacts.clientId],
     references: [clients.id],
   }),
-  user: one(users, { fields: [clientContacts.userId], references: [users.id] }),
+  user: one(users, {
+    fields: [clientContacts.userId],
+    references: [users.id],
+    relationName: "portalLogin",
+  }),
+  invitedBy: one(users, {
+    fields: [clientContacts.invitedByUserId],
+    references: [users.id],
+    relationName: "invitedBy",
+  }),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({

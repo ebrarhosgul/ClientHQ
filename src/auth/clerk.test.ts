@@ -36,6 +36,7 @@ const {
   agencyMemberships,
   clerkOrganization,
   clerkUser,
+  clerkVerifiedEmails,
   createClerkOrganization,
 } = await import("./clerk");
 
@@ -172,6 +173,55 @@ describe("clerkUser", () => {
     mocks.getUser.mockRejectedValue(outage);
 
     await expect(clerkUser("user_1")).rejects.toThrow(outage);
+  });
+});
+
+describe("clerkVerifiedEmails", () => {
+  it("returns only the verified addresses, lowercased (AC-10)", async () => {
+    mocks.getUser.mockResolvedValue({
+      id: "user_1",
+      emailAddresses: [
+        {
+          emailAddress: "Ada@Northwind.TEST",
+          verification: { status: "verified" },
+        },
+        {
+          emailAddress: "unverified@northwind.test",
+          verification: { status: "unverified" },
+        },
+        { emailAddress: "pending@northwind.test", verification: null },
+      ],
+    });
+
+    await expect(clerkVerifiedEmails("user_1")).resolves.toEqual({
+      ok: true,
+      data: ["ada@northwind.test"],
+    });
+  });
+
+  it("returns an empty list when Clerk has no verified address", async () => {
+    mocks.getUser.mockResolvedValue({ id: "user_1", emailAddresses: [] });
+
+    await expect(clerkVerifiedEmails("user_1")).resolves.toEqual({
+      ok: true,
+      data: [],
+    });
+  });
+
+  it("reports a 404 as not_found rather than throwing (AC-21)", async () => {
+    mocks.getUser.mockRejectedValue(clerkError(404));
+
+    await expect(clerkVerifiedEmails("user_gone")).resolves.toEqual({
+      ok: false,
+      error: { code: "not_found", message: "That account no longer exists." },
+    });
+  });
+
+  it("lets every other Clerk failure propagate (AC-21)", async () => {
+    const outage = clerkError(500);
+    mocks.getUser.mockRejectedValue(outage);
+
+    await expect(clerkVerifiedEmails("user_1")).rejects.toThrow(outage);
   });
 });
 

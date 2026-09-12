@@ -96,12 +96,43 @@ const serverEnvSchema = z.object({
    * may write to. Unset, the seed refuses every remote host.
    */
   SEED_ALLOW_HOST: z.string().min(1).optional(),
+
+  /**
+   * Feature 10, client contacts and portal invitations (spec 0009). The first
+   * email the product sends, and the transport every later email reuses.
+   *
+   * `RESEND_API_KEY` is optional outside production: without it the console
+   * transport in `src/email/send.ts` prints the message instead of sending it,
+   * which is what lets the invitation flow be walked with no provider account.
+   * In production it is required, enforced by the refinement below rather than
+   * here, because a plain `min(1)` would demand it in development too.
+   *
+   * `EMAIL_FROM` is the bare sending address on a domain verified in the Resend
+   * dashboard. The display name is composed per send, never stored here.
+   */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.email("EMAIL_FROM must be a bare email address"),
+});
+
+/**
+ * The one cross field rule: production sends real email, so it needs the key.
+ * Development and test fall back to the console transport instead (spec 0009,
+ * AC-5).
+ */
+const serverEnvSchemaRefined = serverEnvSchema.superRefine((value, ctx) => {
+  if (value.NODE_ENV === "production" && value.RESEND_API_KEY === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["RESEND_API_KEY"],
+      message: "RESEND_API_KEY is required in production",
+    });
+  }
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 function loadEnv(): ServerEnv {
-  const parsed = serverEnvSchema.safeParse(process.env);
+  const parsed = serverEnvSchemaRefined.safeParse(process.env);
 
   if (!parsed.success) {
     const problems = parsed.error.issues
@@ -156,4 +187,15 @@ export function clerkPublishableKey(): string | undefined {
 
 export function isClerkConfigured(): boolean {
   return clerkPublishableKey() !== undefined;
+}
+
+/**
+ * Is there a Resend key to send with?
+ *
+ * Read through `env()`, so a production process with no key has already failed
+ * at parse time and never gets to ask. Outside production the answer decides
+ * which transport `sendEmail()` uses (spec 0009, AC-5).
+ */
+export function isEmailConfigured(): boolean {
+  return env().RESEND_API_KEY !== undefined;
 }

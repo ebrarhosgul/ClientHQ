@@ -122,7 +122,11 @@ const INDEXES: Readonly<Record<string, readonly (readonly string[])[]>> = {
     ["org_id", "archived_at"],
     ["org_id", "name"],
   ],
-  client_contacts: [["user_id"], ["org_id", "client_id"]],
+  client_contacts: [
+    ["user_id"],
+    ["org_id", "client_id"],
+    ["invited_by_user_id"],
+  ],
   projects: [
     ["org_id", "client_id"],
     ["org_id", "status"],
@@ -180,6 +184,12 @@ const FOREIGN_KEYS: readonly ForeignKey[] = [
   {
     table: "client_contacts",
     column: "user_id",
+    references: "users",
+    onDelete: "set null",
+  },
+  {
+    table: "client_contacts",
+    column: "invited_by_user_id",
     references: "users",
     onDelete: "set null",
   },

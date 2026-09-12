@@ -7,6 +7,7 @@ import { agencyContext } from "@/auth/context";
 import { getClient, type ClientRow } from "@/clients/queries";
 import { ArchiveClientButton } from "@/clients/ui/archive-client-button";
 import { RestoreClientButton } from "@/clients/ui/restore-client-button";
+import { ContactsSection } from "@/contacts/ui/contacts-section";
 import { isClerkConfigured } from "@/lib/env";
 import { Badge } from "@/ui/primitives/badge";
 import { PageHeader } from "@/ui/patterns/page-header";
@@ -111,6 +112,8 @@ export default async function ClientDetailPage({
           <Detail label="Country" value={client.billingCountry} />
         </div>
       </div>
+
+      <ContactsSection client={client} />
     </div>
   );
 }

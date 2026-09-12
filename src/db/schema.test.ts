@@ -234,6 +234,8 @@ describe("AC-6: every foreign key deletes the way the spec says", () => {
     ["client_contacts", "org_id", "organizations", "cascade"],
     ["client_contacts", "client_id", "clients", "cascade"],
     ["client_contacts", "user_id", "users", "set null"],
+    // Spec 0009: the inviter, cleared if that staff member is deleted.
+    ["client_contacts", "invited_by_user_id", "users", "set null"],
     ["projects", "org_id", "organizations", "cascade"],
     ["projects", "client_id", "clients", "restrict"],
     ["deliverables", "org_id", "organizations", "restrict"],

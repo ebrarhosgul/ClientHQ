@@ -80,8 +80,22 @@ export const clientContacts = pgTable(
       withTimezone: true,
       mode: "date",
     }),
+    /**
+     * When the email provider last accepted the invitation, stamped only after
+     * a successful hand off and never before (spec 0009). Drives the per
+     * contact cooldown, the per agency daily cap and the "invited by ... on
+     * ..." line, so a failed send leaves it exactly as it was.
+     */
     invitedAt: timestamp("invited_at", { withTimezone: true, mode: "date" }),
     acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
+    /**
+     * The staff member who last sent the invitation: the reply to address and
+     * the "invited by" line. Cleared with the hash; nulled if that user is
+     * deleted (spec 0009).
+     */
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     ...timestamps(),
   },
   (t) => [
@@ -89,6 +103,7 @@ export const clientContacts = pgTable(
     // Non unique on purpose: one person may be a contact of several clients.
     index("client_contacts_user_id_idx").on(t.userId),
     index("client_contacts_org_id_client_id_idx").on(t.orgId, t.clientId),
+    index("client_contacts_invited_by_user_id_idx").on(t.invitedByUserId),
     check(
       "client_contacts_email_lowercase_check",
       sql`${t.email} = lower(${t.email})`,
