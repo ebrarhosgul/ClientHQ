@@ -199,7 +199,7 @@ Add named contacts to a client and invite them to the portal by email. Introduce
   - [x] The email and the screens: the finished React Email template with plain text, envelope and idempotency key, the production key requirement, empty and error states, `/design` entries, axe in both themes, and the Playwright walk · AC-5, AC-12, AC-14
 - [x] Verify it: `/check verify client contacts & portal invitations`
 - [x] Test it: `/test client contacts & portal invitations`
-- [ ] Review it (fresh model): `/check review client contacts & portal invitations`
+- [x] Review it (fresh model): `/check review client contacts & portal invitations`
 - [ ] Document it: `/document client contacts & portal invitations`
 Spec [0009](../specs/0009-client-contacts-portal-invitations/index.md) · atomic build tasks in its `## Build plan` · code in `src/contacts/`, `src/email/`, `src/db/tenant/invitation.ts`, `src/app/portal/accept/`, `src/app/(agency)/(gated)/clients/[id]/page.tsx` (the Contacts section), `drizzle/0002_faithful_marauders.sql` · actions and the acceptance door proven against real PostgreSQL in `src/contacts/contacts.db.test.ts`, the screens in `src/contacts/ui/*.test.tsx` and `e2e/contacts.spec.ts`
 
