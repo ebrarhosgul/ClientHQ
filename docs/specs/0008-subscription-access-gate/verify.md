@@ -1,15 +1,17 @@
-# Verify: subscription access gate · spec 0008 · updated 2026-09-11
+# Verify: subscription access gate · spec 0008 · updated 2026-09-12
 
 _Steps derived from spec 0008 acceptance criteria and its Value sourcing table. `/check verify` runs these; `/test` locks the durable ones._
 
 The manual steps need a signed in agency admin and a way to set the `subscriptions` row by hand (`pnpm db:studio`, or a SQL update on the row's `status` and `past_due_since`). `pnpm db:seed` gives you two agencies: Studio North on `active`, and Harbor Lane on `past_due` since an hour before the seed ran, so the grace window is open on the day you seed and closes on its own a week later. To sign in as either you need a Clerk organization whose id matches the seeded `clerk_org_id`, or point your own organization's row at the state you want.
+
+46 of 48 steps ran and passed against the real app (dev server, real Clerk session, real Supabase dev database, a real Stripe test mode Billing Portal). Left unticked: the two member session variants (the banner and the locked notice as a member). Only one real Clerk account exists in this environment and it is an org admin; nothing in the seed maps to a real Clerk user with a `member` role, so a live member session cannot be driven here. Both are covered instead by automated component tests (`grace-banner.test.tsx`, `locked-notice.test.tsx`), which passed and assert exactly the member wording, but that is not the same evidence as a live session.
 
 ## UI / manual
 
 - [x] Sign in as a brand new agency (no `subscriptions` row) and open `/dashboard` → redirected to `/billing`, which shows the "No subscription" card and a Subscribe button and no locked notice → AC-1, AC-4, AC-10
 - [x] From that `/billing`, subscribe in Stripe test mode, wait for the webhook, then open `/dashboard` → the page renders with no banner, and `/clients` renders too → AC-1, AC-4
 - [x] Set the row to `status = past_due`, `past_due_since = now() - interval '1 hour'`, reload `/clients` → the list renders under one banner headed "Your last payment failed, so changes are paused", naming a date and time ending in "(UTC)" seven days after `past_due_since` → AC-2, AC-5
-- [ ] As an admin in that state, press "Update your card" in the banner → Stripe's Billing Portal opens (the button is the existing `openBillingPortal` action) → AC-5, AC-6
+- [x] As an admin in that state, press "Update your card" in the banner → Stripe's Billing Portal opens (the button is the existing `openBillingPortal` action) → AC-5, AC-6
 - [ ] As a member in that state → the banner has no button, carries "Only an admin of this agency can update the card.", and its "See billing" link lands on `/billing` → AC-5
 - [x] Still in grace, open `/clients/new`, fill in a name and submit → the alert says the subscription needs attention, with a "Go to billing" link, and the client is not created (the list is unchanged after a reload) → AC-6, AC-7, AC-8
 - [x] Still in grace, on a client's detail page press Archive and confirm → the dialog shows the same refusal with the link, and the client stays active → AC-6, AC-7
@@ -51,12 +53,12 @@ One step per row of the spec's Value sourcing table, exercising the source and t
 - [x] The window length: `GRACE_WINDOW_DAYS` is `7` in `src/access/level.ts` and appears in no environment file or `env.ts` → AC-2
 - [x] Which statuses are known: `SUBSCRIPTION_STATUSES` in `src/payments/subscription-status.ts` lists Stripe's eight, and `billing-state.ts` imports it from there rather than defining its own → AC-1
 - [x] Which organization: sign in to agency A while agency B's row is `active` and A has none → A is unsubscribed; the level never comes from a URL or form value → AC-9
-- [ ] Whether to show the portal button: with `memberships.role` set to `member` in the database but a Clerk admin session → the banner still shows the button, because the role comes from the session claim → AC-5
+- [x] Whether to show the portal button: with `memberships.role` set to `member` in the database but a Clerk admin session → the banner still shows the button, because the role comes from the session claim → AC-5
 - [x] "Changes are paused until …": the banner's time is `past_due_since + 7 days` rendered in UTC with "(UTC)" after it, and matches the `datetime` attribute on the `<time>` element → AC-5
-- [ ] The Billing Portal from the banner: the request the button makes is the same `openBillingPortal` Server Action `/billing` uses → AC-5, AC-6
+- [x] The Billing Portal from the banner: the request the button makes is the same `openBillingPortal` Server Action `/billing` uses → AC-5, AC-6
 - [x] Where to send a locked agency: the redirect target is the literal `/billing` from `src/ui/shell/navigation.ts`; renaming that path there fails `routes.test.ts` → AC-4
 - [x] The row the guard judges: refuse a write in grace, then set the row to `active` and retry the same form without reloading → it saves, because the guard reads fresh on every call → AC-6, AC-9
-- [ ] The invariant break: `past_due` with null `past_due_since` logs exactly one `access.invariant` line per page request and one per refused action, each carrying `orgId` → AC-3
+- [x] The invariant break: `past_due` with null `past_due_since` logs exactly one `access.invariant` line per page request and one per refused action, each carrying `orgId` → AC-3
 - [x] Who can fix it (the notice): the notice's last sentence follows the session role, not `memberships.role` and not anything in the URL (`/billing?role=admin` changes nothing) → AC-10
 - [x] Whether to run the gate at all: blank the Clerk publishable key → the gated layout never calls `agencyAccess()` (no subscription query in the log) → AC-13
 - [x] The refusal message: the `subscription_inactive` sentence never contains a Stripe status name, for `past_due`, `unpaid`, `canceled` and `something_new` alike → AC-6

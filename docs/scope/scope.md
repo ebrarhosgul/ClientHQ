@@ -178,9 +178,9 @@ Turning subscription state into what the agency may actually do: full access, a 
   - [x] The grace window: the banner in its admin and member variants with the UTC end date, the refusal shown in forms with a link to `/billing`, and the order of checks and exemption list pinned by tests · AC-5, AC-6, AC-7
   - [x] Locked, logging and the edges: the role aware notice on `/billing`, refusal and invariant logging, the fail closed tests, the real PostgreSQL read test, and the reachable pages test · AC-4, AC-10, AC-11, AC-12
   - [x] Accessibility and the seed: axe on both themes, the manual keyboard and screen reader pass, a `past_due` agency in the seed, and the new states in `/design` · AC-14
-- [ ] Verify it: `/check verify subscription access gate`
+- [x] Verify it: `/check verify subscription access gate`
 - [x] Test it: `/test subscription access gate`
-- [ ] Review it (fresh model): `/check review subscription access gate`
+- [x] Review it (fresh model): `/check review subscription access gate`
 - [ ] Document it: `/document subscription access gate`
 Spec [0008](../specs/0008-subscription-access-gate/index.md) · atomic build tasks in its `## Build plan` · code in `src/access/`, `src/app/(agency)/(gated)/`, `src/app/(agency)/error.tsx`, `src/db/tenant/subscription.ts`, `src/db/tenant/action.ts`, `src/db/tenant/errors.ts`, `src/payments/subscription-status.ts`, `src/ui/patterns/action-error.tsx` · gate proven against real PostgreSQL in `src/access/gate.db.test.ts`, route tree pinned in `src/app/(agency)/(gated)/routes.test.ts` · verify steps in [its `verify.md`](../specs/0008-subscription-access-gate/verify.md)
 
