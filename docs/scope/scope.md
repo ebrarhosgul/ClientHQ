@@ -197,7 +197,7 @@ Add named contacts to a client and invite them to the portal by email. Introduce
   - [x] The invitation lifecycle: cooldown and daily cap, resend and revoke, the send failure path and the `unsent` status, edit with the pending clear and the accepted email lock, remove with its confirm dialog, and the five status badges with their action sets · AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-14
   - [x] Acceptance edges and the fence: the already yours and wrong account states, the unverified email and archived client refusals, the concurrent accept, cross tenant and contact context refusals, the subscription gate on staff writes with acceptance left open, and the structured log lines · AC-9, AC-10, AC-11, AC-12, AC-13, AC-15
   - [x] The email and the screens: the finished React Email template with plain text, envelope and idempotency key, the production key requirement, empty and error states, `/design` entries, axe in both themes, and the Playwright walk · AC-5, AC-12, AC-14
-- [ ] Verify it: `/check verify client contacts & portal invitations`
+- [x] Verify it: `/check verify client contacts & portal invitations`
 - [ ] Test it: `/test client contacts & portal invitations`
 - [ ] Review it (fresh model): `/check review client contacts & portal invitations`
 - [ ] Document it: `/document client contacts & portal invitations`
