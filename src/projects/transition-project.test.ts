@@ -9,7 +9,11 @@
  * `options.where`, and a miss is turned into the right `conflict` message by
  * a follow up read.
  */
+import { and, eq, isNull, type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { projects } from "@/db/schema";
 
 const state = vi.hoisted(() => ({
   update: vi.fn(),
@@ -72,6 +76,23 @@ const { transitionProject } = await import("./transition-project");
 
 const PROJECT_ID = "11111111-1111-7111-8111-111111111111";
 
+const dialect = new PgDialect();
+
+/** The rendered condition, which is what PostgreSQL would receive. */
+function render(sql: SQL | undefined): { sql: string; params: unknown[] } {
+  if (sql === undefined) {
+    throw new Error("expected a where clause, got none");
+  }
+
+  const query = dialect.sqlToQuery(sql);
+
+  return { sql: query.sql, params: query.params };
+}
+
+function whereFromUpdate(): SQL | undefined {
+  return state.update.mock.calls[0]?.[3]?.where as SQL | undefined;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -106,6 +127,23 @@ describe("transitionProject", () => {
       PROJECT_ID,
       { status: "in_progress" },
       { where: expect.anything() },
+    );
+    expect(render(whereFromUpdate())).toStrictEqual(
+      render(and(eq(projects.status, "planning"), isNull(projects.archivedAt))),
+    );
+  });
+
+  it("keeps archived_at is null in the condition, so an archived project is refused at the write (AC-10)", async () => {
+    state.update.mockResolvedValue({ status: "in_progress" });
+
+    await transitionProject({
+      id: PROJECT_ID,
+      from: "planning",
+      to: "in_progress",
+    });
+
+    expect(render(whereFromUpdate()).sql).toContain(
+      render(isNull(projects.archivedAt)).sql,
     );
   });
 

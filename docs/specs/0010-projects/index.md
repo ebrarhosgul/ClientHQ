@@ -138,7 +138,7 @@ All five Server Actions are `withTenantAction` wrappers returning the project's 
 | `/clients/[id]` Projects section | the rows | a new `listProjectsForClient(ctx, clientId)` read: `client_id` matches, `archived_at` is null, ordered by `created_at` descending then `id`, no paging |
 | `/clients/[id]` Projects section | the New project link target | `/projects/new?client=<id>` |
 | `/clients/[id]` Projects section | the archived link target | `/projects?client=<id>&archived=true&status=all` |
-| `archiveClient` confirm | the active project count | a new `countActiveProjects(ctx, clientId)` read, run by the client page and passed to `ArchiveClientButton` as a prop; zero shows the existing copy unchanged |
+| `archiveClient` confirm | the active project count | the length of the same `listProjectsForClient` read the client page runs once and shares with its Projects section, passed to `ArchiveClientButton` as a prop; zero shows the existing copy unchanged |
 | every write | what renders again afterwards | the action's `revalidate` config: `/projects`, `/projects/[id]` (page), `/clients/[id]` (page) |
 | any `[id]` route for a foreign or missing id | not found rather than forbidden | the tenant scoped `findById` returning nothing either way, so a prober cannot tell a missing id from another agency's project |
 
@@ -181,7 +181,7 @@ Ordered for Tracer Bullet: the thinnest end to end thread (a real create landing
 6. Edit: `updateProject` and `/projects/[id]/edit` with the client shown read only and a clearable due date; the concurrent edit test mirrors spec 0006's. Satisfies **AC-7**, **AC-18**.
 7. Archive and restore, admin only: `archiveProject` and `restoreProject` with `requireRole: "admin"`, both idempotent, the confirm dialog on archive, the two buttons rendered only when `ctx.role === "admin"`, and no move buttons on an archived project; tests for the member refusal and the hidden controls. Satisfies **AC-10**, **AC-11**, **AC-12**.
 8. Thicken the list: the status, client, and archived controls driven by URL params, page links, the page reset on any filter change, the unresolvable client rule, and the appended "(archived)" client option. Satisfies **AC-4**, **AC-5**.
-9. The client page: `listProjectsForClient` and `countActiveProjects` in `src/projects/queries.ts`, the Projects section on `/clients/[id]` with its New project and archived links and its empty state, and `ArchiveClientButton` taking the active project count for its confirm copy. Satisfies **AC-13**, **AC-14**.
+9. The client page: `listProjectsForClient` in `src/projects/queries.ts`, read once by the page for both the section and the count, the Projects section on `/clients/[id]` with its New project and archived links and its empty state, and `ArchiveClientButton` taking the active project count for its confirm copy. Satisfies **AC-13**, **AC-14**.
 10. Empty state, error state, the Deliverables placeholder section on the detail page, and an accessibility pass (axe, both themes) across `/projects`, `/projects/new`, `/projects/[id]`, `/projects/[id]/edit`, and the client page section; add the move button row, the overdue badge, and the client picker to `/design` in every state. Satisfies **AC-6**, **AC-17**.
 
 ## Consequences

@@ -32,13 +32,8 @@ vi.mock("@/db/tenant", () => ({
   tenantDb: () => ({ findMany: state.findMany, findFirst: state.findFirst }),
 }));
 
-const {
-  listProjects,
-  getProject,
-  listProjectsForClient,
-  countActiveProjects,
-  PROJECTS_PAGE_SIZE,
-} = await import("./queries");
+const { listProjects, getProject, listProjectsForClient, PROJECTS_PAGE_SIZE } =
+  await import("./queries");
 
 const ctx = { orgId: "org-1" } as never;
 const TODAY = "2026-06-15";
@@ -357,24 +352,23 @@ describe("listProjectsForClient", () => {
       render(asc(projects.id)),
     ]);
   });
-});
 
-describe("countActiveProjects", () => {
-  const CLIENT_ID = "22222222-2222-7222-8222-222222222222";
-
-  it("counts only the active rows returned", async () => {
-    state.findMany.mockResolvedValue([{ id: "1" }, { id: "2" }]);
-
-    const result = await countActiveProjects(ctx, CLIENT_ID);
-
-    expect(result).toBe(2);
-  });
-
-  it("returns zero for a client with no active projects", async () => {
+  it("scopes to the client's active rows", async () => {
     state.findMany.mockResolvedValue([]);
 
-    const result = await countActiveProjects(ctx, CLIENT_ID);
+    await listProjectsForClient(ctx, CLIENT_ID, TODAY);
 
-    expect(result).toBe(0);
+    expect(render(whereFromCall())).toStrictEqual(
+      render(
+        and(eq(projects.clientId, CLIENT_ID), isNull(projects.archivedAt)),
+      ),
+    );
+  });
+
+  it("returns an empty list for an id that is not a uuid, without ever reaching the database", async () => {
+    const result = await listProjectsForClient(ctx, "not-a-uuid", TODAY);
+
+    expect(state.findMany).not.toHaveBeenCalled();
+    expect(result).toStrictEqual([]);
   });
 });

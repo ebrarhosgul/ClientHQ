@@ -1,67 +1,47 @@
 /**
  * covers: spec 0010 AC-13
  *
- * `listProjectsForClient` has its own tests; this file is about
+ * `listProjectsForClient` has its own tests, and the client page's tests
+ * cover reading it once and containing a failure; this file is about
  * `ProjectsSection`'s own job: showing each row's name, status, due date and
  * overdue badge, the New project and archived links, an empty state with no
- * active projects, and containing a failed read as a reload prompt rather
- * than taking the client page down -- except a tenant resolution failure,
- * which belongs to the layout and must still propagate.
+ * active projects, and a reload prompt when the page hands it no rows.
  */
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
+import type { ClientProjectRow } from "@/projects/queries";
 import {
   expectNoAccessibilityViolations,
   THEMES,
   withTheme,
 } from "@/ui/test/axe";
 
-const mocks = vi.hoisted(() => ({
-  agencyContext: vi.fn(),
-  listProjectsForClient: vi.fn(),
-}));
-
-vi.mock("@/auth/context", () => ({ agencyContext: mocks.agencyContext }));
-vi.mock("@/projects/queries", () => ({
-  listProjectsForClient: mocks.listProjectsForClient,
-}));
-
-const { ProjectsSection } = await import("./projects-section");
+import { ProjectsSection } from "./projects-section";
 
 const CLIENT = { id: "client-1", name: "Northwind Coffee" };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.agencyContext.mockResolvedValue({ orgId: "org-1" });
-});
+const PROJECTS = [
+  {
+    id: "p1",
+    name: "Website relaunch",
+    status: "in_progress",
+    dueDate: "2026-01-01",
+    overdue: true,
+  },
+  {
+    id: "p2",
+    name: "Brand refresh",
+    status: "planning",
+    dueDate: null,
+    overdue: false,
+  },
+] as unknown as readonly ClientProjectRow[];
 
 describe("ProjectsSection", () => {
-  it("lists each project's name, status, due date and overdue badge (AC-13)", async () => {
-    mocks.listProjectsForClient.mockResolvedValue([
-      {
-        id: "p1",
-        name: "Website relaunch",
-        status: "in_progress",
-        dueDate: "2026-01-01",
-        overdue: true,
-      },
-      {
-        id: "p2",
-        name: "Brand refresh",
-        status: "planning",
-        dueDate: null,
-        overdue: false,
-      },
-    ]);
+  it("lists each project's name, status, due date and overdue badge (AC-13)", () => {
+    render(<ProjectsSection client={CLIENT} projects={PROJECTS} />);
 
-    render(await ProjectsSection({ client: CLIENT }));
-
-    expect(mocks.listProjectsForClient).toHaveBeenCalledWith(
-      { orgId: "org-1" },
-      "client-1",
-      expect.any(String),
-    );
     expect(
       screen.getByRole("link", { name: /Website relaunch/ }),
     ).toHaveAttribute("href", "/projects/p1");
@@ -70,10 +50,8 @@ describe("ProjectsSection", () => {
     expect(screen.getByText("No due date")).toBeInTheDocument();
   });
 
-  it("offers a New project link pre-filled with the client, and an archived link (AC-13)", async () => {
-    mocks.listProjectsForClient.mockResolvedValue([]);
-
-    render(await ProjectsSection({ client: CLIENT }));
+  it("offers a New project link pre-filled with the client, and an archived link showing every status (AC-13)", () => {
+    render(<ProjectsSection client={CLIENT} projects={[]} />);
 
     expect(screen.getByRole("link", { name: /New project/ })).toHaveAttribute(
       "href",
@@ -81,14 +59,12 @@ describe("ProjectsSection", () => {
     );
     expect(screen.getByRole("link", { name: "View archived" })).toHaveAttribute(
       "href",
-      "/projects?client=client-1&archived=true",
+      "/projects?client=client-1&archived=true&status=all",
     );
   });
 
-  it("shows an empty state naming the client when it has no active projects", async () => {
-    mocks.listProjectsForClient.mockResolvedValue([]);
-
-    render(await ProjectsSection({ client: CLIENT }));
+  it("shows an empty state naming the client when it has no active projects", () => {
+    render(<ProjectsSection client={CLIENT} projects={[]} />);
 
     expect(screen.getByText("No active projects")).toBeInTheDocument();
     expect(
@@ -96,13 +72,8 @@ describe("ProjectsSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a reload prompt instead of the list when the read fails", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.listProjectsForClient.mockRejectedValue(
-      new Error("connection reset"),
-    );
-
-    render(await ProjectsSection({ client: CLIENT }));
+  it("shows a reload prompt instead of the list when the read failed", () => {
+    render(<ProjectsSection client={CLIENT} projects={undefined} />);
 
     expect(
       screen.getByText("Projects could not be loaded"),
@@ -111,67 +82,31 @@ describe("ProjectsSection", () => {
       "href",
       "/clients/client-1",
     );
-
-    errorSpy.mockRestore();
-  });
-
-  it("lets a tenant resolution failure propagate to the layout", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const resolutionFailure = Object.assign(new Error("no session"), {
-      name: "TenantResolutionError",
-    });
-    mocks.listProjectsForClient.mockRejectedValue(resolutionFailure);
-
-    await expect(ProjectsSection({ client: CLIENT })).rejects.toThrow(
-      resolutionFailure,
-    );
-
-    errorSpy.mockRestore();
   });
 });
 
 describe.each(THEMES)("in the %s theme", (theme) => {
   it("has no axe violation with a list of projects (AC-13)", async () => {
-    mocks.listProjectsForClient.mockResolvedValue([
-      {
-        id: "p1",
-        name: "Website relaunch",
-        status: "in_progress",
-        dueDate: "2026-01-01",
-        overdue: true,
-      },
-      {
-        id: "p2",
-        name: "Brand refresh",
-        status: "planning",
-        dueDate: null,
-        overdue: false,
-      },
-    ]);
-
-    const { container } = render(await ProjectsSection({ client: CLIENT }));
+    const { container } = render(
+      <ProjectsSection client={CLIENT} projects={PROJECTS} />,
+    );
 
     await withTheme(theme, () => expectNoAccessibilityViolations(container));
   });
 
   it("has no axe violation when empty", async () => {
-    mocks.listProjectsForClient.mockResolvedValue([]);
-
-    const { container } = render(await ProjectsSection({ client: CLIENT }));
+    const { container } = render(
+      <ProjectsSection client={CLIENT} projects={[]} />,
+    );
 
     await withTheme(theme, () => expectNoAccessibilityViolations(container));
   });
 
   it("has no axe violation on the reload prompt after a failed read", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.listProjectsForClient.mockRejectedValue(
-      new Error("connection reset"),
+    const { container } = render(
+      <ProjectsSection client={CLIENT} projects={undefined} />,
     );
 
-    const { container } = render(await ProjectsSection({ client: CLIENT }));
-
     await withTheme(theme, () => expectNoAccessibilityViolations(container));
-
-    errorSpy.mockRestore();
   });
 });

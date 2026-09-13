@@ -200,16 +200,27 @@ export type ClientProjectRow = ProjectRow & { readonly overdue: boolean };
 
 /**
  * A client's active projects, newest first, for the client page's Projects
- * section (spec 0010, AC-13). No paging: a client's own project list is
- * expected to stay small.
+ * section (spec 0010, AC-13); their count is what the archive client confirm
+ * shows (AC-14). No paging: a client's own project list is expected to stay
+ * small.
+ *
+ * An id that isn't a uuid gets an empty list without reaching the database,
+ * as `getProject` returns `undefined` for one, so a malformed id can never
+ * surface as a driver error.
  */
 export async function listProjectsForClient(
   ctx: StaffContext,
   clientId: string,
   todayUtc: string,
 ): Promise<readonly ClientProjectRow[]> {
+  const parsed = clientIdSchema.safeParse(clientId);
+
+  if (!parsed.success) {
+    return [];
+  }
+
   const rows = await tenantDb(ctx).findMany(projects, {
-    where: and(eq(projects.clientId, clientId), isNull(projects.archivedAt)),
+    where: and(eq(projects.clientId, parsed.data), isNull(projects.archivedAt)),
     orderBy: [desc(projects.createdAt), asc(projects.id)],
   });
 
@@ -217,20 +228,4 @@ export async function listProjectsForClient(
     ...row,
     overdue: isOverdue(row.dueDate, row.status, row.archivedAt, todayUtc),
   }));
-}
-
-/**
- * How many of a client's projects are active, for the archive client confirm
- * dialog's copy (spec 0010, AC-14). Informational only: read once when the
- * client page loads, never a gate on the archive action itself.
- */
-export async function countActiveProjects(
-  ctx: StaffContext,
-  clientId: string,
-): Promise<number> {
-  const rows = await tenantDb(ctx).findMany(projects, {
-    where: and(eq(projects.clientId, clientId), isNull(projects.archivedAt)),
-  });
-
-  return rows.length;
 }

@@ -1,12 +1,7 @@
 import { FolderKanban, Plus } from "lucide-react";
 import Link from "next/link";
 
-import { agencyContext } from "@/auth/context";
-import {
-  listProjectsForClient,
-  type ClientProjectRow,
-} from "@/projects/queries";
-import { todayUtc } from "@/projects/status";
+import type { ClientProjectRow } from "@/projects/queries";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
 import { ProjectStatusChip } from "@/ui/patterns/status-chip";
@@ -19,19 +14,20 @@ export type ProjectsSectionProps = {
     readonly id: string;
     readonly name: string;
   };
+  /** `undefined` when the read failed: the section shows a reload prompt. */
+  readonly projects: readonly ClientProjectRow[] | undefined;
 };
 
 /**
  * The client page's Projects section (spec 0010, AC-13).
  *
- * `agencyContext()` is cached per request, so this costs the page one query
- * and nothing for the context it already resolved. A failed read is
- * contained here, exactly as `ContactsSection` contains its own: the rest of
- * the client record is still worth showing.
+ * The page reads the rows once and shares them here and with the archive
+ * client confirm's count (AC-14), so the section runs no query of its own. A
+ * failed read still stays contained to this section, exactly as
+ * `ContactsSection` contains its own: the rest of the client record is still
+ * worth showing.
  */
-export async function ProjectsSection({ client }: ProjectsSectionProps) {
-  const projects = await loadProjects(client.id);
-
+export function ProjectsSection({ client, projects }: ProjectsSectionProps) {
   if (projects === undefined) {
     return (
       <section
@@ -71,7 +67,9 @@ export async function ProjectsSection({ client }: ProjectsSectionProps) {
         </h2>
         <div className="flex items-center gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href={`/projects?client=${client.id}&archived=true`}>
+            <Link
+              href={`/projects?client=${client.id}&archived=true&status=all`}
+            >
               View archived
             </Link>
           </Button>
@@ -117,32 +115,4 @@ function ProjectRow({ project }: { readonly project: ClientProjectRow }) {
       </Link>
     </li>
   );
-}
-
-async function loadProjects(
-  clientId: string,
-): Promise<readonly ClientProjectRow[] | undefined> {
-  try {
-    return await listProjectsForClient(
-      await agencyContext(),
-      clientId,
-      todayUtc(),
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: "projects.section",
-        operation: "listProjectsForClient",
-        outcome: "failed",
-        at: new Date().toISOString(),
-      }),
-    );
-    // A resolution failure (no session, no mirror row) is the page's to
-    // handle, not this section's: let it through to the layout.
-    if (error instanceof Error && error.name === "TenantResolutionError") {
-      throw error;
-    }
-
-    return undefined;
-  }
 }
