@@ -21,7 +21,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8 | Subscription checkout & Stripe webhook | Slice 2 | in-progress |
 | 9 | Subscription access gate | Slice 2 | in-progress |
 | 10 | Client contacts & portal invitations | Slice 3 | in-progress |
-| 11 | Projects | Slice 4 | planned |
+| 11 | Projects | Slice 4 | in-progress |
 | 12 | Deliverable upload & download | Slice 5 | planned |
 | 13 | Invoice authoring & lifecycle | Slice 6 | planned |
 | 14 | Invoice PDF | Slice 6 | planned |
@@ -207,10 +207,22 @@ _Settles the invitation send half of feature 19 (a per contact cooldown and a pe
 
 ## Slice 4: Projects
 
-### 11. Projects · needs a decision
+### 11. Projects · in-progress
 The unit of work an agency delivers: create a project under a client, move it through its stages, set a due date, and see it in a list and on its own page.
 **Done when:** staff can create, list, open, edit and archive a project under a client, status moves only through valid transitions, everything stays inside the acting agency, and the screens meet WCAG 2.2 AA including empty and error states.
-- [ ] Design it (spec): `/architect projects`
+- [x] Design it (spec): `/architect projects`
+- [ ] Build it: `/develop projects`
+  - [ ] One thread end to end: the pure status module, the conditional `update` in the tenant layer, the input schemas, `createProject` with the active client picker, a minimal `/projects` list replacing the reserved placeholder, and `/projects/[id]` with the overdue badge, proven invisible to a second agency · AC-1, AC-2, AC-3, AC-4, AC-6, AC-15, AC-16
+  - [ ] The workflow: one button per valid move with the compare and set and the conflict refresh, the deliver confirm, edit with a clearable due date, and admin only archive and restore with the controls hidden from a member · AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-18
+  - [ ] The lists: status, client and archived filters with paging and the unresolvable client rule, the client page's Projects section with its New project and archived links, and the active project count in the archive client confirm · AC-4, AC-5, AC-13, AC-14
+  - [ ] Empty and error states, the Deliverables placeholder, `/design` entries for the move buttons, the overdue badge and the client picker, and axe in both themes · AC-6, AC-17
+- [ ] Verify it: `/check verify projects`
+- [ ] Test it: `/test projects`
+- [ ] Review it (fresh model): `/check review projects`
+- [ ] Document it: `/document projects`
+Spec [0010](../specs/0010-projects/index.md) · atomic build tasks in its `## Build plan` · no migration, the `projects` table from spec 0002 is unchanged
+
+_Settles spec 0006's open question about archiving a client with projects (a count in the confirm, never a block), adds the first admin only actions on the existing `requireRole` option, and gives the tenant layer's `update` an optional condition that feature 13's issue and pay moves should reuse._
 
 ## Slice 5: Deliverables
 
@@ -272,7 +284,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Marketing landing page & SEO**: a public page with metadata, sitemap and social cards. You left it out, so `/` stays a minimal entry point to sign in and sign up · needs a decision
 - **Legal pages & cookie consent**: privacy policy, terms, consent banner. Becomes required rather than optional if real agencies ever sign up · needs a decision
 - **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up. Spec 0002 ships a guarded local seed script, which is most of the data work · needs a decision
-- **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper · from spec 0002 · needs a decision
+- **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper. Spec 0010 reuses the UTC day for a project's overdue badge and its `isOverdue` already takes today as a parameter, so the same column fixes both · from spec 0002 and spec 0010 · needs a decision
 - **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision
 - **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
