@@ -19,6 +19,7 @@ import {
 } from "@/contacts/ui/fixtures";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
+import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { AddressFields } from "@/ui/patterns/address-fields";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
@@ -481,6 +482,45 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               </StatusChip>
             ),
           )}
+        </Row>
+        <Row label="overdue badge">
+          <OverdueBadge />
+        </Row>
+      </Section>
+
+      <Section
+        id={scoped("project-workflow")}
+        title="Project workflow"
+        description="Exactly one button per move valid from the current status. Mark delivered is the one move that asks for confirmation first; opening that confirmation needs a client component, so only its trigger shows here."
+      >
+        <Row label="planning">
+          <Button variant="outline">Start work</Button>
+        </Row>
+        <Row label="in_progress">
+          <Button variant="outline">Send to review</Button>
+        </Row>
+        <Row label="in_review">
+          <Button>Mark delivered</Button>
+          <Button variant="outline">Reopen</Button>
+        </Row>
+        <Row label="delivered (final, no move)">
+          <span className="text-xs text-muted-foreground">
+            No buttons render.
+          </span>
+        </Row>
+        <Row label="client picker (a native select, not the styled listbox)">
+          <select
+            defaultValue=""
+            aria-label={scoped("project-client-picker")}
+            className="h-9 w-56 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-surface"
+          >
+            <option value="" disabled>
+              Choose a client
+            </option>
+            <option value="client-1">Northwind Coffee</option>
+            <option value="client-2">Ridgeline Fitness</option>
+            <option value="client-3">Harbour Books (archived)</option>
+          </select>
         </Row>
       </Section>
 

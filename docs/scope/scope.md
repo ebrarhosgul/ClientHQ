@@ -211,16 +211,16 @@ _Settles the invitation send half of feature 19 (a per contact cooldown and a pe
 The unit of work an agency delivers: create a project under a client, move it through its stages, set a due date, and see it in a list and on its own page.
 **Done when:** staff can create, list, open, edit and archive a project under a client, status moves only through valid transitions, everything stays inside the acting agency, and the screens meet WCAG 2.2 AA including empty and error states.
 - [x] Design it (spec): `/architect projects`
-- [ ] Build it: `/develop projects`
-  - [ ] One thread end to end: the pure status module, the conditional `update` in the tenant layer, the input schemas, `createProject` with the active client picker, a minimal `/projects` list replacing the reserved placeholder, and `/projects/[id]` with the overdue badge, proven invisible to a second agency · AC-1, AC-2, AC-3, AC-4, AC-6, AC-15, AC-16
-  - [ ] The workflow: one button per valid move with the compare and set and the conflict refresh, the deliver confirm, edit with a clearable due date, and admin only archive and restore with the controls hidden from a member · AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-18
-  - [ ] The lists: status, client and archived filters with paging and the unresolvable client rule, the client page's Projects section with its New project and archived links, and the active project count in the archive client confirm · AC-4, AC-5, AC-13, AC-14
-  - [ ] Empty and error states, the Deliverables placeholder, `/design` entries for the move buttons, the overdue badge and the client picker, and axe in both themes · AC-6, AC-17
+- [x] Build it: `/develop projects`
+  - [x] One thread end to end: the pure status module, the conditional `update` in the tenant layer, the input schemas, `createProject` with the active client picker, a minimal `/projects` list replacing the reserved placeholder, and `/projects/[id]` with the overdue badge, proven invisible to a second agency · AC-1, AC-2, AC-3, AC-4, AC-6, AC-15, AC-16
+  - [x] The workflow: one button per valid move with the compare and set and the conflict refresh, the deliver confirm, edit with a clearable due date, and admin only archive and restore with the controls hidden from a member · AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-18
+  - [x] The lists: status, client and archived filters with paging and the unresolvable client rule, the client page's Projects section with its New project and archived links, and the active project count in the archive client confirm · AC-4, AC-5, AC-13, AC-14
+  - [x] Empty and error states, the Deliverables placeholder, `/design` entries for the move buttons, the overdue badge and the client picker, and axe in both themes · AC-6, AC-17
 - [ ] Verify it: `/check verify projects`
 - [ ] Test it: `/test projects`
 - [ ] Review it (fresh model): `/check review projects`
 - [ ] Document it: `/document projects`
-Spec [0010](../specs/0010-projects/index.md) · atomic build tasks in its `## Build plan` · no migration, the `projects` table from spec 0002 is unchanged
+Spec [0010](../specs/0010-projects/index.md) · atomic build tasks in its `## Build plan` · no migration, the `projects` table from spec 0002 is unchanged · code in `src/projects/`, `src/app/(agency)/(gated)/projects/`, `src/db/tenant/accessor.ts`, `src/clients/queries.ts`, `src/clients/ui/archive-client-button.tsx`, `src/app/(agency)/(gated)/clients/[id]/page.tsx`, `src/app/design/gallery.tsx`
 
 _Settles spec 0006's open question about archiving a client with projects (a count in the confirm, never a block), adds the first admin only actions on the existing `requireRole` option, and gives the tenant layer's `update` an optional condition that feature 13's issue and pay moves should reuse._
 

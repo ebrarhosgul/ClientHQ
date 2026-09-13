@@ -72,6 +72,16 @@ export type UpdatePatch<T extends TenantTable> = Partial<
   readonly createdAt?: never;
 };
 
+/**
+ * Makes an `update` a compare and set: the write lands only if `where` still
+ * holds, so a caller can say "only if the status is still X" (spec 0010,
+ * AC-9). ANDed into the same predicate as the tenant and id scope, so it can
+ * only ever narrow the statement further, never widen it.
+ */
+export type UpdateOptions = {
+  readonly where?: SQL;
+};
+
 /** The read surface both audiences share, over whichever tables they may reach. */
 export type TenantReader<TScope extends TenantTable> = {
   findMany<T extends TScope & TenantTable, W extends WithOf<T> = NoRelations>(
@@ -101,11 +111,16 @@ export type StaffAccessor = TenantReader<TenantTable> & {
     values: InsertValues<T>,
   ): Promise<T["$inferSelect"]>;
 
-  /** `undefined` when zero rows matched, which includes another tenant's id. */
+  /**
+   * `undefined` when zero rows matched, which includes another tenant's id
+   * and, when `options.where` is given, a row whose condition no longer
+   * holds (a compare and set miss).
+   */
   update<T extends TenantTable>(
     table: T,
     id: string,
     patch: UpdatePatch<T>,
+    options?: UpdateOptions,
   ): Promise<T["$inferSelect"] | undefined>;
 
   /** `false` when zero rows matched. */
@@ -172,16 +187,21 @@ function buildAccessor(
 ): StaffAccessor {
   const run = async (): Promise<Executor> => executor ?? (await pooledDb());
 
-  /** Tenant predicate, plus the client predicate for a contact, plus the caller's. */
+  /**
+   * Tenant predicate, plus the client predicate for a contact, plus the
+   * caller's own (one for a filter, two for a compare and set update: the id
+   * and the condition). All flattened into one AND, so it can only ever
+   * narrow further.
+   */
   function scope<T extends TenantTable>(
     table: T,
     key: string,
-    extra?: SQL,
+    ...extra: (SQL | undefined)[]
   ): SQL {
     const org = orgPredicate(table, ctx.orgId);
 
     if (ctx.kind === "staff") {
-      return required(and(org, extra));
+      return required(and(org, ...extra));
     }
 
     if (!isContactTableKey(key)) {
@@ -191,7 +211,7 @@ function buildAccessor(
       throw new Error(`${key} has no client path, so a contact cannot read it`);
     }
 
-    return required(and(org, clientPredicate(key, ctx), extra));
+    return required(and(org, clientPredicate(key, ctx), ...extra));
   }
 
   function findConfig<T extends TenantTable, W extends WithOf<T>>(
@@ -258,6 +278,7 @@ function buildAccessor(
     table: T,
     id: string,
     patch: UpdatePatch<T>,
+    options?: UpdateOptions,
   ): Promise<T["$inferSelect"] | undefined> {
     const key = relationalKey(table);
     const executable: PgTable = table;
@@ -266,7 +287,7 @@ function buildAccessor(
     )
       .update(executable)
       .set(columnValues(patch))
-      .where(scope(table, key, eq(table.id, id)))
+      .where(scope(table, key, eq(table.id, id), options?.where))
       .returning();
 
     if (row === undefined) {

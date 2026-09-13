@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   isClerkConfigured: vi.fn(),
   agencyContext: vi.fn(),
   getClient: vi.fn(),
+  countActiveProjects: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
@@ -22,15 +23,23 @@ vi.mock("@/clients/queries", async (importActual) => {
   const actual = await importActual<typeof import("@/clients/queries")>();
   return { ...actual, getClient: mocks.getClient };
 });
+vi.mock("@/projects/queries", async (importActual) => {
+  const actual = await importActual<typeof import("@/projects/queries")>();
+  return { ...actual, countActiveProjects: mocks.countActiveProjects };
+});
 vi.mock("@/clients/ui/archive-client-button", () => ({
   ArchiveClientButton: () => <button type="button">Archive</button>,
 }));
 vi.mock("@/clients/ui/restore-client-button", () => ({
   RestoreClientButton: () => <button type="button">Restore</button>,
 }));
-// The Contacts section runs its own scoped query and has its own tests.
+// The Contacts and Projects sections run their own scoped queries and have
+// their own tests.
 vi.mock("@/contacts/ui/contacts-section", () => ({
   ContactsSection: () => <section aria-label="Contacts" />,
+}));
+vi.mock("@/projects/ui/projects-section", () => ({
+  ProjectsSection: () => <section aria-label="Projects" />,
 }));
 
 const { default: ClientDetailPage } = await import("./page");
@@ -64,6 +73,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.agencyContext.mockResolvedValue({ orgId: "org-1" });
+  mocks.countActiveProjects.mockResolvedValue(0);
 });
 
 describe("ClientDetailPage", () => {
@@ -131,5 +141,18 @@ describe("ClientDetailPage", () => {
     });
     expect(mocks.agencyContext).not.toHaveBeenCalled();
     expect(mocks.getClient).not.toHaveBeenCalled();
+    expect(mocks.countActiveProjects).not.toHaveBeenCalled();
+  });
+
+  it("reads the active project count for the archive confirm (spec 0010, AC-14)", async () => {
+    mocks.getClient.mockResolvedValue(ACTIVE_CLIENT);
+    mocks.countActiveProjects.mockResolvedValue(3);
+
+    await renderPage();
+
+    expect(mocks.countActiveProjects).toHaveBeenCalledWith(
+      { orgId: "org-1" },
+      "client-1",
+    );
   });
 });

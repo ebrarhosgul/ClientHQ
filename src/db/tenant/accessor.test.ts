@@ -562,6 +562,68 @@ describe("update", () => {
   });
 });
 
+describe("update with a compare and set condition (spec 0010, AC-9)", () => {
+  it("ANDs the condition into the same flat predicate as the organization and id", async () => {
+    pooledRecorder.returning = [{ id: "project-row-1", status: "in_progress" }];
+
+    await tenantDb(staff).update(
+      projects,
+      "project-row-1",
+      { status: "in_progress" },
+      { where: eq(projects.status, "planning") },
+    );
+
+    const { sql, params } = render(lastWhere(pooledRecorder.seen));
+
+    expect(sql).toBe(
+      '("projects"."org_id" = $1 and "projects"."id" = $2 and "projects"."status" = $3)',
+    );
+    expect(params).toStrictEqual(["org-row-1", "project-row-1", "planning"]);
+  });
+
+  it("returns undefined, not another tenant's row, when the condition no longer holds", async () => {
+    // No `returning` rows configured: nothing matched.
+    await expect(
+      tenantDb(staff).update(
+        projects,
+        "project-row-1",
+        { status: "in_progress" },
+        { where: eq(projects.status, "in_review") },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("still requires organization and id to match; the condition cannot widen the scope", async () => {
+    await tenantDb(staff).update(
+      projects,
+      "someone-elses-row",
+      { status: "in_progress" },
+      { where: eq(projects.status, "planning") },
+    );
+
+    const { params } = render(lastWhere(pooledRecorder.seen));
+
+    expect(params).toStrictEqual([
+      "org-row-1",
+      "someone-elses-row",
+      "planning",
+    ]);
+  });
+
+  it("behaves exactly as before when no condition is given", async () => {
+    pooledRecorder.returning = [{ id: "project-row-1" }];
+
+    await tenantDb(staff).update(projects, "project-row-1", {
+      name: "Renamed",
+    });
+
+    const { sql, params } = render(lastWhere(pooledRecorder.seen));
+
+    expect(sql).toBe('("projects"."org_id" = $1 and "projects"."id" = $2)');
+    expect(params).toStrictEqual(["org-row-1", "project-row-1"]);
+  });
+});
+
 describe("delete", () => {
   it("scopes the statement by organization and id", async () => {
     pooledRecorder.returning = [{ id: "client-row-1" }];

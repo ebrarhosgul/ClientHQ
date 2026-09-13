@@ -9,6 +9,8 @@ import { ArchiveClientButton } from "@/clients/ui/archive-client-button";
 import { RestoreClientButton } from "@/clients/ui/restore-client-button";
 import { ContactsSection } from "@/contacts/ui/contacts-section";
 import { isClerkConfigured } from "@/lib/env";
+import { countActiveProjects } from "@/projects/queries";
+import { ProjectsSection } from "@/projects/ui/projects-section";
 import { Badge } from "@/ui/primitives/badge";
 import { PageHeader } from "@/ui/patterns/page-header";
 import { Button } from "@/ui/primitives/button";
@@ -64,6 +66,9 @@ export default async function ClientDetailPage({
   }
 
   const archived = client.archivedAt !== null;
+  const activeProjectCount = isClerkConfigured()
+    ? await countActiveProjects(await agencyContext(), client.id)
+    : 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,6 +89,7 @@ export default async function ClientDetailPage({
               <ArchiveClientButton
                 clientId={client.id}
                 clientName={client.name}
+                activeProjectCount={activeProjectCount}
               />
             )}
           </>
@@ -114,6 +120,8 @@ export default async function ClientDetailPage({
       </div>
 
       <ContactsSection client={client} />
+
+      <ProjectsSection client={client} />
     </div>
   );
 }

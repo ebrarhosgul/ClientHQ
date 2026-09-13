@@ -15,6 +15,7 @@
  * database. CI sets it and runs this file against the container it just
  * migrated.
  */
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -64,6 +65,10 @@ vi.mock("./session", () => ({
 }));
 
 loadEnvFiles();
+
+// The two "every table" cases below are two dozen round trips each to a
+// remote database; the default five seconds is for unit tests.
+vi.setConfig({ testTimeout: 30_000 });
 
 const url = process.env.DIRECT_URL;
 
@@ -534,6 +539,29 @@ describe.skipIf(!url)(
         });
       });
 
+      it("cannot use a compare and set condition to reach another organization's row (spec 0010, AC-9)", async () => {
+        await inRollback(async (tx, fixture) => {
+          const db: StaffAccessor = tenantDb(staffOf(fixture, "A"), tx);
+
+          await expect(
+            db.update(
+              projects,
+              fixture.projectB1,
+              { status: "in_progress" },
+              { where: eq(projects.status, "planning") },
+            ),
+          ).resolves.toBeUndefined();
+
+          const theirs = tenantDb(staffOf(fixture, "B"), tx);
+          const stillTheirs = await theirs.findById(
+            projects,
+            fixture.projectB1,
+          );
+
+          expect(stillTheirs?.status).toBe("planning");
+        });
+      });
+
       it("does not distinguish a foreign id from one that never existed", async () => {
         await inRollback(async (tx, fixture) => {
           const db = tenantDb(staffOf(fixture, "A"), tx);
@@ -542,6 +570,35 @@ describe.skipIf(!url)(
           const invented = await db.findById(clients, newId());
 
           expect(foreign).toBe(invented);
+        });
+      });
+    });
+
+    describe("a compare and set update (spec 0010, AC-9)", () => {
+      it("lands when the condition still holds, and misses without writing when it does not", async () => {
+        await inRollback(async (tx, fixture) => {
+          const db: StaffAccessor = tenantDb(staffOf(fixture, "A"), tx);
+
+          const miss = await db.update(
+            projects,
+            fixture.projectA1,
+            { status: "in_progress" },
+            { where: eq(projects.status, "in_review") },
+          );
+
+          expect(miss).toBeUndefined();
+
+          const unchanged = await db.findById(projects, fixture.projectA1);
+          expect(unchanged?.status).toBe("planning");
+
+          const hit = await db.update(
+            projects,
+            fixture.projectA1,
+            { status: "in_progress" },
+            { where: eq(projects.status, "planning") },
+          );
+
+          expect(hit?.status).toBe("in_progress");
         });
       });
     });

@@ -25,7 +25,8 @@ vi.mock("drizzle-orm", async (importActual) => {
   return { ...actual, ilike: vi.fn(actual.ilike) };
 });
 
-const { listClients, getClient, CLIENTS_PAGE_SIZE } = await import("./queries");
+const { listClients, getClient, listClientOptions, CLIENTS_PAGE_SIZE } =
+  await import("./queries");
 const { ilike } = await import("drizzle-orm");
 
 const ctx = { orgId: "org-1" } as never;
@@ -167,5 +168,43 @@ describe("getClient", () => {
 
     expect(state.findById).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
+  });
+});
+
+describe("listClientOptions", () => {
+  it("returns id and name for every row tenantDb finds", async () => {
+    state.findMany.mockResolvedValue([
+      { id: "client-1", name: "Acme", companyEmail: "a@example.com" },
+      { id: "client-2", name: "Harbour Books" },
+    ]);
+
+    const result = await listClientOptions(ctx);
+
+    expect(result).toStrictEqual([
+      { id: "client-1", name: "Acme" },
+      { id: "client-2", name: "Harbour Books" },
+    ]);
+  });
+
+  it("only ever asks for active clients, never archived ones (AC-3)", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    await listClientOptions(ctx);
+
+    expect(state.findMany).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ where: expect.anything() }),
+    );
+  });
+
+  it("orders by name then id", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    await listClientOptions(ctx);
+
+    expect(state.findMany).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orderBy: expect.any(Array) }),
+    );
   });
 });
