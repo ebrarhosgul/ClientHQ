@@ -112,13 +112,14 @@ export default async function ProjectDetailPage({
         {overdue ? <OverdueBadge /> : undefined}
       </div>
 
-      {!archived ? (
-        <ProjectStatusActions
-          projectId={project.id}
-          status={project.status}
-          archived={archived}
-        />
-      ) : undefined}
+      {/* Always mounted, so a conflict message outlives the refresh that
+          archives or moves the project; the component itself renders no
+          buttons while archived (AC-9, AC-10). */}
+      <ProjectStatusActions
+        projectId={project.id}
+        status={project.status}
+        archived={archived}
+      />
 
       <div className="grid gap-6 rounded-lg border border-border bg-card p-4 text-card-foreground sm:grid-cols-2">
         <Detail

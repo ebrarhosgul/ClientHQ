@@ -4,8 +4,8 @@
  * `getProject` and the action buttons are mocked (each has its own tests);
  * this file is about which fields `ProjectDetailPage` shows, which of the
  * archive/restore controls it renders for an admin versus a member (AC-12),
- * that an archived project hides the move buttons (AC-10), and that a
- * missing project -- which includes another agency's id, and every id at all
+ * that an archived project is handed to the always mounted move buttons as
+ * archived so they render nothing (AC-9, AC-10), and that a missing project -- which includes another agency's id, and every id at all
  * with no Clerk session -- resolves not found (AC-15).
  */
 import { render, screen } from "@testing-library/react";
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   agencyContext: vi.fn(),
   getProject: vi.fn(),
   todayUtc: vi.fn(),
+  ProjectStatusActions: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
@@ -35,9 +36,14 @@ vi.mock("@/projects/ui/restore-project-button", () => ({
   RestoreProjectButton: () => <button type="button">Restore</button>,
 }));
 vi.mock("@/projects/ui/project-status-actions", () => ({
-  ProjectStatusActions: () => (
-    <div role="group" aria-label="Move this project" />
-  ),
+  // The real component's contract in miniature: no buttons while archived.
+  ProjectStatusActions: (props: { readonly archived: boolean }) => {
+    mocks.ProjectStatusActions(props);
+
+    return props.archived ? undefined : (
+      <div role="group" aria-label="Move this project" />
+    );
+  },
 }));
 
 const { default: ProjectDetailPage } = await import("./page");
@@ -121,6 +127,20 @@ describe("ProjectDetailPage", () => {
     expect(
       screen.queryByRole("group", { name: "Move this project" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the move buttons mounted while archived, handing them archived: true, so a conflict message survives the refresh (AC-9)", async () => {
+    mocks.getProject.mockResolvedValue({
+      ...ACTIVE_PROJECT,
+      archivedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    await renderPage();
+
+    expect(mocks.ProjectStatusActions).toHaveBeenCalledTimes(1);
+    expect(mocks.ProjectStatusActions).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1", archived: true }),
+    );
   });
 
   it("shows the overdue badge for a past due date on an open project (AC-6)", async () => {

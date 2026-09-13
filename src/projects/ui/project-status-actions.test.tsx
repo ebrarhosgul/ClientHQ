@@ -5,9 +5,11 @@
  * decides which buttons show; this file is about `ProjectStatusActions`
  * rendering exactly those, submitting the right move, and refreshing on
  * every result -- success or the stale-button conflict alike -- so a stale
- * set of buttons never lingers.
+ * set of buttons never lingers. `router.refresh` is a mock, so what the
+ * refresh does to the page is played back here as a rerender with the
+ * status it would bring: the conflict sentence has to outlive that.
  */
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -138,6 +140,103 @@ describe("ProjectStatusActions", () => {
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the conflict message on screen once the refresh has swapped the buttons for the fresh set (AC-9)", async () => {
+    const user = userEvent.setup();
+    mocks.transitionProject.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "conflict",
+        message: "This project was already moved to In progress.",
+      },
+    });
+
+    const { rerender } = render(
+      <ProjectStatusActions
+        projectId="p1"
+        status="planning"
+        archived={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Start work" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    // What `router.refresh()` does to this component: the same instance, the
+    // status someone else moved it to.
+    rerender(
+      <ProjectStatusActions
+        projectId="p1"
+        status="in_progress"
+        archived={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Start work" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Send to review" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This project was already moved to In progress.",
+    );
+  });
+
+  it("keeps the conflict message when the refresh brings back an archived project with no buttons at all (AC-9, AC-10)", async () => {
+    const user = userEvent.setup();
+    mocks.transitionProject.mockResolvedValue({
+      ok: false,
+      error: { code: "conflict", message: "This project is archived." },
+    });
+
+    const { rerender } = render(
+      <ProjectStatusActions
+        projectId="p1"
+        status="planning"
+        archived={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Start work" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    rerender(
+      <ProjectStatusActions projectId="p1" status="planning" archived />,
+    );
+
+    expect(
+      screen.queryByRole("group", { name: "Move this project" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This project is archived.",
+    );
+  });
+
+  it("clears the last error once a later move succeeds", async () => {
+    const user = userEvent.setup();
+    mocks.transitionProject.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "conflict", message: "" },
+    });
+    mocks.transitionProject.mockResolvedValueOnce({
+      ok: true,
+      data: { status: "in_progress" },
+    });
+
+    render(
+      <ProjectStatusActions
+        projectId="p1"
+        status="planning"
+        archived={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Start work" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start work" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mocks.refresh).toHaveBeenCalledTimes(2);
+  });
+
   it("confirms before marking delivered, and refreshes on both outcomes", async () => {
     mocks.transitionProject.mockResolvedValue({
       ok: true,
@@ -158,7 +257,7 @@ describe("ProjectStatusActions", () => {
     const onConfirm = props.onConfirm as () => Promise<{
       readonly ok: boolean;
     }>;
-    const result = await onConfirm();
+    const result = await act(() => onConfirm());
 
     expect(mocks.transitionProject).toHaveBeenCalledWith({
       id: "p1",
@@ -167,5 +266,51 @@ describe("ProjectStatusActions", () => {
     });
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
     expect(result).toStrictEqual({ ok: true });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("closes the delivered dialog on a conflict and shows the message beside the buttons, where the refresh cannot remove it (AC-9)", async () => {
+    mocks.transitionProject.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "conflict",
+        message: "This project was already moved to In progress.",
+      },
+    });
+
+    const { rerender } = render(
+      <ProjectStatusActions
+        projectId="p1"
+        status="in_review"
+        archived={false}
+      />,
+    );
+
+    const onConfirm = mocks.confirmDialogProps[0].onConfirm as () => Promise<{
+      readonly ok: boolean;
+    }>;
+    const result = await act(() => onConfirm());
+
+    // `ok: true` is what closes the dialog; the failure is reported outside it.
+    expect(result).toStrictEqual({ ok: true });
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This project was already moved to In progress.",
+    );
+
+    rerender(
+      <ProjectStatusActions
+        projectId="p1"
+        status="in_progress"
+        archived={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Mark delivered" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This project was already moved to In progress.",
+    );
   });
 });

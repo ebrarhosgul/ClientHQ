@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0010 AC-8, AC-9, AC-10
+ * covers: spec 0010 AC-8, AC-9, AC-10, AC-16
  *
  * `canTransition` itself is proven in `status.test.ts`; this file exercises
  * what `transitionProject` adds on top: an illegal move never reaches the
@@ -16,6 +16,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { projects } from "@/db/schema";
 
 const state = vi.hoisted(() => ({
+  /** Every config handed to `withTenantAction`, so `revalidate` can be pinned (AC-16). */
+  configs: [] as Array<{
+    readonly name?: string;
+    readonly revalidate?: unknown;
+  }>,
   update: vi.fn(),
   findById: vi.fn(),
 }));
@@ -25,16 +30,19 @@ vi.mock("@/db/tenant", async (importActual) => {
 
   return {
     ...actual,
-    withTenantAction:
-      (config: {
-        readonly input: { safeParse: (value: unknown) => never };
-        readonly handler: (args: {
-          readonly input: unknown;
-          readonly ctx: unknown;
-          readonly db: unknown;
-        }) => Promise<unknown>;
-      }) =>
-      async (rawInput: unknown) => {
+    withTenantAction: (config: {
+      readonly name?: string;
+      readonly revalidate?: unknown;
+      readonly input: { safeParse: (value: unknown) => never };
+      readonly handler: (args: {
+        readonly input: unknown;
+        readonly ctx: unknown;
+        readonly db: unknown;
+      }) => Promise<unknown>;
+    }) => {
+      state.configs.push(config);
+
+      return async (rawInput: unknown) => {
         const parsed = config.input.safeParse(rawInput) as
           | { success: true; data: unknown }
           | {
@@ -68,11 +76,13 @@ vi.mock("@/db/tenant", async (importActual) => {
 
           throw thrown;
         }
-      },
+      };
+    },
   };
 });
 
 const { transitionProject } = await import("./transition-project");
+const { PROJECT_REVALIDATE } = await import("./revalidate");
 
 const PROJECT_ID = "11111111-1111-7111-8111-111111111111";
 
@@ -95,6 +105,16 @@ function whereFromUpdate(): SQL | undefined {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("transitionProject revalidates every project surface (AC-16)", () => {
+  it("passes PROJECT_REVALIDATE to withTenantAction", () => {
+    const config = state.configs.find(
+      (candidate) => candidate.name === "transitionProject",
+    );
+
+    expect(config?.revalidate).toBe(PROJECT_REVALIDATE);
+  });
 });
 
 describe("transitionProject", () => {

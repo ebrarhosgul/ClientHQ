@@ -5,7 +5,8 @@
  * cover reading it once and containing a failure; this file is about
  * `ProjectsSection`'s own job: showing each row's name, status, due date and
  * overdue badge, the New project and archived links, an empty state with no
- * active projects, and a reload prompt when the page hands it no rows.
+ * active projects, no New project link for an archived client (AC-3), and a
+ * reload prompt when the page hands it no rows.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -19,7 +20,11 @@ import {
 
 import { ProjectsSection } from "./projects-section";
 
-const CLIENT = { id: "client-1", name: "Northwind Coffee" };
+const CLIENT = { id: "client-1", name: "Northwind Coffee", archivedAt: null };
+const ARCHIVED_CLIENT = {
+  ...CLIENT,
+  archivedAt: new Date("2026-01-01T00:00:00.000Z"),
+};
 
 const PROJECTS = [
   {
@@ -72,6 +77,39 @@ describe("ProjectsSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("offers no New project link for an archived client, and says why in the empty state (AC-3)", () => {
+    render(<ProjectsSection client={ARCHIVED_CLIENT} projects={[]} />);
+
+    expect(
+      screen.queryByRole("link", { name: /New project/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View archived" })).toHaveAttribute(
+      "href",
+      "/projects?client=client-1&archived=true&status=all",
+    );
+    expect(
+      screen.getByText(
+        "This client is archived, so no projects can be added until they are restored.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("still lists an archived client's projects, with a note instead of the New project link (AC-3)", () => {
+    render(<ProjectsSection client={ARCHIVED_CLIENT} projects={PROJECTS} />);
+
+    expect(
+      screen.queryByRole("link", { name: /New project/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Website relaunch/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This client is archived. Restore them to add projects.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows a reload prompt instead of the list when the read failed", () => {
     render(<ProjectsSection client={CLIENT} projects={undefined} />);
 
@@ -97,6 +135,14 @@ describe.each(THEMES)("in the %s theme", (theme) => {
   it("has no axe violation when empty", async () => {
     const { container } = render(
       <ProjectsSection client={CLIENT} projects={[]} />,
+    );
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation for an archived client with projects", async () => {
+    const { container } = render(
+      <ProjectsSection client={ARCHIVED_CLIENT} projects={PROJECTS} />,
     );
 
     await withTheme(theme, () => expectNoAccessibilityViolations(container));

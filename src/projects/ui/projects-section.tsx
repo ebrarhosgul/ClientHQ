@@ -13,6 +13,7 @@ export type ProjectsSectionProps = {
   readonly client: {
     readonly id: string;
     readonly name: string;
+    readonly archivedAt: Date | null;
   };
   /** `undefined` when the read failed: the section shows a reload prompt. */
   readonly projects: readonly ClientProjectRow[] | undefined;
@@ -26,8 +27,14 @@ export type ProjectsSectionProps = {
  * failed read still stays contained to this section, exactly as
  * `ContactsSection` contains its own: the rest of the client record is still
  * worth showing.
+ *
+ * An archived client gets no New project link: the create picker never lists
+ * one (AC-3), so the link could only land on a form that cannot pick this
+ * client. The section says why instead, as the contacts section does.
  */
 export function ProjectsSection({ client, projects }: ProjectsSectionProps) {
+  const archived = client.archivedAt !== null;
+
   if (projects === undefined) {
     return (
       <section
@@ -73,12 +80,14 @@ export function ProjectsSection({ client, projects }: ProjectsSectionProps) {
               View archived
             </Link>
           </Button>
-          <Button asChild size="sm">
-            <Link href={`/projects/new?client=${client.id}`}>
-              <Plus />
-              New project
-            </Link>
-          </Button>
+          {archived ? undefined : (
+            <Button asChild size="sm">
+              <Link href={`/projects/new?client=${client.id}`}>
+                <Plus />
+                New project
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -86,7 +95,11 @@ export function ProjectsSection({ client, projects }: ProjectsSectionProps) {
         <EmptyState
           icon={<FolderKanban />}
           heading="No active projects"
-          description={`${client.name} has no open projects yet.`}
+          description={
+            archived
+              ? "This client is archived, so no projects can be added until they are restored."
+              : `${client.name} has no open projects yet.`
+          }
         />
       ) : (
         <ul className="flex flex-col gap-2">
@@ -95,6 +108,12 @@ export function ProjectsSection({ client, projects }: ProjectsSectionProps) {
           ))}
         </ul>
       )}
+
+      {archived && projects.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          This client is archived. Restore them to add projects.
+        </p>
+      ) : undefined}
     </section>
   );
 }

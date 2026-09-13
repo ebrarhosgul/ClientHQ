@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0010 AC-1, AC-2, AC-3
+ * covers: spec 0010 AC-1, AC-2, AC-3, AC-16
  *
  * `withTenantAction` itself is proven in `src/db/tenant/action.test.ts`; this
  * file exercises what `createProject` adds: the client lookup gate, and that
@@ -11,6 +11,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  /** Every config handed to `withTenantAction`, so `revalidate` can be pinned (AC-16). */
+  configs: [] as Array<{
+    readonly name?: string;
+    readonly revalidate?: unknown;
+  }>,
   findById: vi.fn(),
   insert: vi.fn(),
 }));
@@ -20,16 +25,19 @@ vi.mock("@/db/tenant", async (importActual) => {
 
   return {
     ...actual,
-    withTenantAction:
-      (config: {
-        readonly input: { safeParse: (value: unknown) => never };
-        readonly handler: (args: {
-          readonly input: unknown;
-          readonly ctx: unknown;
-          readonly db: unknown;
-        }) => Promise<unknown>;
-      }) =>
-      async (rawInput: unknown) => {
+    withTenantAction: (config: {
+      readonly name?: string;
+      readonly revalidate?: unknown;
+      readonly input: { safeParse: (value: unknown) => never };
+      readonly handler: (args: {
+        readonly input: unknown;
+        readonly ctx: unknown;
+        readonly db: unknown;
+      }) => Promise<unknown>;
+    }) => {
+      state.configs.push(config);
+
+      return async (rawInput: unknown) => {
         const parsed = config.input.safeParse(rawInput) as
           | { success: true; data: unknown }
           | {
@@ -63,16 +71,28 @@ vi.mock("@/db/tenant", async (importActual) => {
 
           throw thrown;
         }
-      },
+      };
+    },
   };
 });
 
 const { createProject } = await import("./create-project");
+const { PROJECT_REVALIDATE } = await import("./revalidate");
 
 const CLIENT_ID = "11111111-1111-7111-8111-111111111111";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("createProject revalidates every project surface (AC-16)", () => {
+  it("passes PROJECT_REVALIDATE to withTenantAction", () => {
+    const config = state.configs.find(
+      (candidate) => candidate.name === "createProject",
+    );
+
+    expect(config?.revalidate).toBe(PROJECT_REVALIDATE);
+  });
 });
 
 describe("createProject", () => {

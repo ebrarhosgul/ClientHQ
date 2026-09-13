@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState } from "react";
+import { useState } from "react";
 
 import type { ProjectStatus } from "@/db/schema";
 import type { ActionError } from "@/db/tenant";
@@ -17,42 +17,33 @@ type MoveButtonProps = {
   readonly projectId: string;
   readonly from: ProjectStatus;
   readonly move: ProjectMove;
-  /** Refresh the page after every result, success or conflict alike, so a
-   * stale status or a stale set of buttons never lingers (spec 0010, AC-9). */
-  readonly onDone: () => void;
+  /**
+   * Called after every result, success or conflict alike, with the error when
+   * there was one. The parent owns the message and the refresh: a button
+   * cannot hold either, because the refresh that follows a conflict brings
+   * back a different set of moves and unmounts the button that was clicked
+   * (spec 0010, AC-9).
+   */
+  readonly onDone: (error?: ActionError) => void;
 };
 
 /** A move with no confirmation: "Start work", "Send to review", "Reopen". */
 function PlainMoveButton({ projectId, from, move, onDone }: MoveButtonProps) {
-  const [state, submit] = useActionState<
-    { readonly error?: ActionError },
-    FormData
-  >(async () => {
-    const result = await transitionProject({
-      id: projectId,
-      from,
-      to: move.to,
-    });
-
-    onDone();
-
-    if (!result.ok) {
-      return { error: result.error };
-    }
-
-    return {};
-  }, {});
-
   return (
-    <form action={submit} className="flex flex-col items-start gap-1">
+    <form
+      action={async () => {
+        const result = await transitionProject({
+          id: projectId,
+          from,
+          to: move.to,
+        });
+
+        onDone(result.ok ? undefined : result.error);
+      }}
+    >
       <SubmitButton variant="outline" pendingLabel="Working…">
         {move.label}
       </SubmitButton>
-      {state.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          <ActionErrorMessage error={state.error} />
-        </p>
-      ) : undefined}
     </form>
   );
 }
@@ -78,15 +69,11 @@ function ConfirmedMoveButton({
           to: move.to,
         });
 
-        onDone();
+        onDone(result.ok ? undefined : result.error);
 
-        if (!result.ok) {
-          return {
-            ok: false,
-            message: <ActionErrorMessage error={result.error} />,
-          };
-        }
-
+        // Close the dialog either way. A failure is shown beside the buttons
+        // by the parent, where it outlives the refresh; the dialog itself
+        // would not, because every conflict changes the set of moves.
         return { ok: true };
       }}
     />
@@ -97,6 +84,10 @@ function ConfirmedMoveButton({
  * Exactly the buttons `nextStatuses` says are valid right now (spec 0010,
  * AC-8), none while archived. The same pure module the action reads, so the
  * buttons a person sees and the moves the server allows cannot drift apart.
+ *
+ * The last error sits beside the group rather than inside a button, so the
+ * conflict sentence is still on screen once the refresh has replaced the
+ * buttons with the fresh set, or removed them all (AC-9).
  */
 export function ProjectStatusActions({
   projectId,
@@ -108,37 +99,52 @@ export function ProjectStatusActions({
   readonly archived: boolean;
 }) {
   const router = useRouter();
+  const [error, setError] = useState<ActionError | undefined>(undefined);
   const moves = nextStatuses(status, archived);
 
-  if (moves.length === 0) {
+  if (moves.length === 0 && error === undefined) {
     return undefined;
   }
 
+  const onDone = (nextError?: ActionError) => {
+    setError(nextError);
+    router.refresh();
+  };
+
   return (
-    <div
-      role="group"
-      aria-label="Move this project"
-      className="flex flex-wrap items-center gap-2"
-    >
-      {moves.map((move) =>
-        move.confirm ? (
-          <ConfirmedMoveButton
-            key={move.to}
-            projectId={projectId}
-            from={status}
-            move={move}
-            onDone={() => router.refresh()}
-          />
-        ) : (
-          <PlainMoveButton
-            key={move.to}
-            projectId={projectId}
-            from={status}
-            move={move}
-            onDone={() => router.refresh()}
-          />
-        ),
-      )}
+    <div className="flex flex-col items-start gap-2">
+      {moves.length > 0 ? (
+        <div
+          role="group"
+          aria-label="Move this project"
+          className="flex flex-wrap items-center gap-2"
+        >
+          {moves.map((move) =>
+            move.confirm ? (
+              <ConfirmedMoveButton
+                key={move.to}
+                projectId={projectId}
+                from={status}
+                move={move}
+                onDone={onDone}
+              />
+            ) : (
+              <PlainMoveButton
+                key={move.to}
+                projectId={projectId}
+                from={status}
+                move={move}
+                onDone={onDone}
+              />
+            ),
+          )}
+        </div>
+      ) : undefined}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          <ActionErrorMessage error={error} />
+        </p>
+      ) : undefined}
     </div>
   );
 }

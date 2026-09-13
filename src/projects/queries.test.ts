@@ -261,6 +261,30 @@ describe("listProjects", () => {
     );
   });
 
+  it("filters by a valid client id alongside the archived and status predicates, rows still org scoped (AC-5)", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    const clientId = "22222222-2222-7222-8222-222222222222";
+
+    await listProjects(ctx, {
+      archived: true,
+      todayUtc: TODAY,
+      statusParam: "in_review",
+      clientParam: clientId,
+    });
+
+    expect(state.findMany).toHaveBeenCalledTimes(1);
+    expect(render(whereFromCall())).toStrictEqual(
+      render(
+        and(
+          isNotNull(projects.archivedAt),
+          eq(projects.status, "in_review"),
+          eq(projects.clientId, clientId),
+        ),
+      ),
+    );
+  });
+
   it("orders by due date, then name, then id", async () => {
     state.findMany.mockResolvedValue([]);
 
