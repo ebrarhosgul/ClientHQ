@@ -217,7 +217,7 @@ The unit of work an agency delivers: create a project under a client, move it th
   - [x] The lists: status, client and archived filters with paging and the unresolvable client rule, the client page's Projects section with its New project and archived links, and the active project count in the archive client confirm · AC-4, AC-5, AC-13, AC-14
   - [x] Empty and error states, the Deliverables placeholder, `/design` entries for the move buttons, the overdue badge and the client picker, and axe in both themes · AC-6, AC-17
 - [ ] Verify it: `/check verify projects`
-- [ ] Test it: `/test projects`
+- [x] Test it: `/test projects`
 - [ ] Review it (fresh model): `/check review projects`
 - [ ] Document it: `/document projects`
 Spec [0010](../specs/0010-projects/index.md) · atomic build tasks in its `## Build plan` · no migration, the `projects` table from spec 0002 is unchanged · code in `src/projects/`, `src/app/(agency)/(gated)/projects/`, `src/db/tenant/accessor.ts`, `src/clients/queries.ts`, `src/clients/ui/archive-client-button.tsx`, `src/app/(agency)/(gated)/clients/[id]/page.tsx`, `src/app/design/gallery.tsx`
