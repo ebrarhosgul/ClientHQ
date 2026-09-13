@@ -71,9 +71,7 @@ export async function ProjectsSection({ client }: ProjectsSectionProps) {
         </h2>
         <div className="flex items-center gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link
-              href={`/projects?client=${client.id}&archived=true&status=all`}
-            >
+            <Link href={`/projects?client=${client.id}&archived=true`}>
               View archived
             </Link>
           </Button>

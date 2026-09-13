@@ -53,12 +53,20 @@ function archivedLinkHref(
 
 export function ProjectsFilterBar({
   status,
+  statusParam,
   clientId,
   archived,
   clientOptions,
 }: {
-  /** The raw `status` URL param, or the effective default, for the select. */
+  /** The effective status (the implicit default filled in), for the select. */
   readonly status: string;
+  /**
+   * The raw `status` URL param, undefined when the caller relied on the
+   * default. The archived toggle links carry this, not `status`: writing the
+   * effective default into the link would flip the other list's own default
+   * when it is followed (spec 0010, AC-4).
+   */
+  readonly statusParam?: string;
   /** The raw `client` URL param; cleared (undefined) when it did not resolve. */
   readonly clientId?: string;
   readonly archived: boolean;
@@ -129,7 +137,9 @@ export function ProjectsFilterBar({
           size="sm"
           aria-current={archived ? undefined : "true"}
         >
-          <Link href={archivedLinkHref(false, status, clientId)}>Active</Link>
+          <Link href={archivedLinkHref(false, statusParam, clientId)}>
+            Active
+          </Link>
         </Button>
         <Button
           asChild
@@ -137,7 +147,9 @@ export function ProjectsFilterBar({
           size="sm"
           aria-current={archived ? "true" : undefined}
         >
-          <Link href={archivedLinkHref(true, status, clientId)}>Archived</Link>
+          <Link href={archivedLinkHref(true, statusParam, clientId)}>
+            Archived
+          </Link>
         </Button>
       </div>
     </div>

@@ -107,11 +107,13 @@ function statusPredicate(
 /**
  * A page of one agency's projects (spec 0010, AC-4, AC-5).
  *
- * A `client` filter that is not a syntactically valid uuid never reaches the
- * database: it resolves to an empty list directly, the same outcome a
- * well-formed but foreign or nonexistent client id gets once the query runs
- * (this agency's projects never reference another agency's client, so the
- * equality filter alone already excludes it).
+ * A blank `client` param (the `<option value="">All clients</option>` case)
+ * is treated as no filter at all, the same as an absent one, mirroring
+ * `listClients`. A non-blank `client` that is not a syntactically valid uuid
+ * never reaches the database: it resolves to an empty list directly, the
+ * same outcome a well-formed but foreign or nonexistent client id gets once
+ * the query runs (this agency's projects never reference another agency's
+ * client, so the equality filter alone already excludes it).
  */
 export async function listProjects(
   ctx: StaffContext,
@@ -124,9 +126,10 @@ export async function listProjects(
   }: ProjectListParams,
 ): Promise<ProjectListResult> {
   let clientFilter: string | undefined;
+  const trimmedClientParam = clientParam?.trim();
 
-  if (clientParam !== undefined) {
-    const parsed = clientIdSchema.safeParse(clientParam);
+  if (trimmedClientParam) {
+    const parsed = clientIdSchema.safeParse(trimmedClientParam);
 
     if (!parsed.success) {
       return NO_RESULTS;

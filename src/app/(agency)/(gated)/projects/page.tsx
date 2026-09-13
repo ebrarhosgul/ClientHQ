@@ -126,7 +126,15 @@ export default async function ProjectsPage({
     }
   }
 
-  const hasFilter = Boolean(clientParam) || archived || Boolean(statusParam);
+  // `ProjectsFilterBar`'s status <select> always submits a value, so
+  // `statusParam` is set on every "Apply filters" click even when the person
+  // left it on the default. Comparing against the default for this view
+  // (open when active, all when archived) is what tells an unchanged submit
+  // apart from an actual filter (spec 0010, AC-17).
+  const hasFilter =
+    Boolean(clientParam) ||
+    archived ||
+    (statusParam !== undefined && statusParam !== (archived ? "all" : "open"));
 
   return (
     <div className="flex flex-col gap-6">
@@ -145,6 +153,7 @@ export default async function ProjectsPage({
 
       <ProjectsFilterBar
         status={effectiveStatus}
+        statusParam={statusParam}
         clientId={resolvedClientId}
         archived={archived}
         clientOptions={clientOptions}
@@ -162,7 +171,11 @@ export default async function ProjectsPage({
               : "Create the first project under one of your clients to start tracking its work."
           }
           action={
-            hasFilter ? undefined : (
+            hasFilter ? (
+              <Button asChild variant="outline">
+                <Link href="/projects">Clear filters</Link>
+              </Button>
+            ) : (
               <Button asChild>
                 <Link href="/projects/new">
                   <Plus />

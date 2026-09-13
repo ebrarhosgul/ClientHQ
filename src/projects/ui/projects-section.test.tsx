@@ -11,6 +11,12 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  expectNoAccessibilityViolations,
+  THEMES,
+  withTheme,
+} from "@/ui/test/axe";
+
 const mocks = vi.hoisted(() => ({
   agencyContext: vi.fn(),
   listProjectsForClient: vi.fn(),
@@ -75,7 +81,7 @@ describe("ProjectsSection", () => {
     );
     expect(screen.getByRole("link", { name: "View archived" })).toHaveAttribute(
       "href",
-      "/projects?client=client-1&archived=true&status=all",
+      "/projects?client=client-1&archived=true",
     );
   });
 
@@ -119,6 +125,52 @@ describe("ProjectsSection", () => {
     await expect(ProjectsSection({ client: CLIENT })).rejects.toThrow(
       resolutionFailure,
     );
+
+    errorSpy.mockRestore();
+  });
+});
+
+describe.each(THEMES)("in the %s theme", (theme) => {
+  it("has no axe violation with a list of projects (AC-13)", async () => {
+    mocks.listProjectsForClient.mockResolvedValue([
+      {
+        id: "p1",
+        name: "Website relaunch",
+        status: "in_progress",
+        dueDate: "2026-01-01",
+        overdue: true,
+      },
+      {
+        id: "p2",
+        name: "Brand refresh",
+        status: "planning",
+        dueDate: null,
+        overdue: false,
+      },
+    ]);
+
+    const { container } = render(await ProjectsSection({ client: CLIENT }));
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation when empty", async () => {
+    mocks.listProjectsForClient.mockResolvedValue([]);
+
+    const { container } = render(await ProjectsSection({ client: CLIENT }));
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation on the reload prompt after a failed read", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.listProjectsForClient.mockRejectedValue(
+      new Error("connection reset"),
+    );
+
+    const { container } = render(await ProjectsSection({ client: CLIENT }));
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
 
     errorSpy.mockRestore();
   });

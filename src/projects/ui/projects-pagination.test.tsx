@@ -9,6 +9,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import {
+  expectNoAccessibilityViolations,
+  THEMES,
+  withTheme,
+} from "@/ui/test/axe";
+
 import { ProjectsPagination } from "./projects-pagination";
 
 describe("ProjectsPagination", () => {
@@ -94,5 +100,21 @@ describe("ProjectsPagination", () => {
       "href",
       "/projects?page=2&status=in_review&client=client-1&archived=true",
     );
+  });
+});
+
+describe.each(THEMES)("in the %s theme", (theme) => {
+  it("has no axe violation with an ellipsis and a filter carried on every link", async () => {
+    const { container } = render(
+      <ProjectsPagination
+        page={5}
+        pageCount={10}
+        status="in_review"
+        clientId="client-1"
+        archived
+      />,
+    );
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
   });
 });

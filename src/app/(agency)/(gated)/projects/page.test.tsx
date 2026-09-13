@@ -121,6 +121,26 @@ describe("ProjectsPage", () => {
     );
   });
 
+  it("passes the filter bar the effective status for the select and the raw param, undefined, for the toggle links (spec 0010, AC-4)", async () => {
+    await renderAwaited({ archived: "true" });
+
+    const filterBar = JSON.parse(
+      screen.getByTestId("filter-bar").textContent ?? "{}",
+    );
+    expect(filterBar.status).toBe("all");
+    expect(filterBar.statusParam).toBeUndefined();
+  });
+
+  it("passes the raw status param through unchanged when one is given", async () => {
+    await renderAwaited({ status: "in_review" });
+
+    const filterBar = JSON.parse(
+      screen.getByTestId("filter-bar").textContent ?? "{}",
+    );
+    expect(filterBar.status).toBe("in_review");
+    expect(filterBar.statusParam).toBe("in_review");
+  });
+
   it("resolves an active client filter and marks it archived when it is (AC-5)", async () => {
     mocks.getClient.mockResolvedValue({
       id: "client-9",
@@ -179,7 +199,7 @@ describe("ProjectsPage", () => {
     );
   });
 
-  it("shows the filtered empty state, with no action, once a filter is applied", async () => {
+  it("shows the filtered empty state, with a clear filters action, once a filter is applied", async () => {
     mocks.listProjects.mockResolvedValue({
       rows: [],
       page: 1,
@@ -195,5 +215,40 @@ describe("ProjectsPage", () => {
     expect(screen.getAllByRole("link", { name: /new project/i })).toHaveLength(
       1,
     );
+    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+  });
+
+  it("shows the default empty state for the unchanged status=open submitted by the filter form, not the filtered one", async () => {
+    mocks.listProjects.mockResolvedValue({
+      rows: [],
+      page: 1,
+      pageCount: 1,
+      total: 0,
+    });
+
+    await renderAwaited({ status: "open", client: "" });
+
+    expect(screen.getByText("No projects yet")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /new project/i })).toHaveLength(
+      2,
+    );
+  });
+
+  it("shows the default (all statuses) empty state for an archived list with no explicit status", async () => {
+    mocks.listProjects.mockResolvedValue({
+      rows: [],
+      page: 1,
+      pageCount: 1,
+      total: 0,
+    });
+
+    await renderAwaited({ archived: "true" });
+
+    expect(
+      screen.getByText("No projects match these filters"),
+    ).toBeInTheDocument();
   });
 });

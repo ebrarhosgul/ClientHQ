@@ -8,7 +8,20 @@
  * unresolvable client rule, pagination, and the overdue flag each row
  * carries.
  */
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  ne,
+  type SQL,
+} from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { projects } from "@/db/schema";
 
 const state = vi.hoisted(() => ({
   findMany: vi.fn(),
@@ -29,6 +42,27 @@ const {
 
 const ctx = { orgId: "org-1" } as never;
 const TODAY = "2026-06-15";
+
+const dialect = new PgDialect();
+
+/** The rendered statement, which is what PostgreSQL would receive. */
+function render(sql: SQL | undefined): { sql: string; params: unknown[] } {
+  if (sql === undefined) {
+    throw new Error("expected a where clause, got none");
+  }
+
+  const query = dialect.sqlToQuery(sql);
+
+  return { sql: query.sql, params: query.params };
+}
+
+function whereFromCall(index = 0): SQL | undefined {
+  return state.findMany.mock.calls[index]?.[1]?.where as SQL | undefined;
+}
+
+function orderByFromCall(index = 0): readonly SQL[] {
+  return state.findMany.mock.calls[index]?.[1]?.orderBy as readonly SQL[];
+}
 
 function projectRows(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -104,25 +138,104 @@ describe("listProjects", () => {
     expect(result.rows[0]?.overdue).toBe(true);
   });
 
-  it("defaults to every status but delivered (status=open)", async () => {
-    state.findMany.mockResolvedValue([]);
+  describe("statusPredicate (spec 0010, AC-4, Value sourcing)", () => {
+    it("defaults to every status but delivered when no status param and not archived", async () => {
+      state.findMany.mockResolvedValue([]);
 
-    await listProjects(ctx, { archived: false, todayUtc: TODAY });
+      await listProjects(ctx, { archived: false, todayUtc: TODAY });
 
-    expect(state.findMany).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ where: expect.anything() }),
-    );
-  });
+      expect(render(whereFromCall())).toStrictEqual(
+        render(
+          and(isNull(projects.archivedAt), ne(projects.status, "delivered")),
+        ),
+      );
+    });
 
-  it("shows every status once archived and no status filter is given (Value sourcing)", async () => {
-    state.findMany.mockResolvedValue([]);
+    it("shows every status once archived and no status filter is given", async () => {
+      state.findMany.mockResolvedValue([]);
 
-    await listProjects(ctx, { archived: true, todayUtc: TODAY });
+      await listProjects(ctx, { archived: true, todayUtc: TODAY });
 
-    // Both calls still carry a where (the archived predicate at minimum); the
-    // exact SQL is exercised for real in `/check verify`.
-    expect(state.findMany.mock.calls[0]?.[1]?.where).toBeDefined();
+      expect(render(whereFromCall())).toStrictEqual(
+        render(and(isNotNull(projects.archivedAt))),
+      );
+    });
+
+    it("also defaults to open for an unrecognized status param, when not archived", async () => {
+      state.findMany.mockResolvedValue([]);
+
+      await listProjects(ctx, {
+        archived: false,
+        todayUtc: TODAY,
+        statusParam: "not-a-status",
+      });
+
+      expect(render(whereFromCall())).toStrictEqual(
+        render(
+          and(isNull(projects.archivedAt), ne(projects.status, "delivered")),
+        ),
+      );
+    });
+
+    it("shows every status for an unrecognized status param, when archived", async () => {
+      state.findMany.mockResolvedValue([]);
+
+      await listProjects(ctx, {
+        archived: true,
+        todayUtc: TODAY,
+        statusParam: "not-a-status",
+      });
+
+      expect(render(whereFromCall())).toStrictEqual(
+        render(and(isNotNull(projects.archivedAt))),
+      );
+    });
+
+    it("status=open explicitly excludes delivered, whether archived or not", async () => {
+      state.findMany.mockResolvedValue([]);
+
+      await listProjects(ctx, {
+        archived: true,
+        todayUtc: TODAY,
+        statusParam: "open",
+      });
+
+      expect(render(whereFromCall())).toStrictEqual(
+        render(
+          and(isNotNull(projects.archivedAt), ne(projects.status, "delivered")),
+        ),
+      );
+    });
+
+    it("status=all shows every status, whether archived or not", async () => {
+      state.findMany.mockResolvedValue([]);
+
+      await listProjects(ctx, {
+        archived: false,
+        todayUtc: TODAY,
+        statusParam: "all",
+      });
+
+      expect(render(whereFromCall())).toStrictEqual(
+        render(and(isNull(projects.archivedAt))),
+      );
+    });
+
+    it("one named status filters to exactly that status", async () => {
+      state.findMany.mockResolvedValue([]);
+
+      await listProjects(ctx, {
+        archived: false,
+        todayUtc: TODAY,
+        statusParam: "in_review",
+      });
+
+      expect(render(whereFromCall())).toStrictEqual(
+        render(
+          and(isNull(projects.archivedAt), eq(projects.status, "in_review")),
+        ),
+      );
+    });
   });
 
   it("returns an empty list without touching the database for a client filter that is not a uuid (AC-5)", async () => {
@@ -136,15 +249,33 @@ describe("listProjects", () => {
     expect(result).toStrictEqual({ rows: [], page: 1, pageCount: 1, total: 0 });
   });
 
+  it("treats a blank client param as no filter, the same as an absent one (AC-4, AC-5)", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    await listProjects(ctx, {
+      archived: false,
+      todayUtc: TODAY,
+      clientParam: "",
+    });
+
+    expect(state.findMany).toHaveBeenCalled();
+    expect(render(whereFromCall())).toStrictEqual(
+      render(
+        and(isNull(projects.archivedAt), ne(projects.status, "delivered")),
+      ),
+    );
+  });
+
   it("orders by due date, then name, then id", async () => {
     state.findMany.mockResolvedValue([]);
 
     await listProjects(ctx, { archived: false, todayUtc: TODAY });
 
-    expect(state.findMany).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ orderBy: expect.any(Array) }),
-    );
+    expect(orderByFromCall().map((clause) => render(clause))).toStrictEqual([
+      render(asc(projects.dueDate)),
+      render(asc(projects.name)),
+      render(asc(projects.id)),
+    ]);
   });
 
   it.each(["0", "-1", "abc", "999"])(
@@ -221,10 +352,10 @@ describe("listProjectsForClient", () => {
 
     await listProjectsForClient(ctx, CLIENT_ID, TODAY);
 
-    expect(state.findMany).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ orderBy: expect.any(Array) }),
-    );
+    expect(orderByFromCall().map((clause) => render(clause))).toStrictEqual([
+      render(desc(projects.createdAt)),
+      render(asc(projects.id)),
+    ]);
   });
 });
 

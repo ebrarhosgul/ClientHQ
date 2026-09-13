@@ -12,6 +12,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ClientOption } from "@/clients/queries";
+import {
+  expectNoAccessibilityViolations,
+  THEMES,
+  withTheme,
+} from "@/ui/test/axe";
+
 import type { ProjectDetail } from "../queries";
 
 const mocks = vi.hoisted(() => ({
@@ -208,5 +214,45 @@ describe("ProjectForm, editing", () => {
     expect(mocks.updateProject).toHaveBeenCalledWith(
       expect.objectContaining({ id: "p1", dueDate: "" }),
     );
+  });
+});
+
+describe.each(THEMES)("in the %s theme", (theme) => {
+  it("has no axe violation creating, including the client select's disabled placeholder option (AC-1, AC-3)", async () => {
+    const { container } = render(
+      <ProjectForm clientOptions={CLIENT_OPTIONS} />,
+    );
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation editing, with the client shown as read only text (AC-7)", async () => {
+    const { container } = render(<ProjectForm project={PROJECT} />);
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation with a field error shown beside its field (AC-2)", async () => {
+    const user = userEvent.setup();
+    mocks.createProject.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "validation",
+        message: "",
+        fieldErrors: { name: ["Enter a name."] },
+      },
+    });
+
+    const { container } = render(
+      <ProjectForm clientOptions={CLIENT_OPTIONS} />,
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /client/i }),
+      "client-1",
+    );
+    await user.click(screen.getByRole("button", { name: "Create project" }));
+    await screen.findByText("Enter a name.");
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
   });
 });

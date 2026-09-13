@@ -8,6 +8,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import {
+  expectNoAccessibilityViolations,
+  THEMES,
+  withTheme,
+} from "@/ui/test/axe";
+
 import { ProjectsFilterBar } from "./projects-filter-bar";
 
 describe("ProjectsFilterBar", () => {
@@ -68,6 +74,7 @@ describe("ProjectsFilterBar", () => {
     render(
       <ProjectsFilterBar
         status="in_progress"
+        statusParam="in_progress"
         clientId="client-1"
         archived={false}
         clientOptions={[]}
@@ -91,6 +98,46 @@ describe("ProjectsFilterBar", () => {
     );
   });
 
+  it("does not write the effective open default into the Archived link when no status param is given (spec 0010, AC-4)", () => {
+    render(
+      <ProjectsFilterBar status="open" archived={false} clientOptions={[]} />,
+    );
+
+    expect(screen.getByRole("link", { name: "Archived" })).toHaveAttribute(
+      "href",
+      "/projects?archived=true",
+    );
+  });
+
+  it("does not write the effective all default into the Active link when no status param is given (spec 0010, AC-4)", () => {
+    render(<ProjectsFilterBar status="all" archived clientOptions={[]} />);
+
+    expect(screen.getByRole("link", { name: "Active" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+  });
+
+  it("still carries an explicit status param across both toggle links", () => {
+    render(
+      <ProjectsFilterBar
+        status="delivered"
+        statusParam="delivered"
+        archived={false}
+        clientOptions={[]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Archived" })).toHaveAttribute(
+      "href",
+      "/projects?status=delivered&archived=true",
+    );
+    expect(screen.getByRole("link", { name: "Active" })).toHaveAttribute(
+      "href",
+      "/projects?status=delivered",
+    );
+  });
+
   it("shows the hidden archived field in the status form only when archived is true", () => {
     const { container, rerender } = render(
       <ProjectsFilterBar status="all" archived={false} clientOptions={[]} />,
@@ -111,5 +158,32 @@ describe("ProjectsFilterBar", () => {
     expect(
       screen.getByRole("group", { name: "Filter by archived" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe.each(THEMES)("in the %s theme", (theme) => {
+  it("has no axe violation with an empty client picker", async () => {
+    const { container } = render(
+      <ProjectsFilterBar status="open" archived={false} clientOptions={[]} />,
+    );
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
+  });
+
+  it("has no axe violation with a resolved client and an archived one in the picker (AC-5)", async () => {
+    const { container } = render(
+      <ProjectsFilterBar
+        status="all"
+        statusParam="all"
+        clientId="client-1"
+        archived
+        clientOptions={[
+          { id: "client-1", name: "Northwind Coffee", archived: true },
+          { id: "client-2", name: "Acme" },
+        ]}
+      />,
+    );
+
+    await withTheme(theme, () => expectNoAccessibilityViolations(container));
   });
 });
