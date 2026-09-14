@@ -230,11 +230,11 @@ _Settles spec 0006's open question about archiving a client with projects (a cou
 Attaching real files to a project, uploaded straight to storage so bytes never pass through the server, with a per file switch for whether the client may see it.
 **Done when:** a file uploads directly with a short lived signed URL, the confirmed size and type are read back from storage rather than trusted from the browser, an unconfirmed upload is never listed or downloadable, downloads are permission checked and time limited, and deleting removes the stored object before the row.
 - [x] Design it (spec): `/architect deliverable upload & download`
-- [ ] Build it: `/develop deliverable upload & download`
-  - [ ] The storage port and one thread end to end: the `R2_*` variables, `src/storage/` on the AWS S3 SDK with its in memory fake and the signing tests, the file rules and schemas, `requestUpload` and `confirmUpload`, a minimal Deliverables list replacing the placeholder, the browser upload with progress, and the staff download route, proven with one real upload · AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-9, AC-10, AC-12, AC-16, AC-18
-  - [ ] The upload's failure paths and management: `abandonUpload`, the confirm retry and its result copies, the archived project rule, the not configured notice, the visibility switch, and delete behind a confirm with object first removal · AC-1, AC-6, AC-7, AC-8, AC-9, AC-11, AC-15, AC-17, AC-18
-  - [ ] The contact download rule, the missing file and storage not configured pages, and `scripts/r2-setup.ts` with the `verify.md` steps for buckets, tokens, CORS and the wrong content type refusal · AC-4, AC-12, AC-13, AC-14, AC-18, AC-19
-  - [ ] Empty and error states, `/design` entries for every new piece, `e2e/deliverables.spec.ts`, and axe in both themes · AC-10, AC-20
+- [x] Build it: `/develop deliverable upload & download`
+  - [x] The storage port and one thread end to end: the `R2_*` variables, `src/storage/` on the AWS S3 SDK with its in memory fake and the signing tests, the file rules and schemas, `requestUpload` and `confirmUpload`, a minimal Deliverables list replacing the placeholder, the browser upload with progress, and the staff download route, proven with one real upload · AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-9, AC-10, AC-12, AC-16, AC-18
+  - [x] The upload's failure paths and management: `abandonUpload`, the confirm retry and its result copies, the archived project rule, the not configured notice, the visibility switch, and delete behind a confirm with object first removal · AC-1, AC-6, AC-7, AC-8, AC-9, AC-11, AC-15, AC-17, AC-18
+  - [x] The contact download rule, the missing file and storage not configured pages, and `scripts/r2-setup.ts` with the `verify.md` steps for buckets, tokens, CORS and the wrong content type refusal · AC-4, AC-12, AC-13, AC-14, AC-18, AC-19
+  - [x] Empty and error states, `/design` entries for every new piece, `e2e/deliverables.spec.ts`, and axe in both themes · AC-10, AC-20
 - [ ] Verify it: `/check verify deliverable upload & download`
 - [ ] Test it: `/test deliverable upload & download`
 - [ ] Review it (fresh model): `/check review deliverable upload & download`

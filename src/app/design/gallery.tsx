@@ -5,6 +5,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -20,6 +21,8 @@ import {
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
+import { formatBytes } from "@/deliverables/format";
+import { typeLabel } from "@/deliverables/file-rules";
 import { AddressFields } from "@/ui/patterns/address-fields";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
@@ -72,6 +75,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/primitives/select";
+import { Progress } from "@/ui/primitives/progress";
 import { Separator } from "@/ui/primitives/separator";
 import { Skeleton, SkeletonRegion } from "@/ui/primitives/skeleton";
 import { Switch } from "@/ui/primitives/switch";
@@ -834,6 +838,172 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
           heading="No invoices yet"
           description="Your agency has not issued any invoices to you. This is what an empty state looks like in the client portal: it describes, it does not invite."
         />
+      </Section>
+
+      <Section
+        id={scoped("deliverables")}
+        title="Deliverables"
+        description="The project page's Deliverables section: the list, the upload control in every phase, and the two pages the download route answers outside the app shell. Controls here are inert stand ins, since the page has no session to act with (spec 0011)."
+      >
+        <div className="flex flex-col gap-6">
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              list, two ready rows
+            </p>
+            <ul className="flex flex-col gap-2">
+              {[
+                {
+                  name: "Logo pack.zip",
+                  contentType: "application/zip",
+                  sizeBytes: 48_213_904,
+                  uploadedByName: "Priya Shah",
+                  createdOn: "1 February 2026 (UTC)",
+                  visibleToClient: true,
+                },
+                {
+                  name: "Internal QA notes.pdf",
+                  contentType: "application/pdf",
+                  sizeBytes: 12_880,
+                  uploadedByName: "Sam Reyes",
+                  createdOn: "20 January 2026 (UTC)",
+                  visibleToClient: false,
+                },
+              ].map((deliverable) => (
+                <li
+                  key={deliverable.name}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-medium underline underline-offset-2">
+                      {deliverable.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {typeLabel(deliverable.contentType)} ·{" "}
+                      {formatBytes(deliverable.sizeBytes)} · Uploaded by{" "}
+                      {deliverable.uploadedByName} on {deliverable.createdOn}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Visible to client</span>
+                      <Switch
+                        size="sm"
+                        checked={deliverable.visibleToClient}
+                        aria-label={`Visible to client: ${deliverable.name}`}
+                      />
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      type="button"
+                      aria-label={`Delete ${deliverable.name}`}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Row label="empty">
+            <EmptyState
+              icon={<FileText />}
+              heading="No deliverables yet"
+              description="Files added to this project will show up here."
+              className="w-full"
+            />
+          </Row>
+
+          <Row label="error (read failed)">
+            <ErrorState
+              heading="Deliverables could not be loaded"
+              description="The rest of this project is fine. Reload to try the deliverables again."
+              action={
+                <Button variant="outline" type="button">
+                  Reload
+                </Button>
+              }
+              className="w-full"
+            />
+          </Row>
+
+          <Row label="storage not configured notice">
+            <p className="text-sm text-muted-foreground">
+              File storage is not configured for this environment.
+            </p>
+          </Row>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              upload control: picking
+            </p>
+            <input
+              type="file"
+              aria-label="Choose a file to upload"
+              className="text-sm"
+              disabled
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              upload control: uploading, 62%
+            </p>
+            <div className="flex max-w-sm flex-col gap-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Style guide v2.pdf · 6.1 MB</span>
+                <span>62%</span>
+              </div>
+              <Progress value={62} aria-label="Uploading Style guide v2.pdf" />
+              <div>
+                <Button type="button" variant="outline" size="sm">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <Row label="upload control: failure, with retry">
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 text-sm text-destructive"
+            >
+              <span>The upload did not finish.</span>
+              <Button type="button" size="sm" variant="outline">
+                Retry
+              </Button>
+            </div>
+          </Row>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="mb-2 font-mono text-xs text-muted-foreground">
+                missing file page (route response, 404)
+              </p>
+              <div className="rounded-lg border border-border bg-card p-6 text-center text-card-foreground">
+                <p className="text-base font-semibold">This file is missing</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  &quot;Style guide v2.pdf&quot; could not be found in storage.
+                  It may need to be uploaded again.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 font-mono text-xs text-muted-foreground">
+                storage not configured page (route response, 503)
+              </p>
+              <div className="rounded-lg border border-border bg-card p-6 text-center text-card-foreground">
+                <p className="text-base font-semibold">
+                  File storage is not configured
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Downloads are unavailable in this environment.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </Section>
 
       <Section
