@@ -9,6 +9,12 @@ import { ArchiveClientButton } from "@/clients/ui/archive-client-button";
 import { RestoreClientButton } from "@/clients/ui/restore-client-button";
 import { ContactsSection } from "@/contacts/ui/contacts-section";
 import { isClerkConfigured } from "@/lib/env";
+import {
+  listProjectsForClient,
+  type ClientProjectRow,
+} from "@/projects/queries";
+import { todayUtc } from "@/projects/status";
+import { ProjectsSection } from "@/projects/ui/projects-section";
 import { Badge } from "@/ui/primitives/badge";
 import { PageHeader } from "@/ui/patterns/page-header";
 import { Button } from "@/ui/primitives/button";
@@ -20,6 +26,41 @@ import { Button } from "@/ui/primitives/button";
  */
 async function findClient(id: string): Promise<ClientRow | undefined> {
   return isClerkConfigured() ? getClient(await agencyContext(), id) : undefined;
+}
+
+/**
+ * The client's active projects, read once for both the Projects section and
+ * the archive confirm's count (spec 0010, AC-13, AC-14). A failed read is
+ * contained: the section shows a reload prompt, the count falls back to zero
+ * (the confirm then shows its plain copy, which is right for informational
+ * text), and the rest of the client record still renders.
+ */
+async function loadProjects(
+  clientId: string,
+): Promise<readonly ClientProjectRow[] | undefined> {
+  try {
+    return await listProjectsForClient(
+      await agencyContext(),
+      clientId,
+      todayUtc(),
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "projects.section",
+        operation: "listProjectsForClient",
+        outcome: "failed",
+        at: new Date().toISOString(),
+      }),
+    );
+    // A resolution failure (no session, no mirror row) is the layout's to
+    // handle, not this page's: let it through.
+    if (error instanceof Error && error.name === "TenantResolutionError") {
+      throw error;
+    }
+
+    return undefined;
+  }
 }
 
 export async function generateMetadata({
@@ -64,6 +105,8 @@ export default async function ClientDetailPage({
   }
 
   const archived = client.archivedAt !== null;
+  const projects = await loadProjects(client.id);
+  const activeProjectCount = projects?.length ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,6 +127,7 @@ export default async function ClientDetailPage({
               <ArchiveClientButton
                 clientId={client.id}
                 clientName={client.name}
+                activeProjectCount={activeProjectCount}
               />
             )}
           </>
@@ -114,6 +158,8 @@ export default async function ClientDetailPage({
       </div>
 
       <ContactsSection client={client} />
+
+      <ProjectsSection client={client} projects={projects} />
     </div>
   );
 }

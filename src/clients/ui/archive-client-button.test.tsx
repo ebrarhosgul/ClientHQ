@@ -40,7 +40,13 @@ beforeEach(() => {
 
 describe("ArchiveClientButton", () => {
   it("shows the trigger and asks for confirmation with the client's name (AC-8)", () => {
-    render(<ArchiveClientButton clientId="c1" clientName="Northwind" />);
+    render(
+      <ArchiveClientButton
+        clientId="c1"
+        clientName="Northwind"
+        activeProjectCount={0}
+      />,
+    );
 
     expect(
       screen.getByRole("button", { name: /archive/i }),
@@ -50,6 +56,35 @@ describe("ArchiveClientButton", () => {
     expect(props.title).toBe("Archive Northwind?");
     expect(props.confirmLabel).toBe("Archive");
     expect(props.variant).toBe("destructive");
+    expect(props.description).toBe(
+      "This removes them from your active client list. Nothing is deleted, and you can restore them at any time.",
+    );
+  });
+
+  it("names the active project count in the confirm copy when the client has any (AC-14)", () => {
+    render(
+      <ArchiveClientButton
+        clientId="c1"
+        clientName="Northwind"
+        activeProjectCount={2}
+      />,
+    );
+
+    const props = mocks.confirmDialogProps[0];
+    expect(props.description).toContain("2 active projects");
+  });
+
+  it("uses singular wording for exactly one active project (AC-14)", () => {
+    render(
+      <ArchiveClientButton
+        clientId="c1"
+        clientName="Northwind"
+        activeProjectCount={1}
+      />,
+    );
+
+    const props = mocks.confirmDialogProps[0];
+    expect(props.description).toContain("1 active project,");
   });
 
   it("archives and refreshes on a successful confirm", async () => {
@@ -57,7 +92,13 @@ describe("ArchiveClientButton", () => {
       ok: true,
       data: { archivedAt: new Date() },
     });
-    render(<ArchiveClientButton clientId="c1" clientName="Northwind" />);
+    render(
+      <ArchiveClientButton
+        clientId="c1"
+        clientName="Northwind"
+        activeProjectCount={0}
+      />,
+    );
 
     const onConfirm = mocks.confirmDialogProps[0].onConfirm as () => Promise<{
       readonly ok: boolean;
@@ -74,7 +115,13 @@ describe("ArchiveClientButton", () => {
       ok: false,
       error: { code: "not_found", message: "" },
     });
-    render(<ArchiveClientButton clientId="c1" clientName="Northwind" />);
+    render(
+      <ArchiveClientButton
+        clientId="c1"
+        clientName="Northwind"
+        activeProjectCount={0}
+      />,
+    );
 
     const onConfirm = mocks.confirmDialogProps[0].onConfirm as () => Promise<{
       readonly ok: boolean;

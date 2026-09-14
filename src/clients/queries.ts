@@ -100,3 +100,25 @@ export async function getClient(
     ? tenantDb(ctx).findById(clients, parsed.data)
     : undefined;
 }
+
+export type ClientOption = {
+  readonly id: string;
+  readonly name: string;
+};
+
+/**
+ * Every active client of the agency, for the project create form's picker
+ * (spec 0010, Value sourcing). Ordered by name then id, no paging: unlike
+ * `listClients` this never shows an archived client, because the picker must
+ * never offer one to create a project under (AC-3).
+ */
+export async function listClientOptions(
+  ctx: StaffContext,
+): Promise<readonly ClientOption[]> {
+  const rows = await tenantDb(ctx).findMany(clients, {
+    where: isNull(clients.archivedAt),
+    orderBy: [asc(clients.name), asc(clients.id)],
+  });
+
+  return rows.map((row) => ({ id: row.id, name: row.name }));
+}

@@ -131,7 +131,7 @@ test.describe("the agency shell", () => {
     expect(stray).toEqual({ clerkModals: 0, dialogs: 0 });
   });
 
-  test("lands a sidebar link whose feature has not shipped on a real page", async ({
+  test("lands a sidebar link on a real page inside the shell", async ({
     page,
   }) => {
     await page.goto("/dashboard");
@@ -141,8 +141,10 @@ test.describe("the agency shell", () => {
       .getByRole("link", { name: "Projects" })
       .click();
 
-    // Inside the shell, with an explanation and a way back, not a bare 404.
-    await expect(page.getByText("Not here yet")).toBeVisible();
+    // Inside the shell on the destination page, not a bare 404.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Projects" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("navigation", { name: "Sections" }).first(),
     ).toBeVisible();

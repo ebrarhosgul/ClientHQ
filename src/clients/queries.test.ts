@@ -8,7 +8,11 @@
  * clamping) and that a name search is applied, trimmed, as a case
  * insensitive `ilike`.
  */
+import { and, asc, isNotNull, isNull, type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { clients } from "@/db/schema";
 
 const state = vi.hoisted(() => ({
   findMany: vi.fn(),
@@ -25,10 +29,32 @@ vi.mock("drizzle-orm", async (importActual) => {
   return { ...actual, ilike: vi.fn(actual.ilike) };
 });
 
-const { listClients, getClient, CLIENTS_PAGE_SIZE } = await import("./queries");
+const { listClients, getClient, listClientOptions, CLIENTS_PAGE_SIZE } =
+  await import("./queries");
 const { ilike } = await import("drizzle-orm");
 
 const ctx = { orgId: "org-1" } as never;
+
+const dialect = new PgDialect();
+
+/** The rendered statement, which is what PostgreSQL would receive. */
+function render(sql: SQL | undefined): { sql: string; params: unknown[] } {
+  if (sql === undefined) {
+    throw new Error("expected a where clause, got none");
+  }
+
+  const query = dialect.sqlToQuery(sql);
+
+  return { sql: query.sql, params: query.params };
+}
+
+function whereFromCall(index = 0): SQL | undefined {
+  return state.findMany.mock.calls[index]?.[1]?.where as SQL | undefined;
+}
+
+function orderByFromCall(index = 0): readonly SQL[] {
+  return state.findMany.mock.calls[index]?.[1]?.orderBy as readonly SQL[];
+}
 
 function rows(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -89,10 +115,10 @@ describe("listClients", () => {
 
     await listClients(ctx, { archived: false });
 
-    expect(state.findMany).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ orderBy: expect.any(Array) }),
-    );
+    expect(orderByFromCall().map((clause) => render(clause))).toStrictEqual([
+      render(asc(clients.name)),
+      render(asc(clients.id)),
+    ]);
   });
 
   it("filters to archived or active clients depending on the flag", async () => {
@@ -102,12 +128,12 @@ describe("listClients", () => {
     await listClients(ctx, { archived: false });
 
     expect(state.findMany).toHaveBeenCalledTimes(2);
-    // Both calls carry a `where`; the value itself is exercised for real
-    // against PostgreSQL in `/check verify`, so what matters here is only
-    // that a predicate is always present, and never left off.
-    for (const call of state.findMany.mock.calls) {
-      expect(call[1]?.where).toBeDefined();
-    }
+    expect(render(whereFromCall(0))).toStrictEqual(
+      render(and(isNotNull(clients.archivedAt))),
+    );
+    expect(render(whereFromCall(1))).toStrictEqual(
+      render(and(isNull(clients.archivedAt))),
+    );
   });
 
   it("applies a trimmed, case insensitive name search when given one (AC-5)", async () => {
@@ -167,5 +193,42 @@ describe("getClient", () => {
 
     expect(state.findById).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
+  });
+});
+
+describe("listClientOptions", () => {
+  it("returns id and name for every row tenantDb finds", async () => {
+    state.findMany.mockResolvedValue([
+      { id: "client-1", name: "Acme", companyEmail: "a@example.com" },
+      { id: "client-2", name: "Harbour Books" },
+    ]);
+
+    const result = await listClientOptions(ctx);
+
+    expect(result).toStrictEqual([
+      { id: "client-1", name: "Acme" },
+      { id: "client-2", name: "Harbour Books" },
+    ]);
+  });
+
+  it("only ever asks for active clients, never archived ones (AC-3)", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    await listClientOptions(ctx);
+
+    expect(render(whereFromCall())).toStrictEqual(
+      render(isNull(clients.archivedAt)),
+    );
+  });
+
+  it("orders by name then id", async () => {
+    state.findMany.mockResolvedValue([]);
+
+    await listClientOptions(ctx);
+
+    expect(orderByFromCall().map((clause) => render(clause))).toStrictEqual([
+      render(asc(clients.name)),
+      render(asc(clients.id)),
+    ]);
   });
 });
