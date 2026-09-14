@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { agencyContext } from "@/auth/context";
+import { listDeliverables, type DeliverableRow } from "@/deliverables/queries";
+import { DeliverablesSection } from "@/deliverables/ui/deliverables-section";
 import { isClerkConfigured } from "@/lib/env";
 import { getProject, type ProjectDetail } from "@/projects/queries";
 import { isOverdue, todayUtc } from "@/projects/status";
@@ -12,6 +14,7 @@ import { ArchiveProjectButton } from "@/projects/ui/archive-project-button";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { ProjectStatusActions } from "@/projects/ui/project-status-actions";
 import { RestoreProjectButton } from "@/projects/ui/restore-project-button";
+import { isStorageConfigured } from "@/storage";
 import { Badge } from "@/ui/primitives/badge";
 import { PageHeader } from "@/ui/patterns/page-header";
 import { ProjectStatusChip } from "@/ui/patterns/status-chip";
@@ -26,6 +29,36 @@ async function findProject(id: string): Promise<ProjectDetail | undefined> {
   return isClerkConfigured()
     ? getProject(await agencyContext(), id)
     : undefined;
+}
+
+/**
+ * The project's `ready` deliverables, read once for the section (spec 0011,
+ * AC-10). A failed read is contained to the section, exactly as the client
+ * page's Projects section contains its own.
+ */
+async function loadDeliverables(
+  projectId: string,
+): Promise<readonly DeliverableRow[] | undefined> {
+  try {
+    return await listDeliverables(await agencyContext(), projectId);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "deliverables.section",
+        operation: "listDeliverables",
+        outcome: "failed",
+        at: new Date().toISOString(),
+      }),
+    );
+
+    // A resolution failure (no session, no mirror row) is the layout's to
+    // handle, not this page's: let it through.
+    if (error instanceof Error && error.name === "TenantResolutionError") {
+      throw error;
+    }
+
+    return undefined;
+  }
 }
 
 export async function generateMetadata({
@@ -71,6 +104,7 @@ export default async function ProjectDetailPage({
   }
 
   const ctx = await agencyContext();
+  const deliverables = await loadDeliverables(project.id);
   const archived = project.archivedAt !== null;
   const overdue = isOverdue(
     project.dueDate,
@@ -137,20 +171,12 @@ export default async function ProjectDetailPage({
         <Detail label="Description" value={project.description} />
       </div>
 
-      <section
-        aria-labelledby="deliverables-heading"
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
-      >
-        <h2
-          id="deliverables-heading"
-          className="text-base font-semibold tracking-tight"
-        >
-          Deliverables
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          File uploads are coming in a later feature.
-        </p>
-      </section>
+      <DeliverablesSection
+        projectId={project.id}
+        archived={archived}
+        storageConfigured={isStorageConfigured()}
+        deliverables={deliverables}
+      />
     </div>
   );
 }

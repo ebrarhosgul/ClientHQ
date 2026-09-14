@@ -1,0 +1,109 @@
+"use server";
+
+/**
+ * Confirm that a pending upload really landed (spec 0011, AC-6, AC-7).
+ *
+ * A `ready` row short circuits before the uploader check: any staff member
+ * of this agency re-confirming an already finished upload gets the stored
+ * values back with no R2 call, which is what makes the browser's retry after
+ * a page reload safe. Only a still-`pending` row is restricted to the person
+ * who started it.
+ */
+import { eq } from "drizzle-orm";
+
+import { deliverables } from "@/db/schema";
+import { tenantActionError, withTenantAction } from "@/db/tenant";
+
+import { isAllowedContentType, MAX_UPLOAD_BYTES } from "./file-rules";
+import { requireConfiguredStorage } from "./require-storage";
+import { DELIVERABLE_REVALIDATE } from "./revalidate";
+import { confirmUploadInput } from "./schema";
+
+export type ConfirmedUpload = {
+  readonly status: "ready";
+  readonly sizeBytes: number;
+  readonly contentType: string;
+};
+
+function isWithinRules(head: {
+  readonly contentType: string;
+  readonly contentLength: number;
+}): boolean {
+  return (
+    isAllowedContentType(head.contentType) &&
+    head.contentLength >= 1 &&
+    head.contentLength <= MAX_UPLOAD_BYTES
+  );
+}
+
+export const confirmUpload = withTenantAction({
+  name: "confirmUpload",
+  input: confirmUploadInput,
+  revalidate: DELIVERABLE_REVALIDATE,
+  handler: async ({ input, ctx, db }): Promise<ConfirmedUpload> => {
+    const storage = requireConfiguredStorage();
+
+    const row = await db.findById(deliverables, input.deliverableId);
+
+    if (row === undefined) {
+      throw tenantActionError({ code: "not_found", message: "" });
+    }
+
+    if (row.status === "ready") {
+      return {
+        status: "ready",
+        sizeBytes: row.sizeBytes,
+        contentType: row.contentType,
+      };
+    }
+
+    if (row.uploadedByUserId !== ctx.userId) {
+      throw tenantActionError({ code: "not_found", message: "" });
+    }
+
+    const head = await storage.head(row.r2Key);
+
+    if (head === undefined) {
+      throw tenantActionError({
+        code: "conflict",
+        message: "The upload has not finished yet. Try again in a moment.",
+      });
+    }
+
+    if (!isWithinRules(head)) {
+      // Idempotent: tolerates a concurrent `abandonUpload` having already
+      // removed either the object or the row.
+      await storage.delete(row.r2Key);
+      await db.delete(deliverables, row.id);
+
+      throw tenantActionError({
+        code: "validation",
+        message:
+          "This file was removed because it did not match what was declared.",
+      });
+    }
+
+    const updated = await db.update(
+      deliverables,
+      row.id,
+      {
+        status: "ready",
+        contentType: head.contentType,
+        sizeBytes: head.contentLength,
+      },
+      { where: eq(deliverables.status, "pending") },
+    );
+
+    if (updated === undefined) {
+      // Raced with an abandon, a delete, or another confirm: gone or already
+      // flipped by the time this compare and set ran.
+      throw tenantActionError({ code: "not_found", message: "" });
+    }
+
+    return {
+      status: "ready",
+      sizeBytes: updated.sizeBytes,
+      contentType: updated.contentType,
+    };
+  },
+});
