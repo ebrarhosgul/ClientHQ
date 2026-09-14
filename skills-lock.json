@@ -163,6 +163,12 @@
       "skillPath": "plugins/writing/skills/award-application/SKILL.md",
       "computedHash": "a17d79bcea144dd793ea50623efe81e5249173e7d764f422fc802ce6c0ca8478"
     },
+    "aws-sdk-js-v3-usage": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-sdk-js-v3-usage/SKILL.md",
+      "computedHash": "b2c5175e7e8951cb6b2d65ddda09187906feb222cdd97a3757a82f7fa142a873"
+    },
     "axum": {
       "source": "bobmatnyc/claude-mpm-skills",
       "sourceType": "github",
@@ -432,6 +438,12 @@
       "sourceType": "github",
       "skillPath": "plugins/cloudflare/skills/cloudflare-api/SKILL.md",
       "computedHash": "08b1b0c0972c38323bffebfb47410ec6a633431d9ca74d2212edf486fb8d8b94"
+    },
+    "cloudflare-r2": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-r2/skills/cloudflare-r2/SKILL.md",
+      "computedHash": "0b85d438ef70a9f8009a44e867999cc94cbc96d970ccb71b75f8f066d79e09ff"
     },
     "cloudflare-worker-builder": {
       "source": "jezweb/claude-skills",
