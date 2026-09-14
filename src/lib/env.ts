@@ -112,6 +112,29 @@ const serverEnvSchema = z.object({
    */
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.email("EMAIL_FROM must be a bare email address"),
+
+  /**
+   * Feature 12, deliverable upload and download (spec 0011). Cloudflare R2,
+   * which speaks the S3 API, is where every deliverable's bytes live.
+   *
+   * All four are optional outside production, exactly like `RESEND_API_KEY`:
+   * without them `isStorageConfigured()` is `false`, the Deliverables section
+   * shows a notice instead of an upload control, and every write refuses with
+   * `conflict` before touching a row (AC-18). Required in production by the
+   * refinement below.
+   */
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
+
+  /**
+   * `scripts/r2-setup.ts` only, never the app: an Admin Read and Write token
+   * for the operator running the bucket setup script. Optional in every
+   * environment, including production, because Vercel never carries it.
+   */
+  R2_ADMIN_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_ADMIN_SECRET_ACCESS_KEY: z.string().min(1).optional(),
 });
 
 /**
@@ -125,6 +148,27 @@ const serverEnvSchemaRefined = serverEnvSchema.superRefine((value, ctx) => {
       code: "custom",
       path: ["RESEND_API_KEY"],
       message: "RESEND_API_KEY is required in production",
+    });
+  }
+
+  // The four R2 variables travel together: a production deploy with only some
+  // of them set is a misconfiguration, not a partially working feature.
+  if (value.NODE_ENV === "production") {
+    (
+      [
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET",
+      ] as const
+    ).forEach((key) => {
+      if (value[key] === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required in production`,
+        });
+      }
     });
   }
 });

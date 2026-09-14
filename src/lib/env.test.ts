@@ -43,6 +43,16 @@ const VALID = {
   EMAIL_FROM: "invites@example.com",
 } as const;
 
+// Added by deliverable upload & download (spec 0011): the four R2 variables
+// are required in production, alongside RESEND_API_KEY, whenever a test
+// exercises a production environment for a reason unrelated to either rule.
+const PRODUCTION_R2 = {
+  R2_ACCOUNT_ID: "account",
+  R2_ACCESS_KEY_ID: "key",
+  R2_SECRET_ACCESS_KEY: "secret",
+  R2_BUCKET: "bucket",
+} as const;
+
 /**
  * Replace the whole process environment.
  *
@@ -136,12 +146,13 @@ describe("env", () => {
     it.each(["development", "test", "production"] as const)(
       "accepts NODE_ENV=%s",
       async (nodeEnv) => {
-        // Production also needs the Resend key (spec 0009); see the email
-        // cases below for the rule itself.
+        // Production also needs the Resend key (spec 0009) and the R2 group
+        // (spec 0011); see their own describe blocks for the rules themselves.
         setProcessEnv({
           ...VALID,
           NODE_ENV: nodeEnv,
           RESEND_API_KEY: "re_not_a_real_key",
+          ...PRODUCTION_R2,
         });
 
         const env = await freshEnv();
@@ -230,11 +241,86 @@ describe("env", () => {
           ...VALID,
           NODE_ENV: "production",
           RESEND_API_KEY: "re_not_a_real_key",
+          ...PRODUCTION_R2,
         });
 
         const env = await freshEnv();
 
         expect(env().RESEND_API_KEY).toBe("re_not_a_real_key");
+      });
+    });
+
+    describe("deliverable storage, R2 (spec 0011)", () => {
+      it("accepts a missing R2_* group outside production, so the app runs with storage unconfigured", async () => {
+        setProcessEnv({ ...VALID, NODE_ENV: "development" });
+
+        const env = await freshEnv();
+
+        expect(env().R2_ACCOUNT_ID).toBeUndefined();
+        expect(env().R2_ACCESS_KEY_ID).toBeUndefined();
+        expect(env().R2_SECRET_ACCESS_KEY).toBeUndefined();
+        expect(env().R2_BUCKET).toBeUndefined();
+      });
+
+      it.each([
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET",
+      ] as const)("requires %s in production", async (key) => {
+        const group: Record<string, string> = {
+          R2_ACCOUNT_ID: "account",
+          R2_ACCESS_KEY_ID: "key",
+          R2_SECRET_ACCESS_KEY: "secret",
+          R2_BUCKET: "bucket",
+        };
+        delete group[key];
+
+        setProcessEnv({
+          ...VALID,
+          NODE_ENV: "production",
+          RESEND_API_KEY: "re_not_a_real_key",
+          ...group,
+        });
+
+        const env = await freshEnv();
+
+        expect(() => env()).toThrow(
+          new RegExp(`${key} is required in production`),
+        );
+      });
+
+      it("accepts the full R2_* group in production", async () => {
+        setProcessEnv({
+          ...VALID,
+          NODE_ENV: "production",
+          RESEND_API_KEY: "re_not_a_real_key",
+          R2_ACCOUNT_ID: "account",
+          R2_ACCESS_KEY_ID: "key",
+          R2_SECRET_ACCESS_KEY: "secret",
+          R2_BUCKET: "bucket",
+        });
+
+        const env = await freshEnv();
+
+        expect(env().R2_BUCKET).toBe("bucket");
+      });
+
+      it("accepts the two R2_ADMIN_* variables everywhere, since Vercel never sets them", async () => {
+        setProcessEnv({
+          ...VALID,
+          NODE_ENV: "production",
+          RESEND_API_KEY: "re_not_a_real_key",
+          R2_ACCOUNT_ID: "account",
+          R2_ACCESS_KEY_ID: "key",
+          R2_SECRET_ACCESS_KEY: "secret",
+          R2_BUCKET: "bucket",
+        });
+
+        const env = await freshEnv();
+
+        expect(env().R2_ADMIN_ACCESS_KEY_ID).toBeUndefined();
+        expect(env().R2_ADMIN_SECRET_ACCESS_KEY).toBeUndefined();
       });
     });
 
