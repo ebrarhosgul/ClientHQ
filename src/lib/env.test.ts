@@ -78,6 +78,12 @@ async function freshEnv() {
   return mod.env;
 }
 
+/** Import a fresh copy of the module, for the functions that read `process.env` directly. */
+async function freshModule() {
+  vi.resetModules();
+  return import("./env");
+}
+
 let originalEnv: NodeJS.ProcessEnv;
 
 beforeEach(() => {
@@ -402,6 +408,43 @@ describe("env", () => {
         expect(message).not.toContain(VALID.DATABASE_URL);
         expect(message).not.toContain("pw@");
       }
+    });
+  });
+
+  describe("isR2Configured (spec 0011, AC-18)", () => {
+    it("is true when all four R2 variables are set, with no Clerk key or anything else env() requires", async () => {
+      setProcessEnv({
+        R2_ACCOUNT_ID: "account",
+        R2_ACCESS_KEY_ID: "key",
+        R2_SECRET_ACCESS_KEY: "secret",
+        R2_BUCKET: "bucket",
+      });
+
+      const { isR2Configured } = await freshModule();
+
+      expect(isR2Configured()).toBe(true);
+    });
+
+    // The bug this guards against: isR2Configured used to go through env(),
+    // which throws unconditionally when CLERK_SECRET_KEY (or any other
+    // required key) is missing. The download route calls this before it
+    // knows whether Clerk is configured, so that throw surfaced as a 500
+    // instead of the intended 503.
+    it("answers false, rather than throwing, when the rest of the environment is entirely empty", async () => {
+      setProcessEnv({});
+
+      const { isR2Configured } = await freshModule();
+
+      expect(() => isR2Configured()).not.toThrow();
+      expect(isR2Configured()).toBe(false);
+    });
+
+    it("is false when only some of the four are set", async () => {
+      setProcessEnv({ R2_ACCOUNT_ID: "account", R2_BUCKET: "bucket" });
+
+      const { isR2Configured } = await freshModule();
+
+      expect(isR2Configured()).toBe(false);
     });
   });
 

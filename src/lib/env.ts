@@ -209,10 +209,11 @@ export function env(): ServerEnv {
 /**
  * Is Clerk configured on this machine?
  *
- * The one place in the project that reads `process.env` outside `env()`, and it
- * has to: `env()` throws when a required key is missing, which is exactly the
- * question being asked here, and Next only inlines a `NEXT_PUBLIC_` variable
- * into the browser bundle when it is written out in full like this.
+ * One of two places in the project that reads `process.env` outside `env()`
+ * (`isR2Configured` below is the other), and it has to: `env()` throws when a
+ * required key is missing, which is exactly the question being asked here,
+ * and Next only inlines a `NEXT_PUBLIC_` variable into the browser bundle when
+ * it is written out in full like this.
  *
  * Two things depend on the answer. `ClerkProvider` throws without a
  * publishable key, so the root layout only mounts it when there is one; and the
@@ -231,6 +232,31 @@ export function clerkPublishableKey(): string | undefined {
 
 export function isClerkConfigured(): boolean {
   return clerkPublishableKey() !== undefined;
+}
+
+/**
+ * Are all four R2 variables set, read directly from `process.env` rather than
+ * through `env()`.
+ *
+ * This has to skip `env()` for the same reason `isClerkConfigured` does:
+ * `CLERK_SECRET_KEY` has no `.optional()`, so `env()` throws when Clerk is not
+ * configured, and the download route needs an answer to "is storage
+ * configured" before it has even asked whether Clerk is (spec 0011, AC-18) or
+ * it crashes with a 500 instead of answering 503. Read the four keys straight
+ * from `process.env` so this question never depends on the rest of the
+ * schema being satisfiable.
+ */
+export function isR2Configured(): boolean {
+  return (
+    isNonEmpty(process.env.R2_ACCOUNT_ID) &&
+    isNonEmpty(process.env.R2_ACCESS_KEY_ID) &&
+    isNonEmpty(process.env.R2_SECRET_ACCESS_KEY) &&
+    isNonEmpty(process.env.R2_BUCKET)
+  );
+}
+
+function isNonEmpty(value: string | undefined): boolean {
+  return value !== undefined && value.length > 0;
 }
 
 /**

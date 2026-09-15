@@ -878,7 +878,7 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
                       {deliverable.name}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {typeLabel(deliverable.contentType)} ·{" "}
+                      <span>{typeLabel(deliverable.contentType)}</span> ·{" "}
                       {formatBytes(deliverable.sizeBytes)} · Uploaded by{" "}
                       {deliverable.uploadedByName} on {deliverable.createdOn}
                     </span>

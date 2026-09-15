@@ -105,7 +105,7 @@ export function DeliverablesSection({
                   {deliverable.name}
                 </a>
                 <span className="text-xs text-muted-foreground">
-                  {typeLabel(deliverable.contentType)} ·{" "}
+                  <span>{typeLabel(deliverable.contentType)}</span> ·{" "}
                   {formatBytes(deliverable.sizeBytes)} · Uploaded by{" "}
                   {deliverable.uploadedByName} on{" "}
                   {formatBillingDate(deliverable.createdAt)}
