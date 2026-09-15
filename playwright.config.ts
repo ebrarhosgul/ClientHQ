@@ -57,8 +57,8 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     /**
-     * No Clerk credentials, deliberately, so a local run behaves exactly like
-     * CI's browser job, which has none at all.
+     * No Clerk credentials and no R2 credentials, deliberately, so a local
+     * run behaves exactly like CI's browser job, which has none of either.
      *
      * Spec 0005 narrowed `src/proxy.ts` to require a session on everything
      * outside a short public list, and without a publishable key that proxy is a
@@ -67,6 +67,12 @@ export default defineConfig({
      * their own `.env`, every one of those routes would redirect to `/sign-in`
      * and the suite would go red on their machine and stay green on CI, which is
      * the worst of both.
+     *
+     * The same goes for the four `R2_*` variables: `e2e/deliverables.spec.ts`
+     * asserts the download route's storage not configured branch, which
+     * only trips when `isR2Configured()` is false. A developer's own `.env`
+     * has real R2 credentials, so without this blank the suite is red only on
+     * their machine, same failure mode as the Clerk keys above.
      *
      * Blanking rather than removing: `next dev` reads `.env` itself, and its
      * loader leaves a variable already present in the environment alone.
@@ -80,6 +86,10 @@ export default defineConfig({
       ...definedEnv(),
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
       CLERK_SECRET_KEY: "",
+      R2_ACCOUNT_ID: "",
+      R2_ACCESS_KEY_ID: "",
+      R2_SECRET_ACCESS_KEY: "",
+      R2_BUCKET: "",
     },
   },
 });
