@@ -238,7 +238,7 @@ Attaching real files to a project, uploaded straight to storage so bytes never p
 - [x] Verify it: `/check verify deliverable upload & download`
 - [x] Test it: `/test deliverable upload & download`
 - [x] Review it (fresh model): `/check review deliverable upload & download`
-- [ ] Document it: `/document deliverable upload & download`
+- [x] Document it: `/document deliverable upload & download`
 Spec [0011](../specs/0011-deliverable-upload-download/index.md) · atomic build tasks in its `## Build plan` · no migration, the `deliverables` table from spec 0002 is unchanged · new area `src/storage/`, feature code in `src/deliverables/`, the download route at `src/app/deliverables/[id]/download/`, `scripts/r2-setup.ts`, `src/lib/env.ts`, `eslint.config.mjs`
 
 ## Slice 6: Invoices
