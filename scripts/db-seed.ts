@@ -6,8 +6,9 @@
  * accepted, 1 invited and still pending, 1 never invited), 3 projects across
  * statuses, 4 deliverables (2 ready and visible to the client, 1 ready and
  * internal, 1 pending) and 5 invoices, one in each status, each with line
- * items. A subscription row is included too, so the access gate has something
- * to read.
+ * items and, for the four that were issued, the event history that got them
+ * there (spec 0012). A subscription row is included too, so the access gate
+ * has something to read.
  *
  * A second, much smaller agency sits beside it (spec 0008): one admin and a
  * subscription in `past_due` since an hour before the seed ran, so the grace
@@ -130,6 +131,8 @@ const INVOICE = {
 };
 const lineId = (invoice: number, position: number): string =>
   fixedId(10, invoice * 100 + position);
+const eventId = (invoice: number, n: number): string =>
+  fixedId(11, invoice * 100 + n);
 
 // ---------------------------------------------------------------------------
 // The dataset, as plain data
@@ -284,6 +287,134 @@ const INVOICES: readonly InvoiceInput[] = [
     lines: [
       { description: "Retainer, June", quantity: "1", unitAmountCents: 250000 },
     ],
+  },
+];
+
+/**
+ * What happened to each issued invoice, in order (spec 0012, AC-18). The draft
+ * has no history yet, which is the honest history of a draft. Timestamps are
+ * fixed so a second run rewrites the same rows rather than adding a second
+ * copy of the story.
+ */
+const INVOICE_EVENTS: readonly (typeof schema.invoiceEvents.$inferInsert)[] = [
+  // INV-0001, sent to Northwind and still open.
+  {
+    id: eventId(2, 1),
+    orgId: ORG,
+    invoiceId: INVOICE.sent,
+    kind: "issued",
+    fromStatus: "draft",
+    toStatus: "sent",
+    actorUserId: USER.admin,
+    createdAt: new Date("2026-08-20T09:12:00Z"),
+  },
+  {
+    id: eventId(2, 2),
+    orgId: ORG,
+    invoiceId: INVOICE.sent,
+    kind: "notified",
+    actorUserId: USER.admin,
+    note: "delivered: priya.patel@northwind.example, devon.reyes@northwind.example",
+    createdAt: new Date("2026-08-20T09:12:04Z"),
+  },
+  // INV-0002, Lumen, paid four weeks after issue.
+  {
+    id: eventId(3, 1),
+    orgId: ORG,
+    invoiceId: INVOICE.paid,
+    kind: "issued",
+    fromStatus: "draft",
+    toStatus: "sent",
+    actorUserId: USER.member,
+    createdAt: new Date("2026-07-01T10:30:00Z"),
+  },
+  {
+    id: eventId(3, 2),
+    orgId: ORG,
+    invoiceId: INVOICE.paid,
+    kind: "notified",
+    actorUserId: USER.member,
+    note: "delivered: marcus.lindqvist@lumen.example, finance@lumen.example",
+    createdAt: new Date("2026-07-01T10:30:03Z"),
+  },
+  {
+    id: eventId(3, 3),
+    orgId: ORG,
+    invoiceId: INVOICE.paid,
+    kind: "paid",
+    fromStatus: "sent",
+    toStatus: "paid",
+    actorUserId: USER.admin,
+    createdAt: new Date("2026-07-28T14:05:00Z"),
+  },
+  // INV-0003, Lumen, moved to overdue by the nightly sweep (no actor).
+  {
+    id: eventId(4, 1),
+    orgId: ORG,
+    invoiceId: INVOICE.overdue,
+    kind: "issued",
+    fromStatus: "draft",
+    toStatus: "sent",
+    actorUserId: USER.member,
+    createdAt: new Date("2026-07-15T16:45:00Z"),
+  },
+  {
+    id: eventId(4, 2),
+    orgId: ORG,
+    invoiceId: INVOICE.overdue,
+    kind: "notification_failed",
+    actorUserId: USER.member,
+    note: "delivered: marcus.lindqvist@lumen.example; failed: finance@lumen.example (mailbox full)",
+    createdAt: new Date("2026-07-15T16:45:05Z"),
+  },
+  {
+    id: eventId(4, 3),
+    orgId: ORG,
+    invoiceId: INVOICE.overdue,
+    kind: "notified",
+    actorUserId: USER.member,
+    note: "delivered: marcus.lindqvist@lumen.example, finance@lumen.example",
+    createdAt: new Date("2026-07-15T17:02:00Z"),
+  },
+  {
+    id: eventId(4, 4),
+    orgId: ORG,
+    invoiceId: INVOICE.overdue,
+    kind: "overdue",
+    fromStatus: "sent",
+    toStatus: "overdue",
+    createdAt: new Date("2026-08-15T03:00:00Z"),
+  },
+  // INV-0004, Harbor Books, voided when the client was archived.
+  {
+    id: eventId(5, 1),
+    orgId: ORG,
+    invoiceId: INVOICE.void,
+    kind: "issued",
+    fromStatus: "draft",
+    toStatus: "sent",
+    actorUserId: USER.admin,
+    createdAt: new Date("2026-06-02T08:00:00Z"),
+  },
+  {
+    id: eventId(5, 2),
+    orgId: ORG,
+    invoiceId: INVOICE.void,
+    kind: "notification_failed",
+    actorUserId: USER.admin,
+    note: "no contacts to notify",
+    createdAt: new Date("2026-06-02T08:00:02Z"),
+  },
+  {
+    id: eventId(5, 3),
+    orgId: ORG,
+    invoiceId: INVOICE.void,
+    kind: "voided",
+    fromStatus: "sent",
+    toStatus: "void",
+    actorUserId: USER.admin,
+    note: "Engagement ended before the retainer started.",
+    createdAt: new Date("2026-06-10T11:20:00Z"),
   },
 ];
 
@@ -532,6 +663,7 @@ function dataset() {
 
     invoices: built.map((entry) => entry.invoice),
     invoiceLineItems: built.flatMap((entry) => entry.lineItems),
+    invoiceEvents: INVOICE_EVENTS,
   };
 }
 
@@ -626,6 +758,11 @@ async function main(): Promise<number> {
         tx,
         schema.invoiceLineItems,
         data.invoiceLineItems,
+      ),
+      invoice_events: await upsertAll(
+        tx,
+        schema.invoiceEvents,
+        data.invoiceEvents,
       ),
     }));
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { clientContacts, clients } from "./clients";
 import { memberships, organizations, subscriptions, users } from "./identity";
-import { invoiceLineItems, invoices } from "./invoices";
+import { invoiceEvents, invoiceLineItems, invoices } from "./invoices";
 import { deliverables, projects } from "./projects";
 import { processedWebhookEvents } from "./webhooks";
 
@@ -105,6 +105,9 @@ export const insertInvoiceLineItemSchema = createInsertSchema(
   },
 );
 export const selectInvoiceLineItemSchema = createSelectSchema(invoiceLineItems);
+
+export const insertInvoiceEventSchema = createInsertSchema(invoiceEvents);
+export const selectInvoiceEventSchema = createSelectSchema(invoiceEvents);
 
 export const insertProcessedWebhookEventSchema = createInsertSchema(
   processedWebhookEvents,

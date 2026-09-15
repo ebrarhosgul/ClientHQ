@@ -418,6 +418,7 @@ describe("the select schemas describe a row as it comes back", () => {
       taxCents: 800,
       totalCents: 4801,
       paidAt: null,
+      notes: null,
       createdAt: new Date("2026-08-20T09:00:00Z"),
       updatedAt: new Date("2026-08-20T09:00:00Z"),
     };

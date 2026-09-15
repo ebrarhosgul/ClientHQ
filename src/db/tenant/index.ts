@@ -78,6 +78,13 @@ export {
   type AgencyProfile,
 } from "./organization";
 
+/**
+ * Feature 13's one transaction that has to commit before a network call
+ * (spec 0012). The raw transaction stays inside the layer: the callback gets
+ * a scoped accessor and the invoice numbering door bound to it.
+ */
+export { tenantTransaction, type TenantTransactionScope } from "./transaction";
+
 export {
   createAgencyRows,
   ensureMirrorRows,
