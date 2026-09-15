@@ -209,7 +209,7 @@ export function UploadDeliverable({
           accept={UPLOAD_ACCEPT}
           aria-label="Choose a file to upload"
           disabled={phase !== "idle"}
-          className="text-sm"
+          className="w-full min-w-0 text-sm"
           onChange={(event) => {
             const picked = event.target.files?.[0];
 

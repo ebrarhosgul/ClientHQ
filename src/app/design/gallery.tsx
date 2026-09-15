@@ -941,7 +941,7 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
             <input
               type="file"
               aria-label="Choose a file to upload"
-              className="text-sm"
+              className="w-full min-w-0 text-sm"
               disabled
             />
           </div>
