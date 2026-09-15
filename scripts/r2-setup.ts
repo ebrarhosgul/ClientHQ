@@ -51,7 +51,13 @@ async function main() {
   );
   const accountId = requireVariable("R2_ACCOUNT_ID", value.R2_ACCOUNT_ID);
   const bucket = requireVariable("R2_BUCKET", value.R2_BUCKET);
-  const appUrl = value.NEXT_PUBLIC_APP_URL;
+  // Read straight off `process.env`, not `value.NEXT_PUBLIC_APP_URL`: the
+  // schema gives that field a `http://localhost:3000` default, so it can
+  // never be `undefined` and this check could never fire through `env()`.
+  const appUrl = requireVariable(
+    "NEXT_PUBLIC_APP_URL",
+    process.env.NEXT_PUBLIC_APP_URL,
+  );
 
   const client = new S3Client({
     region: "auto",

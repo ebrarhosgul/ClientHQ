@@ -73,7 +73,22 @@ export const confirmUpload = withTenantAction({
     if (!isWithinRules(head)) {
       // Idempotent: tolerates a concurrent `abandonUpload` having already
       // removed either the object or the row.
-      await storage.delete(row.r2Key);
+      try {
+        await storage.delete(row.r2Key);
+      } catch {
+        // A transient storage failure here must not rethrow: `withTenantAction`
+        // rethrows anything it does not recognise as a tenant action error,
+        // and the client calls this action fire-and-forget, so an escaped
+        // rejection would strand the uploader in "Finishing up…" with no way
+        // out. `conflict` is retried automatically by the browser's confirm
+        // ladder, same as "the upload has not finished yet".
+        throw tenantActionError({
+          code: "conflict",
+          message:
+            "The upload could not be verified right now. Try again in a moment.",
+        });
+      }
+
       await db.delete(deliverables, row.id);
 
       throw tenantActionError({

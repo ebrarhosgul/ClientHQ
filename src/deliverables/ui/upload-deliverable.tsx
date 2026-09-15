@@ -55,6 +55,14 @@ export function UploadDeliverable({
     { readonly deliverableId: string } | undefined
   >();
 
+  // Best effort, per the action's own docblock: nothing depends on this
+  // call arriving, so a rejection (network failure reaching the action, or
+  // anything else) is swallowed rather than left as an unhandled promise
+  // rejection. The result's own `ok`/`error` is equally uninteresting here.
+  function safeAbandon(deliverableId: string) {
+    abandonUpload({ deliverableId }).catch(() => undefined);
+  }
+
   function reset() {
     setPhase("idle");
     setFile(undefined);
@@ -91,7 +99,7 @@ export function UploadDeliverable({
       if (xhr.status >= 200 && xhr.status < 300) {
         void runConfirm(deliverableId, 1);
       } else {
-        void abandonUpload({ deliverableId });
+        safeAbandon(deliverableId);
         setPhase("put-failed");
         setMessage("The upload did not finish.");
         setAnnouncement("The upload did not finish.");
@@ -99,14 +107,14 @@ export function UploadDeliverable({
     };
 
     xhr.onerror = () => {
-      void abandonUpload({ deliverableId });
+      safeAbandon(deliverableId);
       setPhase("put-failed");
       setMessage("The upload did not finish.");
       setAnnouncement("The upload did not finish.");
     };
 
     xhr.onabort = () => {
-      void abandonUpload({ deliverableId });
+      safeAbandon(deliverableId);
       reset();
     };
 
@@ -119,7 +127,20 @@ export function UploadDeliverable({
     setPhase("confirming");
     setAnnouncement("Confirming upload.");
 
-    const result = await confirmUpload({ deliverableId });
+    let result;
+
+    try {
+      result = await confirmUpload({ deliverableId });
+    } catch {
+      // A rejection here (a dropped connection reaching the action, or
+      // anything else escaping it) must not leave the UI stuck on
+      // "Finishing up…" with no way out. Land on the same retryable phase
+      // the exhausted-retries branch below uses.
+      setPhase("confirm-retry-exhausted");
+      setMessage("The upload could not be confirmed. Try again in a moment.");
+      setAnnouncement("The upload could not be confirmed.");
+      return;
+    }
 
     if (result.ok) {
       setAnnouncement("Upload complete.");
@@ -162,12 +183,29 @@ export function UploadDeliverable({
     setMessage(undefined);
     setAnnouncement(`Starting upload for ${pickedFile.name}.`);
 
-    const result = await requestUpload({
-      projectId,
-      name: pickedFile.name,
-      contentType: pickedFile.type,
-      sizeBytes: pickedFile.size,
-    });
+    let result;
+
+    try {
+      result = await requestUpload({
+        projectId,
+        name: pickedFile.name,
+        contentType: pickedFile.type,
+        sizeBytes: pickedFile.size,
+      });
+    } catch {
+      // A rejection here must not leave the file input locked in the
+      // "requesting" phase with no message and no way to try again.
+      setMessage("The upload could not be started. Try again.");
+      setAnnouncement("The upload could not be started.");
+      setPhase("idle");
+      setFile(undefined);
+
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+
+      return;
+    }
 
     if (!result.ok) {
       const [firstFieldError] =

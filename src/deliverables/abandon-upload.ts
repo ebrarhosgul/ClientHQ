@@ -37,8 +37,21 @@ export const abandonUpload = withTenantAction({
     }
 
     // Object first, then row: a failure here leaves a visible pending row
-    // rather than an object nobody can find any more.
-    await storage.delete(row.r2Key);
+    // rather than an object nobody can find any more. The `try/catch` is load
+    // bearing, not defensive: `withTenantAction` rethrows anything it does not
+    // recognise, and the browser calls this action fire-and-forget, so an
+    // escaped rejection becomes an unhandled promise rejection with no phase
+    // to display it in.
+    try {
+      await storage.delete(row.r2Key);
+    } catch {
+      throw tenantActionError({
+        code: "conflict",
+        message:
+          "The file could not be removed from storage. Try again in a moment.",
+      });
+    }
+
     await db.delete(deliverables, row.id);
 
     return { removed: true };

@@ -93,6 +93,9 @@ const PENDING = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The real action always resolves, best effort or not; `safeAbandon` in the
+  // component chains `.catch` onto it, so the mock has to be a promise too.
+  mocks.abandonUpload.mockResolvedValue({ ok: true, data: { removed: true } });
   FakeXHR.instances = [];
   vi.stubGlobal("XMLHttpRequest", FakeXHR);
 });
