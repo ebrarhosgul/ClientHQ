@@ -829,6 +829,100 @@ describe.skipIf(url === undefined)(
         });
       });
 
+      it("redirects staff to /billing before reading the row when the subscription is unsubscribed", async () => {
+        await inRollback(async (tx, fixture) => {
+          await tx
+            .update(subscriptions)
+            .set({ status: "incomplete" })
+            .where(eq(subscriptions.orgId, fixture.orgA));
+
+          const row = await insertPending(tx, fixture, { status: "ready" });
+          state.storage?.put(row.r2Key, {
+            contentType: "application/pdf",
+            contentLength: 10,
+          });
+
+          await expect(
+            GET(new Request("http://localhost/x"), {
+              params: Promise.resolve({ id: row.id }),
+            }),
+          ).rejects.toMatchObject({
+            digest: "NEXT_REDIRECT;replace;/billing",
+          });
+        });
+      });
+
+      it("redirects staff to /billing before reading the row when the subscription is locked", async () => {
+        await inRollback(async (tx, fixture) => {
+          await tx
+            .update(subscriptions)
+            .set({ status: "canceled" })
+            .where(eq(subscriptions.orgId, fixture.orgA));
+
+          const row = await insertPending(tx, fixture, { status: "ready" });
+          state.storage?.put(row.r2Key, {
+            contentType: "application/pdf",
+            contentLength: 10,
+          });
+
+          await expect(
+            GET(new Request("http://localhost/x"), {
+              params: Promise.resolve({ id: row.id }),
+            }),
+          ).rejects.toMatchObject({
+            digest: "NEXT_REDIRECT;replace;/billing",
+          });
+        });
+      });
+
+      it("answers the app's 404, not a 500, for a signed in staff session resolving to no_mirror_row", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture, { status: "ready" });
+
+          state.claims = {
+            clerkUserId: `user_${fixture.tag}_ghost`,
+            clerkOrgId: undefined,
+            clerkOrgRole: undefined,
+          };
+
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
+        });
+      });
+
+      it("answers the app's 404, not a 500, for a signed in person with a mirror row but no accepted contact", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture, { status: "ready" });
+
+          const ghostUserId = newId();
+          await tx.insert(users).values({
+            id: ghostUserId,
+            clerkUserId: `user_${fixture.tag}_ghost`,
+            email: `ghost-${fixture.tag}@example.test`,
+            name: "Ghost",
+          });
+
+          state.claims = {
+            clerkUserId: `user_${fixture.tag}_ghost`,
+            clerkOrgId: undefined,
+            clerkOrgRole: undefined,
+          };
+
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
+        });
+      });
+
       it("answers the app's 404 for a pending row", async () => {
         await inRollback(async (tx, fixture) => {
           const row = await insertPending(tx, fixture);

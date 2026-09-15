@@ -208,15 +208,20 @@ describe("UploadDeliverable", () => {
     expect(FakeXHR.instances).toHaveLength(0);
   });
 
-  it("abandons the upload and offers a retry when the PUT fails (AC-5, AC-8)", async () => {
+  it("abandons the upload and retries with a fresh request, not the abandoned row's URL (AC-5, AC-8)", async () => {
     const user = userEvent.setup();
-    mocks.requestUpload.mockResolvedValue({ ok: true, data: PENDING });
+    const RETRY_PENDING = {
+      deliverableId: "d2",
+      uploadUrl: "https://r2.example.com/put-url-2",
+      expiresAt: new Date("2026-01-01T00:15:00.000Z"),
+    };
+    mocks.requestUpload
+      .mockResolvedValueOnce({ ok: true, data: PENDING })
+      .mockResolvedValueOnce({ ok: true, data: RETRY_PENDING });
 
     render(<UploadDeliverable projectId="p1" />);
-    await user.upload(
-      screen.getByLabelText("Choose a file to upload"),
-      pickedFile(),
-    );
+    const input = screen.getByLabelText("Choose a file to upload");
+    await user.upload(input, pickedFile());
     await waitFor(() => expect(FakeXHR.instances).toHaveLength(1));
 
     const xhr = FakeXHR.instances[0];
@@ -230,11 +235,40 @@ describe("UploadDeliverable", () => {
       "The upload did not finish.",
     );
     expect(mocks.confirmUpload).not.toHaveBeenCalled();
+    expect(input).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
+    // A fresh `requestUpload` for a fresh row, per spec 0011's browser flow
+    // step 5, not a second PUT to the abandoned row's presigned URL.
+    await waitFor(() => expect(mocks.requestUpload).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(FakeXHR.instances).toHaveLength(2));
-    expect(FakeXHR.instances[1].openedUrl).toBe(PENDING.uploadUrl);
+    expect(FakeXHR.instances[1].openedUrl).toBe(RETRY_PENDING.uploadUrl);
+    expect(FakeXHR.instances[1].openedUrl).not.toBe(PENDING.uploadUrl);
+    expect(mocks.abandonUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocks the file input via Choose another file after a failed PUT, with no successful retry (AC-8)", async () => {
+    const user = userEvent.setup();
+    mocks.requestUpload.mockResolvedValue({ ok: true, data: PENDING });
+
+    render(<UploadDeliverable projectId="p1" />);
+    const input = screen.getByLabelText("Choose a file to upload");
+    await user.upload(input, pickedFile());
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(1));
+
+    FakeXHR.instances[0].status = 500;
+    FakeXHR.instances[0].onload?.();
+    await screen.findByRole("alert");
+    expect(input).toBeDisabled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Choose another file" }),
+    );
+
+    expect(input).not.toBeDisabled();
+    expect(input).toHaveValue("");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("treats a network error the same as a failed PUT (AC-8)", async () => {

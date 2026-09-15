@@ -52,7 +52,7 @@ export function UploadDeliverable({
   const [message, setMessage] = useState<string | undefined>();
   const [announcement, setAnnouncement] = useState("");
   const [pending, setPending] = useState<
-    { readonly deliverableId: string; readonly uploadUrl: string } | undefined
+    { readonly deliverableId: string } | undefined
   >();
 
   function reset() {
@@ -193,10 +193,7 @@ export function UploadDeliverable({
       return;
     }
 
-    setPending({
-      deliverableId: result.data.deliverableId,
-      uploadUrl: result.data.uploadUrl,
-    });
+    setPending({ deliverableId: result.data.deliverableId });
     putFile(pickedFile, result.data.deliverableId, result.data.uploadUrl);
   }
 
@@ -263,16 +260,12 @@ export function UploadDeliverable({
           className="flex flex-wrap items-center gap-2 text-sm text-destructive"
         >
           <span>{message}</span>
-          {phase === "put-failed" &&
-          pending !== undefined &&
-          file !== undefined ? (
+          {phase === "put-failed" && file !== undefined ? (
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={() =>
-                putFile(file, pending.deliverableId, pending.uploadUrl)
-              }
+              onClick={() => void beginUpload(file)}
             >
               Retry
             </Button>
@@ -287,7 +280,9 @@ export function UploadDeliverable({
               Retry
             </Button>
           ) : undefined}
-          {phase === "confirm-invalid" || phase === "confirm-cancelled" ? (
+          {phase === "put-failed" ||
+          phase === "confirm-invalid" ||
+          phase === "confirm-cancelled" ? (
             <Button type="button" size="sm" variant="outline" onClick={reset}>
               Choose another file
             </Button>

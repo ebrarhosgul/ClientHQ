@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { agencyAccess } from "@/access/gate";
 import { deliverables } from "@/db/schema";
-import { tenantContext, tenantDb } from "@/db/tenant";
+import { isTenantResolutionError, tenantContext, tenantDb } from "@/db/tenant";
 import { deliverableId } from "@/deliverables/schema";
 import {
   downloadErrorResponse,
@@ -25,6 +25,13 @@ const GET_EXPIRES_SECONDS = 120;
  * exactly as the gated layout applies it, since a route handler sits outside
  * that layout and would otherwise bypass spec 0008), the row, its status and
  * visibility rules, `head`, then the redirect.
+ *
+ * A route handler has no layout or error boundary above it, unlike a Server
+ * Action's `withTenantAction`, so a signed in person with no active Clerk
+ * organization and no accepted `client_contacts` row (`tenantContext()`
+ * throwing `no_active_org`, `no_mirror_row` or `no_contact`) is caught here
+ * and answered with the same 404 as a nonexistent id, rather than a 500
+ * (AC-12, AC-13).
  */
 export const runtime = "nodejs";
 
@@ -52,7 +59,17 @@ export async function GET(
     return notFoundResponse();
   }
 
-  const ctx = await tenantContext();
+  let ctx;
+
+  try {
+    ctx = await tenantContext();
+  } catch (thrown) {
+    if (isTenantResolutionError(thrown)) {
+      return notFoundResponse();
+    }
+
+    throw thrown;
+  }
 
   if (ctx.kind === "staff") {
     const access = await agencyAccess();
