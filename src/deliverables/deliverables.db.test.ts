@@ -535,6 +535,33 @@ describe.skipIf(url === undefined)(
         });
       });
 
+      it("returns conflict and leaves the pending row and the object in place when the out-of-rules cleanup delete fails", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture);
+          state.storage?.put(row.r2Key, {
+            contentType: "application/x-msdownload",
+            contentLength: 10,
+          });
+          state.storage?.failNextDelete();
+
+          const result = await confirmUpload({ deliverableId: row.id });
+
+          expect(result).toMatchObject({
+            ok: false,
+            error: { code: "conflict" },
+          });
+          expect(state.storage?.has(row.r2Key)).toBe(true);
+
+          const [stillThere] = await tx
+            .select()
+            .from(deliverables)
+            .where(eq(deliverables.id, row.id));
+
+          expect(stillThere).toBeDefined();
+          expect(stillThere?.status).toBe("pending");
+        });
+      });
+
       it("short circuits on an already ready row for any staff member, no R2 call", async () => {
         await inRollback(async (tx, fixture) => {
           const row = await insertPending(tx, fixture, {
@@ -666,6 +693,32 @@ describe.skipIf(url === undefined)(
           const result = await abandonUpload({ deliverableId: newId() });
 
           expect(result).toMatchObject({ ok: true, data: { removed: false } });
+        });
+      });
+
+      it("returns conflict and leaves the row and the object in place when the delete fails", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture);
+          state.storage?.put(row.r2Key, {
+            contentType: "application/pdf",
+            contentLength: 10,
+          });
+          state.storage?.failNextDelete();
+
+          const result = await abandonUpload({ deliverableId: row.id });
+
+          expect(result).toMatchObject({
+            ok: false,
+            error: { code: "conflict" },
+          });
+          expect(state.storage?.has(row.r2Key)).toBe(true);
+
+          const [stillThere] = await tx
+            .select()
+            .from(deliverables)
+            .where(eq(deliverables.id, row.id));
+
+          expect(stillThere).toBeDefined();
         });
       });
 

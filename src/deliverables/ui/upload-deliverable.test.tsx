@@ -412,6 +412,52 @@ describe("UploadDeliverable", () => {
       "This upload was cancelled.",
     );
   });
+
+  it("recovers from a rejected confirmUpload with a working retry, rather than a stuck Finishing up (AC-6)", async () => {
+    const user = userEvent.setup();
+    mocks.requestUpload.mockResolvedValue({ ok: true, data: PENDING });
+    mocks.confirmUpload.mockRejectedValueOnce(new Error("network error"));
+
+    render(<UploadDeliverable projectId="p1" />);
+    await user.upload(
+      screen.getByLabelText("Choose a file to upload"),
+      pickedFile(),
+    );
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(1));
+
+    FakeXHR.instances[0].status = 200;
+    FakeXHR.instances[0].onload?.();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The upload could not be confirmed. Try again in a moment.",
+    );
+    expect(screen.queryByText("Finishing up…")).not.toBeInTheDocument();
+
+    mocks.confirmUpload.mockResolvedValueOnce({
+      ok: true,
+      data: { status: "ready", sizeBytes: 5, contentType: "application/pdf" },
+    });
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("re-enables the input with a message when requestUpload rejects, rather than a stuck requesting phase (AC-1)", async () => {
+    const user = userEvent.setup();
+    mocks.requestUpload.mockRejectedValueOnce(new Error("network error"));
+
+    render(<UploadDeliverable projectId="p1" />);
+    const input = screen.getByLabelText("Choose a file to upload");
+    await user.upload(input, pickedFile());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The upload could not be started. Try again.",
+    );
+    expect(input).not.toBeDisabled();
+    expect(input).toHaveValue("");
+    expect(FakeXHR.instances).toHaveLength(0);
+  });
 });
 
 describe.each(THEMES)("in the %s theme", (theme) => {
