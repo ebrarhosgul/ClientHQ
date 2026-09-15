@@ -23,7 +23,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Client contacts & portal invitations | Slice 3 | in-progress |
 | 11 | Projects | Slice 4 | in-progress |
 | 12 | Deliverable upload & download | Slice 5 | in-progress |
-| 13 | Invoice authoring & lifecycle | Slice 6 | planned |
+| 13 | Invoice authoring & lifecycle | Slice 6 | in-progress |
 | 14 | Invoice PDF | Slice 6 | planned |
 | 15 | Client portal | Slice 7 | planned |
 | 16 | Team members & roles | Slice 8 | planned |
@@ -243,10 +243,21 @@ Spec [0011](../specs/0011-deliverable-upload-download/index.md) · atomic build 
 
 ## Slice 6: Invoices
 
-### 13. Invoice authoring & lifecycle · needs a decision
+### 13. Invoice authoring & lifecycle · in-progress
 Building an invoice from line items and moving it through draft, sent, paid, overdue and void. Numbers are assigned on issue so issued invoices form a gapless sequence, and issuing notifies the client contacts.
 **Done when:** staff can draft an invoice with line items, issue it to assign its number and freeze the items, mark it paid or void it, totals are computed in integer cents, concurrent issues never collide on a number, and drafts and voided invoices stay invisible to clients.
-- [ ] Design it (spec): `/architect invoice authoring & lifecycle`
+- [x] Design it (spec): `/architect invoice authoring & lifecycle`
+- [ ] Build it: `/develop invoice authoring & lifecycle`
+  - [ ] The migration and the pure modules: `invoices.notes`, the append only `invoice_events` table in the tenant registry, the seed and schema assert extensions, the status module (transitions, past due, client visible statuses, number format), the money parsers and formatter, and the Zod schemas · AC-2, AC-3, AC-4, AC-9, AC-12, AC-14, AC-15, AC-16, AC-18
+  - [ ] One thread end to end: `tenantTransaction` and `nextInvoiceNumber` in the tenant layer, create a draft, add a line under the row lock, issue it for a real number through the locked transaction, a minimal `/invoices` list and `/invoices/[id]`, proven by the concurrent numbering and cross agency tests · AC-1, AC-3, AC-4, AC-5, AC-14, AC-15
+  - [ ] Notification: the issue email template, the send after commit with one event per attempt, the no contacts warning, Resend with its cooldown, the failure warning, and the `/portal/invoices/[id]` placeholder · AC-6, AC-7, AC-11, AC-16
+  - [ ] The full draft editor and the closing moves: header form, edit, remove and move lines with the live totals, mark paid with its date, void with its reason, both compare and set · AC-2, AC-3, AC-8, AC-9, AC-15, AC-17
+  - [ ] List filters and paging, the past due badge, the frozen document and events list, the client page section, empty and error states, `/design` entries and axe in both themes · AC-10, AC-11, AC-12, AC-13, AC-17
+- [ ] Verify it: `/check verify invoice authoring & lifecycle`
+- [ ] Test it: `/test invoice authoring & lifecycle`
+- [ ] Review it (fresh model): `/check review invoice authoring & lifecycle`
+- [ ] Document it: `/document invoice authoring & lifecycle`
+Spec [0012](../specs/0012-invoice-authoring-lifecycle/index.md) · atomic build tasks in its `## Build plan` · one migration (`invoices.notes` and `invoice_events`) · feature code in `src/invoices/`, the pages under `src/app/(agency)/(gated)/invoices/`, the placeholder at `src/app/portal/invoices/[id]/`, the template in `src/email/templates/`, `src/lib/money.ts`, `src/lib/dates.ts`, `src/db/tenant/`
 
 ### 14. Invoice PDF · needs a decision
 A downloadable file the client can save and forward to their own accountant. New work that spec 0001 does not cover, so it carries its own decision about how the document is produced and where it is stored or generated.
@@ -303,6 +314,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Gate re check on client side navigation**: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately by the wrapper, so the gap is read only and bounded. Worth measuring once real agencies exist; `template.tsx` in the `(gated)` group is the first thing to try if it matters · from spec 0008 · needs a decision
 - **Preview environment file storage**: R2's CORS rule is per bucket and per origin, so each Vercel preview URL that needs real uploads needs its own bucket run through `pnpm r2:setup`, or previews run with storage unconfigured (which spec 0011 supports with a visible notice). Decide between one shared preview bucket with a wildcard origin rule and per preview buckets if previews ever need real files · from spec 0011 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
+- **Zero decimal currencies**: the invoice unit amount input and the money formatter assume two minor unit digits (USD, EUR, GBP), so a JPY style currency would be entered and displayed inconsistently. Decide on a minor unit table keyed by currency before an agency outside the two decimal world signs up · from spec 0012 · needs a decision
+- **Contact erasure must scrub invoice event notes**: the `notified` and `notification_failed` rows in `invoice_events` carry the contact addresses that were emailed. Any GDPR erasure of a contact has to scrub them from those notes as well as from `client_contacts` · from spec 0012 · needs a decision
 
 ## Legend
 
