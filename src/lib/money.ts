@@ -128,3 +128,119 @@ export function invoiceTotals(
     totalCents: toCents(subtotal + BigInt(tax), "total"),
   };
 }
+
+/**
+ * The three additions from spec 0012: the two parsers that turn what a person
+ * typed into the integers the columns hold, and the one formatter that turns
+ * the integers back into money a person reads. All three assume a currency
+ * with two minor unit digits (spec 0012 Follow-up records the zero decimal
+ * currency gap).
+ */
+
+/** A major unit amount as typed: up to 8 whole digits, at most 2 decimals. */
+const MONEY_INPUT_PATTERN = /^\d{1,8}(\.\d{1,2})?$/;
+
+/** A percent as typed: 0 to 100 with at most 2 decimals. */
+const PERCENT_INPUT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
+
+const HUNDRED = BigInt(100);
+
+/** The most a line's unit amount may be, in cents (spec 0012, AC-3). */
+export const MAX_UNIT_AMOUNT_CENTS = 99_999_999;
+
+export type ParsedInput<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string };
+
+/**
+ * `"12.5"` becomes `1250` cents, `"0.07"` becomes `7`, `"1,000"` is refused.
+ * Parsed as a decimal string, never through a float, so `"0.29"` is exactly
+ * 29 and not 28.999999. The bound is the one AC-3 sets, 99,999,999 cents.
+ */
+export function parseMoneyInput(input: string): ParsedInput<number> {
+  const trimmed = input.trim();
+
+  if (!MONEY_INPUT_PATTERN.test(trimmed)) {
+    return {
+      ok: false,
+      message:
+        "Enter an amount like 1250 or 1250.50, with at most two decimals.",
+    };
+  }
+
+  const [whole, fraction = ""] = trimmed.split(".");
+  const cents = BigInt(whole) * HUNDRED + BigInt(fraction.padEnd(2, "0"));
+
+  if (cents > BigInt(MAX_UNIT_AMOUNT_CENTS)) {
+    return {
+      ok: false,
+      message: `Enter an amount of ${formatMoneyPlain(MAX_UNIT_AMOUNT_CENTS)} or less.`,
+    };
+  }
+
+  return { ok: true, value: Number(cents) };
+}
+
+/**
+ * `"7.25"` becomes `725` basis points, `"100"` becomes `10000`, `"7.255"` and
+ * `"100.01"` are refused. Parsed as a decimal string, never through a float.
+ */
+export function percentToBasisPoints(input: string): ParsedInput<number> {
+  const trimmed = input.trim();
+
+  if (!PERCENT_INPUT_PATTERN.test(trimmed)) {
+    return {
+      ok: false,
+      message: "Enter a percentage like 20 or 7.25, with at most two decimals.",
+    };
+  }
+
+  const [whole, fraction = ""] = trimmed.split(".");
+  const basisPoints = BigInt(whole) * HUNDRED + BigInt(fraction.padEnd(2, "0"));
+
+  if (basisPoints > TEN_THOUSAND) {
+    return { ok: false, message: "Enter a percentage between 0 and 100." };
+  }
+
+  return { ok: true, value: Number(basisPoints) };
+}
+
+/** `1234.56`, no symbol: the number a bound in a message is written with. */
+function formatMoneyPlain(cents: number): string {
+  const negative = cents < 0;
+  const magnitude = Math.abs(cents);
+  const whole = Math.floor(magnitude / 100).toLocaleString("en-US");
+  const fraction = String(magnitude % 100).padStart(2, "0");
+
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
+/**
+ * Whole cents to the money a person reads, in the invoice's own currency:
+ * `formatMoney(123456, "USD")` is `$1,234.56`, `formatMoney(123456, "EUR")`
+ * is `€1,234.56`. The `en-US` locale regardless of the agency (spec 0012,
+ * Consequences), and the split into whole and fraction is done in integers
+ * so no float ever meets the amount: `Intl` only ever sees a string.
+ */
+export function formatMoney(cents: number, currency: string): string {
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  // `formatToParts` on a placeholder gives the symbol, its placement and any
+  // spacing for this currency; the digits are then substituted, once, from
+  // the integer split, in the place the first digit run sat.
+  const parts = formatter.formatToParts(cents < 0 ? -1 : 1);
+  const plain = formatMoneyPlain(cents).replace(/^-/, "");
+  const digitRun = new Set(["integer", "group", "decimal", "fraction"]);
+  const firstDigit = parts.findIndex((part) => digitRun.has(part.type));
+
+  return parts
+    .map((part, index) =>
+      index === firstDigit ? plain : digitRun.has(part.type) ? "" : part.value,
+    )
+    .join("");
+}

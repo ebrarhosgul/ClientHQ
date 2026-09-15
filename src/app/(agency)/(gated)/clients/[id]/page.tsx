@@ -8,6 +8,11 @@ import { getClient, type ClientRow } from "@/clients/queries";
 import { ArchiveClientButton } from "@/clients/ui/archive-client-button";
 import { RestoreClientButton } from "@/clients/ui/restore-client-button";
 import { ContactsSection } from "@/contacts/ui/contacts-section";
+import {
+  listInvoicesForClient,
+  type ClientInvoiceRow,
+} from "@/invoices/queries";
+import { InvoicesSection } from "@/invoices/ui/invoices-section";
 import { isClerkConfigured } from "@/lib/env";
 import {
   listProjectsForClient,
@@ -63,6 +68,37 @@ async function loadProjects(
   }
 }
 
+/**
+ * The client's invoices, every status but void, for the Invoices section
+ * (spec 0012, AC-13). Contained the same way the projects read is.
+ */
+async function loadInvoices(
+  clientId: string,
+): Promise<readonly ClientInvoiceRow[] | undefined> {
+  try {
+    return await listInvoicesForClient(
+      await agencyContext(),
+      clientId,
+      todayUtc(),
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "invoices.section",
+        operation: "listInvoicesForClient",
+        outcome: "failed",
+        at: new Date().toISOString(),
+      }),
+    );
+
+    if (error instanceof Error && error.name === "TenantResolutionError") {
+      throw error;
+    }
+
+    return undefined;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: PageProps<"/clients/[id]">): Promise<Metadata> {
@@ -105,7 +141,10 @@ export default async function ClientDetailPage({
   }
 
   const archived = client.archivedAt !== null;
-  const projects = await loadProjects(client.id);
+  const [projects, invoices] = await Promise.all([
+    loadProjects(client.id),
+    loadInvoices(client.id),
+  ]);
   const activeProjectCount = projects?.length ?? 0;
 
   return (
@@ -160,6 +199,8 @@ export default async function ClientDetailPage({
       <ContactsSection client={client} />
 
       <ProjectsSection client={client} projects={projects} />
+
+      <InvoicesSection client={client} invoices={invoices} />
     </div>
   );
 }
