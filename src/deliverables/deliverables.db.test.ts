@@ -75,11 +75,6 @@ vi.mock("next/navigation", () => ({
       digest: `NEXT_REDIRECT;replace;${to}`,
     });
   },
-  notFound: (): never => {
-    throw Object.assign(new Error("NEXT_NOT_FOUND"), {
-      digest: "NEXT_HTTP_ERROR_FALLBACK;404",
-    });
-  },
 }));
 
 vi.mock("@/storage", () => ({
@@ -838,11 +833,13 @@ describe.skipIf(url === undefined)(
         await inRollback(async (tx, fixture) => {
           const row = await insertPending(tx, fixture);
 
-          await expect(
-            GET(new Request("http://localhost/x"), {
-              params: Promise.resolve({ id: row.id }),
-            }),
-          ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
         });
       });
 
@@ -852,11 +849,13 @@ describe.skipIf(url === undefined)(
 
           actAsStaff(fixture, "B");
 
-          await expect(
-            GET(new Request("http://localhost/x"), {
-              params: Promise.resolve({ id: row.id }),
-            }),
-          ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
         });
       });
 
@@ -904,11 +903,13 @@ describe.skipIf(url === undefined)(
 
           actAsContact(fixture, "2");
 
-          await expect(
-            GET(new Request("http://localhost/x"), {
-              params: Promise.resolve({ id: row.id }),
-            }),
-          ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
         });
       });
 
@@ -921,11 +922,13 @@ describe.skipIf(url === undefined)(
 
           actAsContact(fixture, "1");
 
-          await expect(
-            GET(new Request("http://localhost/x"), {
-              params: Promise.resolve({ id: row.id }),
-            }),
-          ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
         });
       });
 
@@ -939,11 +942,13 @@ describe.skipIf(url === undefined)(
 
           actAsContact(fixture, "1");
 
-          await expect(
-            GET(new Request("http://localhost/x"), {
-              params: Promise.resolve({ id: row.id }),
-            }),
-          ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+          const response = await GET(new Request("http://localhost/x"), {
+            params: Promise.resolve({ id: row.id }),
+          });
+
+          expect(response.status).toBe(404);
+          const body = await response.text();
+          expect(body).toContain("Page not found");
         });
       });
     });

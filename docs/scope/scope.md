@@ -235,7 +235,7 @@ Attaching real files to a project, uploaded straight to storage so bytes never p
   - [x] The upload's failure paths and management: `abandonUpload`, the confirm retry and its result copies, the archived project rule, the not configured notice, the visibility switch, and delete behind a confirm with object first removal · AC-1, AC-6, AC-7, AC-8, AC-9, AC-11, AC-15, AC-17, AC-18
   - [x] The contact download rule, the missing file and storage not configured pages, and `scripts/r2-setup.ts` with the `verify.md` steps for buckets, tokens, CORS and the wrong content type refusal · AC-4, AC-12, AC-13, AC-14, AC-18, AC-19
   - [x] Empty and error states, `/design` entries for every new piece, `e2e/deliverables.spec.ts`, and axe in both themes · AC-10, AC-20
-- [ ] Verify it: `/check verify deliverable upload & download`
+- [x] Verify it: `/check verify deliverable upload & download`
 - [ ] Test it: `/test deliverable upload & download`
 - [ ] Review it (fresh model): `/check review deliverable upload & download`
 - [ ] Document it: `/document deliverable upload & download`

@@ -1,11 +1,14 @@
 import { eq } from "drizzle-orm";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { agencyAccess } from "@/access/gate";
 import { deliverables } from "@/db/schema";
 import { tenantContext, tenantDb } from "@/db/tenant";
 import { deliverableId } from "@/deliverables/schema";
-import { downloadErrorResponse } from "@/deliverables/download-error-page";
+import {
+  downloadErrorResponse,
+  notFoundResponse,
+} from "@/deliverables/download-error-page";
 import { isClerkConfigured } from "@/lib/env";
 import { objectStorage } from "@/storage";
 
@@ -46,7 +49,7 @@ export async function GET(
   // can ever be this agency's or this contact's own, exactly as every page
   // treats it (spec 0004, AC-22).
   if (!parsedId.success || !isClerkConfigured()) {
-    notFound();
+    return notFoundResponse();
   }
 
   const ctx = await tenantContext();
@@ -61,7 +64,7 @@ export async function GET(
     const row = await tenantDb(ctx).findById(deliverables, parsedId.data);
 
     if (row === undefined || row.status !== "ready") {
-      notFound();
+      return notFoundResponse();
     }
 
     return respondWithSignedDownload(storage, row);
@@ -78,7 +81,7 @@ export async function GET(
     !row.visibleToClient ||
     row.project.archivedAt !== null
   ) {
-    notFound();
+    return notFoundResponse();
   }
 
   return respondWithSignedDownload(storage, row);

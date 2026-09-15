@@ -1,12 +1,21 @@
 /**
- * The two readable pages the download route answers outside the normal app
- * shell (spec 0011, AC-14, AC-18): the object behind a `ready` row is
- * missing, and storage is not configured at all.
+ * The readable pages the download route answers outside the normal app
+ * shell (spec 0011, AC-9, AC-12, AC-13, AC-14, AC-18): the row doesn't
+ * resolve (missing, wrong tenant, not ready), the object behind a `ready`
+ * row is missing, and storage is not configured at all.
  *
  * A route handler renders no layout, so this is a small standalone HTML
  * document rather than a React page: it inlines the handful of design
  * tokens (`design.md`) it needs for both themes via `prefers-color-scheme`,
  * rather than depending on a hashed, build time stylesheet path.
+ *
+ * `notFound()` from `next/navigation` is not an option here: it only
+ * renders a route segment's `not-found.js` boundary, which a route handler,
+ * having no page or layout of its own, never has. Called from this file,
+ * it still throws and still ends the response with status `404`, but with
+ * an empty body, not the app's actual not found page. `notFoundResponse()`
+ * below is the same page `src/app/not-found.tsx` shows, built by hand for
+ * the same reason `downloadErrorResponse` is: no layout to render it in.
  */
 
 export type DownloadErrorPage = {
@@ -92,5 +101,21 @@ export function downloadErrorResponse({
   return new Response(html, {
     status,
     headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * The same wording as `src/app/not-found.tsx`, for every case the download
+ * route treats as a plain nonexistent id: a non uuid, a row that isn't
+ * this caller's to see, or a row that isn't `ready` (spec 0011, AC-9,
+ * AC-12, AC-13). Every one of those cases returns this exact response, so
+ * they are indistinguishable from one another and from a truly nonexistent
+ * id, as the spec requires.
+ */
+export function notFoundResponse(): Response {
+  return downloadErrorResponse({
+    status: 404,
+    heading: "Page not found",
+    body: "This address does not lead anywhere. It may have moved, or the link that brought you here may be out of date.",
   });
 }
