@@ -1,0 +1,113 @@
+/**
+ * covers: spec 0011 AC-2, AC-3
+ */
+import { describe, expect, it } from "vitest";
+
+import { MAX_UPLOAD_BYTES } from "./file-rules";
+import { requestUploadInput } from "./schema";
+
+const VALID = {
+  projectId: "0198a000-0000-7000-8000-000000000000",
+  name: "Style guide.pdf",
+  contentType: "application/pdf",
+  sizeBytes: 1024,
+};
+
+describe("requestUploadInput", () => {
+  it("accepts a valid request", () => {
+    expect(requestUploadInput.safeParse(VALID).success).toBe(true);
+  });
+
+  it("trims the name", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      name: "  Style guide.pdf  ",
+    });
+
+    expect(result.success && result.data.name).toBe("Style guide.pdf");
+  });
+
+  it("rejects an empty name", () => {
+    const result = requestUploadInput.safeParse({ ...VALID, name: "" });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a 256 character name", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      name: "a".repeat(256),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a 255 character name", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      name: "a".repeat(255),
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a name with a control character", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      name: `bad${String.fromCharCode(0)}name.pdf`,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(["/", "\\", '"'])("rejects a name containing %s", (char) => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      name: `bad${char}name.pdf`,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a content type outside the allowlist", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      contentType: "application/x-msdownload",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a 0 byte file", () => {
+    const result = requestUploadInput.safeParse({ ...VALID, sizeBytes: 0 });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a file one byte over the cap", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      sizeBytes: MAX_UPLOAD_BYTES + 1,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a file exactly at the cap", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      sizeBytes: MAX_UPLOAD_BYTES,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a non integer size", () => {
+    const result = requestUploadInput.safeParse({
+      ...VALID,
+      sizeBytes: 1024.5,
+    });
+
+    expect(result.success).toBe(false);
+  });
+});

@@ -22,7 +22,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 9 | Subscription access gate | Slice 2 | in-progress |
 | 10 | Client contacts & portal invitations | Slice 3 | in-progress |
 | 11 | Projects | Slice 4 | in-progress |
-| 12 | Deliverable upload & download | Slice 5 | planned |
+| 12 | Deliverable upload & download | Slice 5 | in-progress |
 | 13 | Invoice authoring & lifecycle | Slice 6 | planned |
 | 14 | Invoice PDF | Slice 6 | planned |
 | 15 | Client portal | Slice 7 | planned |
@@ -226,10 +226,20 @@ _Settles spec 0006's open question about archiving a client with projects (a cou
 
 ## Slice 5: Deliverables
 
-### 12. Deliverable upload & download · needs a decision
+### 12. Deliverable upload & download · in-progress
 Attaching real files to a project, uploaded straight to storage so bytes never pass through the server, with a per file switch for whether the client may see it.
 **Done when:** a file uploads directly with a short lived signed URL, the confirmed size and type are read back from storage rather than trusted from the browser, an unconfirmed upload is never listed or downloadable, downloads are permission checked and time limited, and deleting removes the stored object before the row.
-- [ ] Design it (spec): `/architect deliverable upload & download`
+- [x] Design it (spec): `/architect deliverable upload & download`
+- [x] Build it: `/develop deliverable upload & download`
+  - [x] The storage port and one thread end to end: the `R2_*` variables, `src/storage/` on the AWS S3 SDK with its in memory fake and the signing tests, the file rules and schemas, `requestUpload` and `confirmUpload`, a minimal Deliverables list replacing the placeholder, the browser upload with progress, and the staff download route, proven with one real upload · AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-9, AC-10, AC-12, AC-16, AC-18
+  - [x] The upload's failure paths and management: `abandonUpload`, the confirm retry and its result copies, the archived project rule, the not configured notice, the visibility switch, and delete behind a confirm with object first removal · AC-1, AC-6, AC-7, AC-8, AC-9, AC-11, AC-15, AC-17, AC-18
+  - [x] The contact download rule, the missing file and storage not configured pages, and `scripts/r2-setup.ts` with the `verify.md` steps for buckets, tokens, CORS and the wrong content type refusal · AC-4, AC-12, AC-13, AC-14, AC-18, AC-19
+  - [x] Empty and error states, `/design` entries for every new piece, `e2e/deliverables.spec.ts`, and axe in both themes · AC-10, AC-20
+- [x] Verify it: `/check verify deliverable upload & download`
+- [x] Test it: `/test deliverable upload & download`
+- [x] Review it (fresh model): `/check review deliverable upload & download`
+- [x] Document it: `/document deliverable upload & download`
+Spec [0011](../specs/0011-deliverable-upload-download/index.md) · atomic build tasks in its `## Build plan` · no migration, the `deliverables` table from spec 0002 is unchanged · new area `src/storage/`, feature code in `src/deliverables/`, the download route at `src/app/deliverables/[id]/download/`, `scripts/r2-setup.ts`, `src/lib/env.ts`, `eslint.config.mjs`
 
 ## Slice 6: Invoices
 
@@ -291,6 +301,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
 - **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · needs a decision
 - **Gate re check on client side navigation**: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately by the wrapper, so the gap is read only and bounded. Worth measuring once real agencies exist; `template.tsx` in the `(gated)` group is the first thing to try if it matters · from spec 0008 · needs a decision
+- **Preview environment file storage**: R2's CORS rule is per bucket and per origin, so each Vercel preview URL that needs real uploads needs its own bucket run through `pnpm r2:setup`, or previews run with storage unconfigured (which spec 0011 supports with a visible notice). Decide between one shared preview bucket with a wildcard origin rule and per preview buckets if previews ever need real files · from spec 0011 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 
 ## Legend

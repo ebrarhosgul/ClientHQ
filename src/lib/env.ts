@@ -112,6 +112,29 @@ const serverEnvSchema = z.object({
    */
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.email("EMAIL_FROM must be a bare email address"),
+
+  /**
+   * Feature 12, deliverable upload and download (spec 0011). Cloudflare R2,
+   * which speaks the S3 API, is where every deliverable's bytes live.
+   *
+   * All four are optional outside production, exactly like `RESEND_API_KEY`:
+   * without them `isStorageConfigured()` is `false`, the Deliverables section
+   * shows a notice instead of an upload control, and every write refuses with
+   * `conflict` before touching a row (AC-18). Required in production by the
+   * refinement below.
+   */
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
+
+  /**
+   * `scripts/r2-setup.ts` only, never the app: an Admin Read and Write token
+   * for the operator running the bucket setup script. Optional in every
+   * environment, including production, because Vercel never carries it.
+   */
+  R2_ADMIN_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_ADMIN_SECRET_ACCESS_KEY: z.string().min(1).optional(),
 });
 
 /**
@@ -125,6 +148,27 @@ const serverEnvSchemaRefined = serverEnvSchema.superRefine((value, ctx) => {
       code: "custom",
       path: ["RESEND_API_KEY"],
       message: "RESEND_API_KEY is required in production",
+    });
+  }
+
+  // The four R2 variables travel together: a production deploy with only some
+  // of them set is a misconfiguration, not a partially working feature.
+  if (value.NODE_ENV === "production") {
+    (
+      [
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET",
+      ] as const
+    ).forEach((key) => {
+      if (value[key] === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required in production`,
+        });
+      }
     });
   }
 });
@@ -165,10 +209,11 @@ export function env(): ServerEnv {
 /**
  * Is Clerk configured on this machine?
  *
- * The one place in the project that reads `process.env` outside `env()`, and it
- * has to: `env()` throws when a required key is missing, which is exactly the
- * question being asked here, and Next only inlines a `NEXT_PUBLIC_` variable
- * into the browser bundle when it is written out in full like this.
+ * One of two places in the project that reads `process.env` outside `env()`
+ * (`isR2Configured` below is the other), and it has to: `env()` throws when a
+ * required key is missing, which is exactly the question being asked here,
+ * and Next only inlines a `NEXT_PUBLIC_` variable into the browser bundle when
+ * it is written out in full like this.
  *
  * Two things depend on the answer. `ClerkProvider` throws without a
  * publishable key, so the root layout only mounts it when there is one; and the
@@ -187,6 +232,31 @@ export function clerkPublishableKey(): string | undefined {
 
 export function isClerkConfigured(): boolean {
   return clerkPublishableKey() !== undefined;
+}
+
+/**
+ * Are all four R2 variables set, read directly from `process.env` rather than
+ * through `env()`.
+ *
+ * This has to skip `env()` for the same reason `isClerkConfigured` does:
+ * `CLERK_SECRET_KEY` has no `.optional()`, so `env()` throws when Clerk is not
+ * configured, and the download route needs an answer to "is storage
+ * configured" before it has even asked whether Clerk is (spec 0011, AC-18) or
+ * it crashes with a 500 instead of answering 503. Read the four keys straight
+ * from `process.env` so this question never depends on the rest of the
+ * schema being satisfiable.
+ */
+export function isR2Configured(): boolean {
+  return (
+    isNonEmpty(process.env.R2_ACCOUNT_ID) &&
+    isNonEmpty(process.env.R2_ACCESS_KEY_ID) &&
+    isNonEmpty(process.env.R2_SECRET_ACCESS_KEY) &&
+    isNonEmpty(process.env.R2_BUCKET)
+  );
+}
+
+function isNonEmpty(value: string | undefined): boolean {
+  return value !== undefined && value.length > 0;
 }
 
 /**

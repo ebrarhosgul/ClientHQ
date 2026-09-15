@@ -17,10 +17,18 @@ const mocks = vi.hoisted(() => ({
   getProject: vi.fn(),
   todayUtc: vi.fn(),
   ProjectStatusActions: vi.fn(),
+  isStorageConfigured: vi.fn(),
+  listDeliverables: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
 vi.mock("@/auth/context", () => ({ agencyContext: mocks.agencyContext }));
+vi.mock("@/storage", () => ({
+  isStorageConfigured: mocks.isStorageConfigured,
+}));
+vi.mock("@/deliverables/queries", () => ({
+  listDeliverables: mocks.listDeliverables,
+}));
 vi.mock("@/projects/queries", async (importActual) => {
   const actual = await importActual<typeof import("@/projects/queries")>();
   return { ...actual, getProject: mocks.getProject };
@@ -73,6 +81,8 @@ beforeEach(() => {
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.agencyContext.mockResolvedValue({ orgId: "org-1", role: "admin" });
   mocks.todayUtc.mockReturnValue("2026-01-01");
+  mocks.isStorageConfigured.mockReturnValue(false);
+  mocks.listDeliverables.mockResolvedValue([]);
 });
 
 describe("ProjectDetailPage", () => {

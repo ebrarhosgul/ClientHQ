@@ -67,6 +67,33 @@ const eslintConfig = defineConfig([
     rules: { "clienthq/no-system-access-import": "off" },
   },
 
+  // Plain hygiene, not a custom rule (spec 0011): only the storage port and
+  // its setup script talk to R2. Everything else reaches storage through
+  // `src/storage/`'s four functions, the same shape the in memory fake
+  // stands in for in every test.
+  {
+    name: "clienthq/aws-sdk-boundary",
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@aws-sdk/*"],
+              message:
+                'Import the storage port from "@/storage" instead of the AWS SDK directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    name: "clienthq/aws-sdk-boundary-storage",
+    files: ["src/storage/**", "scripts/r2-setup.ts"],
+    rules: { "no-restricted-imports": "off" },
+  },
+
   // Last, so it wins: turns off every ESLint rule that would argue with
   // Prettier about formatting. ESLint judges code, Prettier decides layout.
   prettierCompat,

@@ -18,11 +18,14 @@
     "db:seed": "tsx scripts/db-seed.ts",
     "db:studio": "drizzle-kit studio",
     "db:check": "tsx scripts/db-check.ts",
+    "r2:setup": "tsx scripts/r2-setup.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@clerk/nextjs": "^7.9.1",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
