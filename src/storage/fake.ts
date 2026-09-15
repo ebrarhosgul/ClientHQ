@@ -25,12 +25,20 @@ export type FakeObjectStorage = ObjectStorage & {
   readonly deleted: readonly string[];
   /** Make the next `delete()` call (and only that one) throw. */
   readonly failNextDelete: () => void;
+  /**
+   * Run `fn` once, after the next `head()` call has read the object but
+   * before it returns. Lets a test land a concurrent write, such as a
+   * competing `abandonUpload`, inside the gap a caller like `confirmUpload`
+   * leaves between reading the object and acting on it.
+   */
+  readonly runAfterNextHead: (fn: () => Promise<void>) => void;
 };
 
 export function createFakeObjectStorage(): FakeObjectStorage {
   const objects = new Map<string, FakeObject>();
   const deleted: string[] = [];
   let failNext = false;
+  let afterHead: (() => Promise<void>) | undefined;
 
   return {
     put(key, object) {
@@ -47,6 +55,10 @@ export function createFakeObjectStorage(): FakeObjectStorage {
       failNext = true;
     },
 
+    runAfterNextHead(fn) {
+      afterHead = fn;
+    },
+
     async presignPut({ key }) {
       return `https://fake-storage.test/${encodeURIComponent(key)}?signed=put`;
     },
@@ -57,13 +69,21 @@ export function createFakeObjectStorage(): FakeObjectStorage {
 
     async head(key): Promise<HeadResult | undefined> {
       const object = objects.get(key);
+      const result =
+        object === undefined
+          ? undefined
+          : {
+              contentType: object.contentType,
+              contentLength: object.contentLength,
+            };
 
-      return object === undefined
-        ? undefined
-        : {
-            contentType: object.contentType,
-            contentLength: object.contentLength,
-          };
+      const hook = afterHead;
+      afterHead = undefined;
+      if (hook) {
+        await hook();
+      }
+
+      return result;
     },
 
     async delete(key) {

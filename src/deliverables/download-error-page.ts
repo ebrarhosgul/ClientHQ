@@ -9,6 +9,14 @@
  * tokens (`design.md`) it needs for both themes via `prefers-color-scheme`,
  * rather than depending on a hashed, build time stylesheet path.
  *
+ * `DOWNLOAD_PAGE_TOKENS` below is those values, copied by hand out of
+ * `src/app/globals.css` because a route handler has no stylesheet to read
+ * at request time. `src/ui/token-discipline.test.ts` does not scan this
+ * directory, so nothing stops that copy drifting from the source on its
+ * own; `download-error-page.test.ts` reads the same four pairs back out of
+ * `globals.css` and fails if they no longer match, which is what keeps
+ * these literal.
+ *
  * `notFound()` from `next/navigation` is not an option here: it only
  * renders a route segment's `not-found.js` boundary, which a route handler,
  * having no page or layout of its own, never has. Called from this file,
@@ -22,6 +30,30 @@ export type DownloadErrorPage = {
   readonly status: number;
   readonly heading: string;
   readonly body: string;
+};
+
+/**
+ * The four token pairs this page needs, pinned to `src/app/globals.css` by
+ * `download-error-page.test.ts`. Keyed by the same custom property names
+ * `globals.css` declares them under, so the test can compare each value
+ * directly against what that file's `tokens:light` and `tokens:dark-explicit`
+ * blocks say.
+ */
+export const DOWNLOAD_PAGE_TOKENS: Readonly<
+  Record<"light" | "dark", Readonly<Record<string, string>>>
+> = {
+  light: {
+    "--background": "oklch(0.994 0.002 70)",
+    "--foreground": "oklch(0.22 0.008 70)",
+    "--muted-foreground": "oklch(0.44 0.01 70)",
+    "--border": "oklch(0.885 0.005 70)",
+  },
+  dark: {
+    "--background": "oklch(0.175 0.006 70)",
+    "--foreground": "oklch(0.945 0.004 70)",
+    "--muted-foreground": "oklch(0.735 0.01 70)",
+    "--border": "oklch(0.355 0.008 70)",
+  },
 };
 
 function escapeHtml(value: string): string {
@@ -46,17 +78,17 @@ export function downloadErrorResponse({
 <style>
   :root {
     color-scheme: light dark;
-    --background: oklch(0.994 0.002 70);
-    --foreground: oklch(0.22 0.008 70);
-    --muted-foreground: oklch(0.44 0.01 70);
-    --border: oklch(0.885 0.005 70);
+    --background: ${DOWNLOAD_PAGE_TOKENS.light["--background"]};
+    --foreground: ${DOWNLOAD_PAGE_TOKENS.light["--foreground"]};
+    --muted-foreground: ${DOWNLOAD_PAGE_TOKENS.light["--muted-foreground"]};
+    --border: ${DOWNLOAD_PAGE_TOKENS.light["--border"]};
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --background: oklch(0.175 0.006 70);
-      --foreground: oklch(0.945 0.004 70);
-      --muted-foreground: oklch(0.735 0.01 70);
-      --border: oklch(0.355 0.008 70);
+      --background: ${DOWNLOAD_PAGE_TOKENS.dark["--background"]};
+      --foreground: ${DOWNLOAD_PAGE_TOKENS.dark["--foreground"]};
+      --muted-foreground: ${DOWNLOAD_PAGE_TOKENS.dark["--muted-foreground"]};
+      --border: ${DOWNLOAD_PAGE_TOKENS.dark["--border"]};
     }
   }
   body {

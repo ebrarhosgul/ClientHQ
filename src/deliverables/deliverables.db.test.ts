@@ -583,6 +583,66 @@ describe.skipIf(url === undefined)(
           });
         });
       });
+
+      it("returns not_found and writes nothing when a concurrent abandon removes the row between the object check and the compare-and-set", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture);
+          state.storage?.put(row.r2Key, {
+            contentType: "application/pdf",
+            contentLength: 4096,
+          });
+
+          // Lands the row deletion an `abandonUpload` would do in the gap
+          // this confirm leaves between reading the object (`head()`) and
+          // its `status = "pending"` compare-and-set.
+          state.storage?.runAfterNextHead(async () => {
+            await tx.delete(deliverables).where(eq(deliverables.id, row.id));
+          });
+
+          const result = await confirmUpload({ deliverableId: row.id });
+
+          expect(result).toMatchObject({
+            ok: false,
+            error: { code: "not_found" },
+          });
+
+          const remaining = await tx
+            .select()
+            .from(deliverables)
+            .where(eq(deliverables.id, row.id));
+
+          expect(remaining).toHaveLength(0);
+          // The lost compare-and-set writes nothing of its own: the object
+          // this confirm was validating is left exactly where the abandon
+          // left it, untouched by the confirm that lost the race.
+          expect(state.storage?.has(row.r2Key)).toBe(true);
+        });
+      });
+
+      it("tolerates the row already being gone when the object is out of rules", async () => {
+        await inRollback(async (tx, fixture) => {
+          const row = await insertPending(tx, fixture);
+          state.storage?.put(row.r2Key, {
+            contentType: "application/x-msdownload",
+            contentLength: 10,
+          });
+
+          // A concurrent abandon can remove the row before this confirm's
+          // own out-of-rules cleanup runs; that cleanup must tolerate a
+          // delete matching no row rather than throwing.
+          state.storage?.runAfterNextHead(async () => {
+            await tx.delete(deliverables).where(eq(deliverables.id, row.id));
+          });
+
+          const result = await confirmUpload({ deliverableId: row.id });
+
+          expect(result).toMatchObject({
+            ok: false,
+            error: { code: "validation" },
+          });
+          expect(state.storage?.has(row.r2Key)).toBe(false);
+        });
+      });
     });
 
     describe("abandonUpload (AC-7, AC-8)", () => {
