@@ -96,7 +96,7 @@ const { issueInvoice } = await import("./issue-invoice");
 const { markInvoicePaid, voidInvoice } = await import("./transition-invoice");
 const { resendInvoiceNotification } =
   await import("./resend-invoice-notification");
-const { getInvoice, listInvoices, listInvoicesForClient } =
+const { contactsToNotify, getInvoice, listInvoices, listInvoicesForClient } =
   await import("./queries");
 const { lockDraft } = await import("./draft");
 
@@ -371,6 +371,79 @@ describe.skipIf(!url)("invoices against real PostgreSQL", () => {
           .from(invoices)
           .where(eq(invoices.orgId, fixture.orgA));
         expect(rows).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("updating a draft's header (AC-2)", () => {
+    it("refuses a missing or another agency's client with validation, changing nothing", async () => {
+      await inRollback(async (_tx, fixture) => {
+        const id = await draftWithLines(fixture, 0);
+
+        const foreign = await updateInvoiceDraft({
+          id,
+          clientId: fixture.clientB1,
+          dueDate: "2027-01-01",
+          taxRatePercent: "0",
+          notes: "",
+        });
+
+        expect(foreign.ok).toBe(false);
+        if (!foreign.ok) {
+          expect(foreign.error.code).toBe("validation");
+          expect(foreign.error.fieldErrors?.clientId?.[0]).toMatch(
+            /active client/,
+          );
+        }
+
+        const stillOriginal = await getInvoice(staffOf(fixture, "A"), id);
+        expect(stillOriginal?.client.id).toBe(fixture.clientA1);
+        expect(stillOriginal?.dueDate).not.toBe("2027-01-01");
+      });
+    });
+
+    it("refuses an archived client with validation, naming the field", async () => {
+      await inRollback(async (_tx, fixture) => {
+        const id = await draftWithLines(fixture, 0);
+
+        const archived = await updateInvoiceDraft({
+          id,
+          clientId: fixture.clientA1Archived,
+          dueDate: "2027-01-01",
+          taxRatePercent: "0",
+          notes: "",
+        });
+
+        expect(archived.ok).toBe(false);
+        if (!archived.ok) {
+          expect(archived.error.code).toBe("validation");
+          expect(archived.error.fieldErrors?.clientId?.[0]).toMatch(/archived/);
+        }
+      });
+    });
+
+    it("moves the draft to a different active client of the same agency", async () => {
+      await inRollback(async (tx, fixture) => {
+        const otherClientId = newId();
+        await tx.insert(clients).values({
+          id: otherClientId,
+          orgId: fixture.orgA,
+          name: "Second Client",
+        });
+        const id = await draftWithLines(fixture, 0);
+
+        const result = await updateInvoiceDraft({
+          id,
+          clientId: otherClientId,
+          dueDate: "2027-01-01",
+          taxRatePercent: "0",
+          notes: "",
+        });
+
+        expect(result.ok).toBe(true);
+
+        const updated = await getInvoice(staffOf(fixture, "A"), id);
+        expect(updated?.client.id).toBe(otherClientId);
       });
     });
   });
@@ -851,6 +924,52 @@ describe.skipIf(!url)("invoices against real PostgreSQL", () => {
         ).toBe(true);
         const onVoid = await resendInvoiceNotification({ id: draft });
         expect(onVoid.ok).toBe(false);
+      });
+    });
+  });
+
+  describe("contactsToNotify (AC-6)", () => {
+    it("orders recipients by name then id and excludes a blank email", async () => {
+      await inRollback(async (tx, fixture) => {
+        await tx.insert(clientContacts).values({
+          id: newId(),
+          orgId: fixture.orgA,
+          clientId: fixture.clientA1,
+          email: "",
+          name: "Blank Email",
+        });
+
+        const contacts = await contactsToNotify(
+          staffOf(fixture, "A"),
+          fixture.clientA1,
+        );
+
+        expect(contacts.map((contact) => contact.name)).toStrictEqual([
+          "Devon",
+          "Priya",
+        ]);
+      });
+    });
+
+    it("returns no contacts for a client id that is not even a uuid, without reaching the database", async () => {
+      await inRollback(async (_tx, fixture) => {
+        const contacts = await contactsToNotify(
+          staffOf(fixture, "A"),
+          "not-a-uuid",
+        );
+
+        expect(contacts).toStrictEqual([]);
+      });
+    });
+
+    it("returns no contacts for a client with none on file", async () => {
+      await inRollback(async (_tx, fixture) => {
+        const contacts = await contactsToNotify(
+          staffOf(fixture, "A"),
+          fixture.clientA1Archived,
+        );
+
+        expect(contacts).toStrictEqual([]);
       });
     });
   });

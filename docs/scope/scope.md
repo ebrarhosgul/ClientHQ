@@ -254,7 +254,7 @@ Building an invoice from line items and moving it through draft, sent, paid, ove
   - [x] The full draft editor and the closing moves: header form, edit, remove and move lines with the live totals, mark paid with its date, void with its reason, both compare and set · AC-2, AC-3, AC-8, AC-9, AC-15, AC-17
   - [x] List filters and paging, the past due badge, the frozen document and events list, the client page section, empty and error states, `/design` entries and axe in both themes · AC-10, AC-11, AC-12, AC-13, AC-17
 - [ ] Verify it: `/check verify invoice authoring & lifecycle`
-- [ ] Test it: `/test invoice authoring & lifecycle`
+- [x] Test it: `/test invoice authoring & lifecycle`
 - [ ] Review it (fresh model): `/check review invoice authoring & lifecycle`
 - [ ] Document it: `/document invoice authoring & lifecycle`
 Spec [0012](../specs/0012-invoice-authoring-lifecycle/index.md) · atomic build tasks in its `## Build plan` · code in `src/invoices/`, `src/db/tenant/transaction.ts`, `src/lib/dates.ts`, `drizzle/0003_broken_baron_strucker.sql` · one migration (`invoices.notes` and `invoice_events`) · feature code in `src/invoices/`, the pages under `src/app/(agency)/(gated)/invoices/`, the placeholder at `src/app/portal/invoices/[id]/`, the template in `src/email/templates/`, `src/lib/money.ts`, `src/lib/dates.ts`, `src/db/tenant/`
