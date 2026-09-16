@@ -28,6 +28,7 @@ import {
   organizations,
   subscriptions,
   users,
+  type InvoiceStatus,
 } from "@/db/schema";
 import type { Executor, StaffContext, TransactionExecutor } from "@/db/tenant";
 import { tenantDb } from "@/db/tenant";
@@ -1248,6 +1249,211 @@ describe.skipIf(!url)("invoices against real PostgreSQL", () => {
       } finally {
         await deleteFixture();
       }
+    });
+  });
+
+  describe("listInvoices (AC-10)", () => {
+    /**
+     * Thirty invoices for agency A, direct inserted rather than issued
+     * through the real actions: this describe is about what the query does
+     * with rows that already exist, not about how they got there. Three are
+     * `void` (indices 0-2); the rest cycle through the other four statuses.
+     * Twenty four belong to `clientA1`, the other six to `clientA1Archived`.
+     */
+    async function seedListing(
+      tx: TransactionExecutor,
+      fixture: Fixture,
+    ): Promise<void> {
+      const total = 30;
+      const voidCount = 3;
+      const clientACount = 24;
+      const cycle: readonly InvoiceStatus[] = [
+        "draft",
+        "sent",
+        "paid",
+        "overdue",
+      ];
+
+      const rows: (typeof invoices.$inferInsert)[] = [];
+
+      for (let index = 0; index < total; index += 1) {
+        const isVoid = index < voidCount;
+        const status: InvoiceStatus = isVoid
+          ? "void"
+          : cycle[(index - voidCount) % cycle.length];
+        const issued = status !== "draft";
+
+        rows.push({
+          id: newId(),
+          orgId: fixture.orgA,
+          clientId:
+            index < clientACount ? fixture.clientA1 : fixture.clientA1Archived,
+          currency: "EUR",
+          status,
+          number: issued ? index + 1 : null,
+          issueDate: issued
+            ? `2026-01-${String((index % 27) + 1).padStart(2, "0")}`
+            : null,
+          dueDate: issued ? "2026-02-15" : null,
+          paidAt: status === "paid" ? new Date() : undefined,
+        });
+      }
+
+      await tx.insert(invoices).values(rows);
+    }
+
+    it("hides void by default, includes it with the toggle, and a named status overrides both", async () => {
+      await inRollback(async (tx, fixture) => {
+        await seedListing(tx, fixture);
+        const ctx = staffOf(fixture, "A");
+
+        const defaultView = await listInvoices(ctx, {
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(defaultView.total).toBe(27);
+        expect(defaultView.rows.some((row) => row.status === "void")).toBe(
+          false,
+        );
+
+        const withVoidToggle = await listInvoices(ctx, {
+          includeVoid: true,
+          todayUtc: todayUtc(),
+        });
+        expect(withVoidToggle.total).toBe(30);
+
+        const onlyVoid = await listInvoices(ctx, {
+          statusParam: "void",
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(onlyVoid.total).toBe(3);
+        expect(onlyVoid.rows.every((row) => row.status === "void")).toBe(true);
+
+        const onlySent = await listInvoices(ctx, {
+          statusParam: "sent",
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(onlySent.total).toBe(7);
+        expect(onlySent.rows.every((row) => row.status === "sent")).toBe(true);
+      });
+    });
+
+    it("narrows to one client, and a client param that isn't a uuid returns empty without a query", async () => {
+      await inRollback(async (tx, fixture) => {
+        await seedListing(tx, fixture);
+        const ctx = staffOf(fixture, "A");
+
+        const northwind = await listInvoices(ctx, {
+          clientParam: fixture.clientA1,
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(northwind.total).toBe(21);
+        expect(
+          northwind.rows.every((row) => row.clientName === "Northwind"),
+        ).toBe(true);
+
+        const oldHarbor = await listInvoices(ctx, {
+          clientParam: fixture.clientA1Archived,
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(oldHarbor.total).toBe(6);
+
+        const notAUuid = await listInvoices(ctx, {
+          clientParam: "not-a-uuid",
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(notAUuid).toStrictEqual({
+          rows: [],
+          page: 1,
+          pageCount: 1,
+          total: 0,
+        });
+      });
+    });
+
+    it("holds 25 rows on page 1 and the rest on page 2, and clamps an unset, zero, non numeric or past-the-end page to 1", async () => {
+      await inRollback(async (tx, fixture) => {
+        await seedListing(tx, fixture);
+        const ctx = staffOf(fixture, "A");
+
+        const page1 = await listInvoices(ctx, {
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(page1.page).toBe(1);
+        expect(page1.pageCount).toBe(2);
+        expect(page1.rows).toHaveLength(25);
+
+        const page2 = await listInvoices(ctx, {
+          pageParam: "2",
+          includeVoid: false,
+          todayUtc: todayUtc(),
+        });
+        expect(page2.page).toBe(2);
+        expect(page2.rows).toHaveLength(2);
+
+        for (const pageParam of ["0", "-1", "abc", "99"]) {
+          const clamped = await listInvoices(ctx, {
+            pageParam,
+            includeVoid: false,
+            todayUtc: todayUtc(),
+          });
+          expect(clamped.page).toBe(1);
+          expect(clamped.rows).toHaveLength(25);
+        }
+      });
+    });
+  });
+
+  describe("listInvoicesForClient (AC-13)", () => {
+    it("excludes void, puts drafts first, and stays within the one client", async () => {
+      await inRollback(async (tx, fixture) => {
+        const draftId = await draftWithLines(fixture, 1);
+        const sentId = await draftWithLines(fixture, 1);
+        expect((await issueInvoice({ id: sentId })).ok).toBe(true);
+
+        const voidId = await draftWithLines(fixture, 0);
+        expect(
+          (await voidInvoice({ id: voidId, from: "draft", reason: "" })).ok,
+        ).toBe(true);
+
+        // A draft for a second client in the same agency, direct inserted
+        // (createInvoiceDraft refuses an archived client, and clientA1Archived
+        // only exists here to be a client that isn't clientA1).
+        const otherClientId = newId();
+        await tx.insert(invoices).values({
+          id: otherClientId,
+          orgId: fixture.orgA,
+          clientId: fixture.clientA1Archived,
+          currency: "EUR",
+          status: "draft",
+        });
+
+        const rows = await listInvoicesForClient(
+          staffOf(fixture, "A"),
+          fixture.clientA1,
+          todayUtc(),
+        );
+
+        const ids = rows.map((row) => row.id);
+        expect(ids).not.toContain(voidId);
+        expect(ids).not.toContain(otherClientId);
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({ id: draftId, status: "draft" });
+        expect(rows[1]).toMatchObject({ id: sentId, status: "sent" });
+
+        const notAUuid = await listInvoicesForClient(
+          staffOf(fixture, "A"),
+          "not-a-uuid",
+          todayUtc(),
+        );
+        expect(notAUuid).toStrictEqual([]);
+      });
     });
   });
 });

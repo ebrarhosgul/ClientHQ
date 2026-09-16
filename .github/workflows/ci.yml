@@ -144,6 +144,28 @@ jobs:
       - name: Prove the Stripe webhook survives replay, reordering and rollback
         run: pnpm vitest run src/payments/webhook.db.test.ts
 
+      # Two simultaneous issues of one draft get consecutive numbers and only
+      # one succeeds; a line removal racing an issue is refused; agency B
+      # cannot see agency A's invoices, lines or events. All three are claims
+      # about the row lock and the transaction, not about TypeScript.
+      - name: Prove invoice numbering, concurrency and tenant isolation hold
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/invoices/invoices.db.test.ts
+
+      # A throw inside tenantTransaction must roll every write back, including
+      # the invoice counter, and nextInvoiceNumber must never hand out another
+      # agency's number.
+      - name: Prove tenantTransaction rolls back and the invoice counter stays scoped
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/db/tenant/transaction.db.test.ts
+
+      # The invoice_events CHECKs (a status kind carries both statuses, a
+      # notification kind carries neither) only mean something enforced by
+      # real PostgreSQL.
+      - name: Prove the invoice_events CHECKs refuse a malformed row
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/db/invoice-events.db.test.ts
+
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would
   # never run on a push and the suite would rot unnoticed.
