@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0005 AC-14, AC-15
+ * covers: spec 0005 AC-14, AC-15; spec 0013 AC-2
  *
  * `agencyProfile`, against real SQL. The same shape as
  * `provisioning.db.test.ts`: everything runs inside a transaction that is
@@ -10,7 +10,10 @@
  * What is worth a database rather than a mock here is `deleted_at is null`:
  * the one predicate this reader carries, and the one that has to keep matching
  * `resolveStaffContext`'s own filter (AC-14) so a soft deleted agency's name
- * cannot be read back after resolution has already stopped returning it.
+ * cannot be read back after resolution has already stopped returning it. Spec
+ * 0013 widened the parameter from `StaffContext` to `TenantContext` so a
+ * client contact's invoice PDF can read the agency name too; both context
+ * kinds carry the same `orgId`, which is proven with a contact context below.
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -21,7 +24,7 @@ import { loadEnvFiles } from "@/lib/load-env-files";
 
 import * as schema from "../schema";
 import { organizations } from "../schema";
-import type { StaffContext } from "./context";
+import type { ContactContext, StaffContext } from "./context";
 import type { TransactionExecutor } from "./executor";
 import { agencyProfile, deletedOrganizationClerkIds } from "./organization";
 
@@ -59,6 +62,17 @@ function staffContext(orgId: string): StaffContext {
     userId: "irrelevant-to-this-reader",
     clerkUserId: "irrelevant-to-this-reader",
     role: "admin",
+  };
+}
+
+function contactContext(orgId: string): ContactContext {
+  return {
+    kind: "contact",
+    orgId,
+    userId: "irrelevant-to-this-reader",
+    clerkUserId: "irrelevant-to-this-reader",
+    clientId: "irrelevant-to-this-reader",
+    contactId: "irrelevant-to-this-reader",
   };
 }
 
@@ -120,6 +134,31 @@ describe.skipIf(!url)("agencyProfile against real PostgreSQL", () => {
       await expect(
         agencyProfile(staffContext("00000000-0000-0000-0000-000000000000"), tx),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  it("reads back the same row for a client contact's context (spec 0013, AC-2)", async () => {
+    await inRollback(async (tx) => {
+      const [org] = await tx
+        .insert(organizations)
+        .values({
+          id: newId(),
+          clerkOrgId: clerkId("org"),
+          name: "Northwind",
+          slug: "northwind",
+        })
+        .returning();
+
+      if (org === undefined) {
+        throw new Error("insert did not return a row");
+      }
+
+      await expect(agencyProfile(contactContext(org.id), tx)).resolves.toEqual({
+        id: org.id,
+        name: "Northwind",
+        slug: "northwind",
+        defaultCurrency: "USD",
+      });
     });
   });
 });
