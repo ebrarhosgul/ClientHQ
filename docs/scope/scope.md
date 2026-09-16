@@ -272,7 +272,7 @@ A downloadable file the client can save and forward to their own accountant. New
 - [x] Verify it: `/check verify invoice PDF`
 - [ ] Test it: `/test invoice PDF`
 - [ ] Review it (fresh model): `/check review invoice PDF`
-- [ ] Document it: `/document invoice PDF`
+- [x] Document it: `/document invoice PDF`
 Spec [0013](../specs/0013-invoice-pdf/index.md) · atomic build tasks in its `## Build plan` · code in `src/invoices/presentation.ts`, `src/invoices/pdf/`, `src/invoices/queries.ts`, `src/invoices/ui/invoice-document.tsx`, `src/invoices/ui/invoice-totals.tsx`, `src/app/invoices/[id]/pdf/`, `src/app/portal/invoices/[id]/pdf/`, `src/db/tenant/organization.ts`, `src/deliverables/download-error-page.ts`, `next.config.ts`, `eslint.config.mjs`
 
 ## Slice 7: Client portal
