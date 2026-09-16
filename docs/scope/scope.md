@@ -24,7 +24,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Projects | Slice 4 | in-progress |
 | 12 | Deliverable upload & download | Slice 5 | in-progress |
 | 13 | Invoice authoring & lifecycle | Slice 6 | in-progress |
-| 14 | Invoice PDF | Slice 6 | planned |
+| 14 | Invoice PDF | Slice 6 | in-progress |
 | 15 | Client portal | Slice 7 | planned |
 | 16 | Team members & roles | Slice 8 | planned |
 | 17 | Clerk webhook sync | Slice 8 | planned |
@@ -259,10 +259,21 @@ Building an invoice from line items and moving it through draft, sent, paid, ove
 - [ ] Document it: `/document invoice authoring & lifecycle`
 Spec [0012](../specs/0012-invoice-authoring-lifecycle/index.md) · atomic build tasks in its `## Build plan` · code in `src/invoices/`, `src/db/tenant/transaction.ts`, `src/lib/dates.ts`, `drizzle/0003_broken_baron_strucker.sql` · one migration (`invoices.notes` and `invoice_events`) · feature code in `src/invoices/`, the pages under `src/app/(agency)/(gated)/invoices/`, the placeholder at `src/app/portal/invoices/[id]/`, the template in `src/email/templates/`, `src/lib/money.ts`, `src/lib/dates.ts`, `src/db/tenant/`
 
-### 14. Invoice PDF · needs a decision
+### 14. Invoice PDF · in-progress
 A downloadable file the client can save and forward to their own accountant. New work that spec 0001 does not cover, so it carries its own decision about how the document is produced and where it is stored or generated.
 **Done when:** an issued invoice downloads as a PDF that matches the on screen invoice exactly, is reachable by both the agency and the invoiced client, and is refused for drafts and voided invoices.
-- [ ] Design it (spec): `/architect invoice PDF`
+- [x] Design it (spec): `/architect invoice PDF`
+- [ ] Build it: `/develop invoice PDF`
+  - [ ] The thin thread: `@react-pdf/renderer`, the bundled Inter fonts, the `next.config.ts` entries, the ESLint import boundary, a minimal `presentInvoice` and PDF document, the staff route and a Download PDF link, proven by a real download from a Vercel preview deployment · AC-1, AC-8
+  - [ ] The contact thread: `agencyProfile` widened to either context, `getInvoiceDocument` scoped by the contact predicates and `CLIENT_VISIBLE_STATUSES`, the `/portal/invoices/[id]/pdf` route, tenant resolution errors as 404, cross tenant database tests · AC-2, AC-7
+  - [ ] Content and screen parity: the full presentation (status, past due, paid on, bill to address, tax label, notes, generated line, title), the screen reading from it with the address block and the link only for PDF statuses, unit tests · AC-3, AC-4
+  - [ ] Layout and failure: A4 with 40 point margins, the repeated header row, unsplit rows, hyphenation off, metadata, the 100 line non ASCII render test, the 500 page with its link and the JSON log line, route tests · AC-5, AC-6, AC-9
+  - [ ] Accessibility and proof: axe over the detail page and the error pages in both themes, the browser download test, the design gallery entries · AC-9, AC-4
+- [ ] Verify it: `/check verify invoice PDF`
+- [ ] Test it: `/test invoice PDF`
+- [ ] Review it (fresh model): `/check review invoice PDF`
+- [ ] Document it: `/document invoice PDF`
+Spec [0013](../specs/0013-invoice-pdf/index.md) · atomic build tasks in its `## Build plan`
 
 ## Slice 7: Client portal
 
@@ -316,6 +327,9 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
 - **Zero decimal currencies**: the invoice unit amount input and the money formatter assume two minor unit digits (USD, EUR, GBP), so a JPY style currency would be entered and displayed inconsistently. Decide on a minor unit table keyed by currency before an agency outside the two decimal world signs up · from spec 0012 · needs a decision
 - **Contact erasure must scrub invoice event notes**: the `notified` and `notification_failed` rows in `invoice_events` carry the contact addresses that were emailed. Any GDPR erasure of a contact has to scrub them from those notes as well as from `client_contacts` · from spec 0012 · needs a decision
+- **Agency letterhead and locale**: the invoice PDF prints the agency by name only, on A4, with dates in UTC and money in the `en-US` locale, because `organizations` has no address, tax or VAT id, payment instructions, page size or locale columns. An agency settings feature would add those columns, a settings form, and the matching block on the PDF and the screen through `presentInvoice` · from spec 0013 · needs a decision
+- **Invoice PDF attached to the issue email**: spec 0012's notification sends a link to the portal; attaching the PDF means rendering inside the post commit send (and on resend) through Resend's single send endpoint, which supports attachments. Decide once the PDF has been trusted for a while · from spec 0013 · needs a decision
+- **Tagged (accessible) invoice PDF**: `@react-pdf/renderer` sets the title, author and language metadata but produces no tag structure, so a screen reader cannot navigate the file the way it navigates the page. Revisit if a client or a procurement requirement asks for it · from spec 0013 · needs a decision
 
 ## Legend
 
