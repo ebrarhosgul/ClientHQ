@@ -1,7 +1,7 @@
 # 0013. Invoice PDF
 
 **Date**: 2026-09-16
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

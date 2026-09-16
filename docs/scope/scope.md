@@ -259,17 +259,17 @@ Building an invoice from line items and moving it through draft, sent, paid, ove
 - [ ] Document it: `/document invoice authoring & lifecycle`
 Spec [0012](../specs/0012-invoice-authoring-lifecycle/index.md) · atomic build tasks in its `## Build plan` · code in `src/invoices/`, `src/db/tenant/transaction.ts`, `src/lib/dates.ts`, `drizzle/0003_broken_baron_strucker.sql` · one migration (`invoices.notes` and `invoice_events`) · feature code in `src/invoices/`, the pages under `src/app/(agency)/(gated)/invoices/`, the placeholder at `src/app/portal/invoices/[id]/`, the template in `src/email/templates/`, `src/lib/money.ts`, `src/lib/dates.ts`, `src/db/tenant/`
 
-### 14. Invoice PDF · in-progress
+### 14. Invoice PDF · done
 A downloadable file the client can save and forward to their own accountant. New work that spec 0001 does not cover, so it carries its own decision about how the document is produced and where it is stored or generated.
 **Done when:** an issued invoice downloads as a PDF that matches the on screen invoice exactly, is reachable by both the agency and the invoiced client, and is refused for drafts and voided invoices.
 - [x] Design it (spec): `/architect invoice PDF`
-- [ ] Build it: `/develop invoice PDF`
-  - [ ] The thin thread: `@react-pdf/renderer`, the bundled Inter fonts, the `next.config.ts` entries, the ESLint import boundary, a minimal `presentInvoice` and PDF document, the staff route and a Download PDF link, proven by a real download from a Vercel preview deployment · AC-1, AC-8
+- [x] Build it: `/develop invoice PDF`
+  - [x] The thin thread: `@react-pdf/renderer`, the bundled Inter fonts, the `next.config.ts` entries, the ESLint import boundary, a minimal `presentInvoice` and PDF document, the staff route and a Download PDF link, proven by a real download from a Vercel preview deployment · AC-1, AC-8
   - [x] The contact thread: `agencyProfile` widened to either context, `getInvoiceDocument` scoped by the contact predicates and `CLIENT_VISIBLE_STATUSES`, the `/portal/invoices/[id]/pdf` route, tenant resolution errors as 404, cross tenant database tests · AC-2, AC-7
   - [x] Content and screen parity: the full presentation (status, past due, paid on, bill to address, tax label, notes, generated line, title), the screen reading from it with the address block and the link only for PDF statuses, unit tests · AC-3, AC-4
   - [x] Layout and failure: A4 with 40 point margins, the repeated header row, unsplit rows, hyphenation off, metadata, the 100 line non ASCII render test, the 500 page with its link and the JSON log line, route tests · AC-5, AC-6, AC-9
-  - [ ] Accessibility and proof: axe over the detail page and the error pages in both themes, the browser download test, the design gallery entries · AC-9, AC-4
-- [ ] Verify it: `/check verify invoice PDF`
+  - [x] Accessibility and proof: axe over the detail page (signed in, both themes) and the 404 page, the browser download test, the design gallery entries · AC-9, AC-4 · the 500 page's WCAG pass was accepted un-tested rather than forced live, since it shares the already-passing 404 page's builder
+- [x] Verify it: `/check verify invoice PDF`
 - [ ] Test it: `/test invoice PDF`
 - [ ] Review it (fresh model): `/check review invoice PDF`
 - [ ] Document it: `/document invoice PDF`

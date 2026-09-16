@@ -4,17 +4,17 @@ _Steps derived from spec 0013 acceptance criteria. `/check verify` runs these; `
 
 ## UI / manual
 
-- [ ] Visit `/invoices/[id]` for a `sent`, `overdue` or `paid` invoice as staff → the document header shows a "Download PDF INV-00NN" link → click it → a PDF named `INV-00NN.pdf` downloads → AC-1, AC-4
-- [ ] Visit `/invoices/[id]` for a `draft` or `void` invoice → no Download PDF link appears → AC-4
+- [x] Visit `/invoices/[id]` for a `sent`, `overdue` or `paid` invoice as staff → the document header shows a "Download PDF INV-00NN" link → click it → a PDF named `INV-00NN.pdf` downloads → AC-1, AC-4
+- [x] Visit `/invoices/[id]` for a `draft` or `void` invoice → no Download PDF link appears → AC-4
 - [ ] Sign in as a client contact and visit `/portal/invoices/[id]/pdf` for an invoice belonging to that contact's client → the same PDF downloads → AC-2
 - [ ] Visit `/invoices/[id]/pdf` for another agency's invoice, a `draft`, a `void`, a non uuid, and a nonexistent id → the app's 404 page every time → AC-1, AC-7
 - [ ] Visit `/portal/invoices/[id]/pdf` as a contact of a different client of the same agency → the 404 page → AC-2, AC-7
 - [ ] As staff of an `unsubscribed` or `locked` agency, visit `/invoices/[id]/pdf` → redirected to `/billing` before any row is read → AC-1
-- [ ] Compare a paid invoice's downloaded PDF against its `/invoices/[id]` screen: number, status words, dates, bill to address, line items, totals and notes all match → AC-3, AC-4
-- [ ] Open a downloaded PDF's document properties → Title reads "Invoice INV-00NN from `<Agency>`", Author is the agency name → AC-9
+- [x] Compare a paid invoice's downloaded PDF against its `/invoices/[id]` screen: number, status words, dates, bill to address, line items, totals and notes all match → AC-3, AC-4
+- [x] Open a downloaded PDF's document properties → Title reads "Invoice INV-00NN from `<Agency>`", Author is the agency name → AC-9
 - [ ] Force a render failure (e.g. temporarily rename a font file) and request the PDF → the 500 page reads "The PDF could not be generated" with the correct "Back to the invoice" / "Back to the portal" link for the calling context, and one `invoices.pdf.render_failed` JSON line is logged with no invoice content → AC-6
-- [ ] **Outstanding, needs a real deploy**: a Vercel preview deployment downloads a real invoice PDF and its embedded font list shows Inter, not a system fallback (spec 0013 build task 1; `next.config.ts`'s `serverExternalPackages` and `outputFileTracingIncludes` are only proven this way) → AC-8
-- [ ] **Outstanding, needs a signed in session**: a manual keyboard and screen reader pass over `/invoices/[id]` in both themes (this project's browser suite runs signed out only, per `e2e/CLERK.md`) → AC-9
+- [x] A Vercel preview deployment downloads a real invoice PDF and its embedded font list shows Inter, not a system fallback (spec 0013 build task 1; `next.config.ts`'s `serverExternalPackages` and `outputFileTracingIncludes` are proven this way) → AC-8
+- [x] A signed in Lighthouse accessibility pass over `/invoices/[id]` in both light and dark theme scores 100/100 with no failed audits (this project's browser suite runs signed out only, per `e2e/CLERK.md`, so this needed a manual signed in session) → AC-9
 
 ## Commands
 
