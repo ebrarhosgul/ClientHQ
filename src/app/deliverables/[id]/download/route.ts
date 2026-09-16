@@ -10,6 +10,11 @@ import {
   notFoundResponse,
 } from "@/deliverables/download-error-page";
 import { isClerkConfigured } from "@/lib/env";
+import {
+  isPortalReadable,
+  portalAccess,
+  PORTAL_UNAVAILABLE_PATH,
+} from "@/portal/gate";
 import { objectStorage } from "@/storage";
 
 /** The signed GET is valid for 2 minutes. */
@@ -21,10 +26,12 @@ const GET_EXPIRES_SECONDS = 120;
  *
  * Outside every route group on purpose (the proxy requires a session but not
  * an organization), which is what lets a client contact reach it at all.
- * Order: storage configured, context, the subscription gate (staff only,
- * exactly as the gated layout applies it, since a route handler sits outside
- * that layout and would otherwise bypass spec 0008), the row, its status and
- * visibility rules, `head`, then the redirect.
+ * Order: storage configured, context, the access gate (the subscription gate
+ * for staff, exactly as the gated layout applies it, since a route handler
+ * sits outside that layout and would otherwise bypass spec 0008; `portalAccess`
+ * for a contact, spec 0014 AC-13, answering `302` to `/portal/unavailable`
+ * when locked or unsubscribed), the row, its status and visibility rules,
+ * `head`, then the redirect.
  *
  * A route handler has no layout or error boundary above it, unlike a Server
  * Action's `withTenantAction`, so a signed in person with no active Clerk
@@ -85,6 +92,12 @@ export async function GET(
     }
 
     return respondWithSignedDownload(storage, row);
+  }
+
+  const access = await portalAccess(ctx);
+
+  if (!isPortalReadable(access.level)) {
+    redirect(PORTAL_UNAVAILABLE_PATH);
   }
 
   const row = await tenantDb(ctx).findFirst(deliverables, {

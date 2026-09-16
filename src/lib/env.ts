@@ -92,6 +92,18 @@ const serverEnvSchema = z.object({
   E2E_CLERK_USER_PASSWORD: z.string().min(1).optional(),
 
   /**
+   * Feature 15, the client portal (spec 0014). A second dedicated user in the
+   * Clerk development instance, this one with no agency membership, so the
+   * browser suite has a documented way to walk the contact path. Never read
+   * by the application itself; `scripts/db-seed.ts` writes the id onto the
+   * seeded contact so her accepted row binds to this real account, and the
+   * suite skips when any of the three is unset, exactly as the staff one does.
+   */
+  E2E_CLERK_CONTACT_USERNAME: z.string().min(1).optional(),
+  E2E_CLERK_CONTACT_PASSWORD: z.string().min(1).optional(),
+  E2E_CLERK_CONTACT_USER_ID: z.string().min(1).optional(),
+
+  /**
    * Development only. A database host besides `localhost` that `pnpm db:seed`
    * may write to. Unset, the seed refuses every remote host.
    */

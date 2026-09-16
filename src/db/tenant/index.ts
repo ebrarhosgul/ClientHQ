@@ -117,6 +117,16 @@ export {
   type TenantTableKey,
 } from "./tables";
 
+/**
+ * Feature 15's switcher door (spec 0014, AC-11). The second place, alongside
+ * `context.ts`'s own fallback read, that reads `client_contacts` across
+ * organizations; narrower than `withSystemAccess`, so exported here.
+ */
+export {
+  listAcceptedContactRows,
+  type AcceptedContactRow,
+} from "./contact-rows";
+
 export { unsafeTenantQuery } from "./unsafe";
 
 /**

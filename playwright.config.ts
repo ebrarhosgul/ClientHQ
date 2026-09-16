@@ -1,5 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { loadEnvFiles } from "./src/lib/load-env-files";
+
+// Playwright's own Node process never reads `.env`/`.env.local` on its own,
+// unlike `next dev`, which loads them itself once spawned below. Without this,
+// `hasPortalContactCredentials` could never see a value that lives only in a
+// dotenv file, exactly the shape `E2E_CLERK_CONTACT_*` and the Clerk keys are
+// kept in (`drizzle.config.ts` and every script under `scripts/` load the same
+// way, for the same reason).
+loadEnvFiles();
+
 const PORT = 3100;
 // localhost, not 127.0.0.1: `next dev` treats the raw IP as a cross origin host
 // and blocks its own hot reload socket, which surfaces as a console error that
@@ -16,6 +26,29 @@ function definedEnv(): Record<string, string> {
     ),
   );
 }
+
+/**
+ * A second, dedicated dev server and project for `e2e/portal-contact.spec.ts`
+ * (spec 0014, AC-16), the one suite that has to sign in for real.
+ *
+ * The default server below blanks the Clerk keys on purpose, so every other
+ * spec runs signed out; sharing it with a suite that needs a genuine session
+ * would mean choosing one behaviour and breaking the other. This server keeps
+ * whatever Clerk keys the runner actually has, on its own port, and only
+ * exists at all when the three `E2E_CLERK_CONTACT_*` variables and both Clerk
+ * keys are present, so an ordinary run (no credentials, exactly CI's browser
+ * job today) never pays for a second `next dev` it will not use.
+ */
+const PORTAL_CONTACT_PORT = 3101;
+const portalContactBaseURL = `http://localhost:${PORTAL_CONTACT_PORT}`;
+
+const hasPortalContactCredentials = Boolean(
+  process.env.CLERK_SECRET_KEY &&
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+  process.env.E2E_CLERK_CONTACT_USERNAME &&
+  process.env.E2E_CLERK_CONTACT_PASSWORD &&
+  process.env.E2E_CLERK_CONTACT_USER_ID,
+);
 
 /**
  * End to end tests, run against the real application.
@@ -47,49 +80,88 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    // `corepack pnpm`, not bare `pnpm`: some environments (sandboxes, fresh
-    // machines before `corepack enable` has run) only resolve pnpm through
-    // corepack, and `next dev` doesn't care which one launched it.
-    command: `corepack pnpm dev --port ${PORT}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    /**
-     * No Clerk credentials and no R2 credentials, deliberately, so a local
-     * run behaves exactly like CI's browser job, which has none of either.
-     *
-     * Spec 0005 narrowed `src/proxy.ts` to require a session on everything
-     * outside a short public list, and without a publishable key that proxy is a
-     * pass through (see `src/lib/env.ts`). That is what keeps `/dashboard`,
-     * `/design` and the rest reachable here. With the keys a developer has in
-     * their own `.env`, every one of those routes would redirect to `/sign-in`
-     * and the suite would go red on their machine and stay green on CI, which is
-     * the worst of both.
-     *
-     * The same goes for the four `R2_*` variables: `e2e/deliverables.spec.ts`
-     * asserts the download route's storage not configured branch, which
-     * only trips when `isR2Configured()` is false. A developer's own `.env`
-     * has real R2 credentials, so without this blank the suite is red only on
-     * their machine, same failure mode as the Clerk keys above.
-     *
-     * Blanking rather than removing: `next dev` reads `.env` itself, and its
-     * loader leaves a variable already present in the environment alone.
-     *
-     * Signing the suite in properly, with Clerk testing tokens and the
-     * `E2E_CLERK_USER_*` pair, is specified in spec 0005 and belongs to `/test`.
-     */
-    env: {
-      // Spread, because Playwright *replaces* the environment rather than
-      // merging into it, and the command needs PATH to find pnpm at all.
-      ...definedEnv(),
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
-      CLERK_SECRET_KEY: "",
-      R2_ACCOUNT_ID: "",
-      R2_ACCESS_KEY_ID: "",
-      R2_SECRET_ACCESS_KEY: "",
-      R2_BUCKET: "",
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /portal-contact\.spec\.ts/,
     },
-  },
+    ...(hasPortalContactCredentials
+      ? [
+          {
+            name: "portal-contact",
+            testMatch: /portal-contact\.spec\.ts/,
+            use: {
+              ...devices["Desktop Chrome"],
+              baseURL: portalContactBaseURL,
+            },
+          },
+        ]
+      : []),
+  ],
+  webServer: [
+    {
+      // `corepack pnpm`, not bare `pnpm`: some environments (sandboxes, fresh
+      // machines before `corepack enable` has run) only resolve pnpm through
+      // corepack, and `next dev` doesn't care which one launched it.
+      command: `corepack pnpm dev --port ${PORT}`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      /**
+       * No Clerk credentials and no R2 credentials, deliberately, so a local
+       * run behaves exactly like CI's browser job, which has none of either.
+       *
+       * Spec 0005 narrowed `src/proxy.ts` to require a session on everything
+       * outside a short public list, and without a publishable key that proxy is a
+       * pass through (see `src/lib/env.ts`). That is what keeps `/dashboard`,
+       * `/design` and the rest reachable here. With the keys a developer has in
+       * their own `.env`, every one of those routes would redirect to `/sign-in`
+       * and the suite would go red on their machine and stay green on CI, which is
+       * the worst of both.
+       *
+       * The same goes for the four `R2_*` variables: `e2e/deliverables.spec.ts`
+       * asserts the download route's storage not configured branch, which
+       * only trips when `isR2Configured()` is false. A developer's own `.env`
+       * has real R2 credentials, so without this blank the suite is red only on
+       * their machine, same failure mode as the Clerk keys above.
+       *
+       * Blanking rather than removing: `next dev` reads `.env` itself, and its
+       * loader leaves a variable already present in the environment alone.
+       *
+       * Signing the staff suite in properly is specified in spec 0005 and
+       * belongs to `/test`; the client portal's own signed in suite runs
+       * against the second server below instead of this one.
+       */
+      env: {
+        // Spread, because Playwright *replaces* the environment rather than
+        // merging into it, and the command needs PATH to find pnpm at all.
+        ...definedEnv(),
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
+        CLERK_SECRET_KEY: "",
+        R2_ACCOUNT_ID: "",
+        R2_ACCESS_KEY_ID: "",
+        R2_SECRET_ACCESS_KEY: "",
+        R2_BUCKET: "",
+      },
+    },
+    ...(hasPortalContactCredentials
+      ? [
+          {
+            command: `corepack pnpm dev --port ${PORTAL_CONTACT_PORT}`,
+            url: portalContactBaseURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+            env: {
+              // The real Clerk keys pass through unchanged, on purpose: this
+              // is the one server that has to be signed in for real.
+              ...definedEnv(),
+              // Its own build directory: `next dev` refuses a second instance
+              // sharing the default server's `.next` (see `next.config.ts`).
+              NEXT_DIST_DIR: ".next-portal-contact",
+            },
+          },
+        ]
+      : []),
+  ],
 });

@@ -132,6 +132,11 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
 
+    // The client portal's own signed in Playwright suite (spec 0014) runs a
+    // second `next dev` with its own build directory (`next.config.ts`,
+    // `playwright.config.ts`), so it never shares a lock with the one above.
+    ".next-portal-contact/**",
+
     // Vendored agent skills and generated artefacts. These are third party
     // sources and generated SQL, not code this project holds to its own rules.
     ".agents/**",

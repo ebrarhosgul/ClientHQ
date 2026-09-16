@@ -414,6 +414,8 @@ describe.each(THEMES)("in the %s theme", (theme) => {
           invoice={detail("overdue")}
           agencyName="Acme Agency"
           todayUtc="2026-09-15"
+          pdfHref="/invoices/inv/pdf"
+          clientHref="/clients/c1"
         />
         <InvoiceEventsList events={EVENTS} />
         <InvoiceEventsList events={[]} />
