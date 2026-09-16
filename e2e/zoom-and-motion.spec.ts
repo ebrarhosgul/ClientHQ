@@ -112,7 +112,12 @@ test.describe("reduced motion", () => {
 
     // A still grey block still reads as "not here yet", so switching the pulse
     // off costs nothing. What announces the state is the region, in words.
-    const region = page.getByRole("status").first();
+    //
+    // Filtered on `aria-busy` rather than plain `.first()`: the gallery has
+    // more than one `status` region now (the invoice totals block is
+    // another), and `aria-busy="true"` is what actually marks this one as
+    // the loading region, not its position in the page.
+    const region = page.locator('[role="status"][aria-busy="true"]').first();
     await expect(region).toBeAttached();
     await expect(region).toContainText("Loading invoices");
   });
