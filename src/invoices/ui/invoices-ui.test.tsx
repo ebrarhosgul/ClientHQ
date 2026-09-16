@@ -142,7 +142,17 @@ function detail(status: InvoiceStatus): InvoiceDetail {
     notes: "Net 30.",
     createdAt: NOW,
     updatedAt: NOW,
-    client: { id: "c1", name: "Northwind", archivedAt: null },
+    client: {
+      id: "c1",
+      name: "Northwind",
+      archivedAt: null,
+      billingAddressLine1: "1 Market St",
+      billingAddressLine2: null,
+      billingCity: "San Francisco",
+      billingRegion: "CA",
+      billingPostalCode: "94105",
+      billingCountry: "US",
+    },
     lines: LINES,
     events: EVENTS,
   };
@@ -400,7 +410,11 @@ describe.each(THEMES)("in the %s theme", (theme) => {
           reason="failed: b@y.test (mailbox full)"
           canResend
         />
-        <InvoiceDocument invoice={detail("overdue")} />
+        <InvoiceDocument
+          invoice={detail("overdue")}
+          agencyName="Acme Agency"
+          todayUtc="2026-09-15"
+        />
         <InvoiceEventsList events={EVENTS} />
         <InvoiceEventsList events={[]} />
       </>,

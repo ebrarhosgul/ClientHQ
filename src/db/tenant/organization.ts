@@ -16,7 +16,7 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { organizations } from "../schema";
-import type { StaffContext } from "./context";
+import type { StaffContext, TenantContext } from "./context";
 import { pooledDb, type Executor, type TransactionExecutor } from "./executor";
 
 /** An agency as its own staff see it. */
@@ -32,9 +32,13 @@ export type AgencyProfile = {
  *
  * `deleted_at is null` matches staff resolution (AC-14), so a deleted agency
  * cannot be read back here after resolution has already stopped returning it.
+ *
+ * Takes either context kind (spec 0013): a client contact's invoice PDF needs
+ * the agency's name too, and both context kinds carry the same `orgId`, which
+ * is all this reads. The first tenant layer door a contact context can call.
  */
 export async function agencyProfile(
-  ctx: StaffContext,
+  ctx: TenantContext,
   executor?: Executor,
 ): Promise<AgencyProfile | undefined> {
   const db = executor ?? (await pooledDb());

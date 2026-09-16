@@ -265,15 +265,15 @@ A downloadable file the client can save and forward to their own accountant. New
 - [x] Design it (spec): `/architect invoice PDF`
 - [ ] Build it: `/develop invoice PDF`
   - [ ] The thin thread: `@react-pdf/renderer`, the bundled Inter fonts, the `next.config.ts` entries, the ESLint import boundary, a minimal `presentInvoice` and PDF document, the staff route and a Download PDF link, proven by a real download from a Vercel preview deployment · AC-1, AC-8
-  - [ ] The contact thread: `agencyProfile` widened to either context, `getInvoiceDocument` scoped by the contact predicates and `CLIENT_VISIBLE_STATUSES`, the `/portal/invoices/[id]/pdf` route, tenant resolution errors as 404, cross tenant database tests · AC-2, AC-7
-  - [ ] Content and screen parity: the full presentation (status, past due, paid on, bill to address, tax label, notes, generated line, title), the screen reading from it with the address block and the link only for PDF statuses, unit tests · AC-3, AC-4
-  - [ ] Layout and failure: A4 with 40 point margins, the repeated header row, unsplit rows, hyphenation off, metadata, the 100 line non ASCII render test, the 500 page with its link and the JSON log line, route tests · AC-5, AC-6, AC-9
+  - [x] The contact thread: `agencyProfile` widened to either context, `getInvoiceDocument` scoped by the contact predicates and `CLIENT_VISIBLE_STATUSES`, the `/portal/invoices/[id]/pdf` route, tenant resolution errors as 404, cross tenant database tests · AC-2, AC-7
+  - [x] Content and screen parity: the full presentation (status, past due, paid on, bill to address, tax label, notes, generated line, title), the screen reading from it with the address block and the link only for PDF statuses, unit tests · AC-3, AC-4
+  - [x] Layout and failure: A4 with 40 point margins, the repeated header row, unsplit rows, hyphenation off, metadata, the 100 line non ASCII render test, the 500 page with its link and the JSON log line, route tests · AC-5, AC-6, AC-9
   - [ ] Accessibility and proof: axe over the detail page and the error pages in both themes, the browser download test, the design gallery entries · AC-9, AC-4
 - [ ] Verify it: `/check verify invoice PDF`
 - [ ] Test it: `/test invoice PDF`
 - [ ] Review it (fresh model): `/check review invoice PDF`
 - [ ] Document it: `/document invoice PDF`
-Spec [0013](../specs/0013-invoice-pdf/index.md) · atomic build tasks in its `## Build plan`
+Spec [0013](../specs/0013-invoice-pdf/index.md) · atomic build tasks in its `## Build plan` · code in `src/invoices/presentation.ts`, `src/invoices/pdf/`, `src/invoices/queries.ts`, `src/invoices/ui/invoice-document.tsx`, `src/invoices/ui/invoice-totals.tsx`, `src/app/invoices/[id]/pdf/`, `src/app/portal/invoices/[id]/pdf/`, `src/db/tenant/organization.ts`, `src/deliverables/download-error-page.ts`, `next.config.ts`, `eslint.config.mjs`
 
 ## Slice 7: Client portal
 

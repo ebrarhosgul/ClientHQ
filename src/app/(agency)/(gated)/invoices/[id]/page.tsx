@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { agencyContext } from "@/auth/context";
 import { listClientOptions, type ClientOption } from "@/clients/queries";
+import { agencyProfile } from "@/db/tenant";
 import {
   contactsToNotify,
   getInvoice,
@@ -101,7 +102,10 @@ export default async function InvoiceDetailPage({
   const today = todayUtc();
   const draft = invoice.status === "draft";
   const pastDue = isPastDue(invoice.status, invoice.dueDate, today);
-  const contacts = await contactsToNotify(ctx, invoice.client.id);
+  const [contacts, agency] = await Promise.all([
+    contactsToNotify(ctx, invoice.client.id),
+    agencyProfile(ctx),
+  ]);
   const latest = latestNotification(invoice.events);
 
   // The header form lists the agency's active clients, plus the draft's own
@@ -208,7 +212,11 @@ export default async function InvoiceDetailPage({
           </Section>
         </>
       ) : (
-        <InvoiceDocument invoice={invoice} />
+        <InvoiceDocument
+          invoice={invoice}
+          agencyName={agency?.name ?? ""}
+          todayUtc={today}
+        />
       )}
 
       <Section

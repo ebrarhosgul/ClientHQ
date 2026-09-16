@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   isClerkConfigured: vi.fn(),
   agencyContext: vi.fn(),
+  agencyProfile: vi.fn(),
   getInvoice: vi.fn(),
   contactsToNotify: vi.fn(),
   listClientOptions: vi.fn(),
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
 vi.mock("@/auth/context", () => ({ agencyContext: mocks.agencyContext }));
+vi.mock("@/db/tenant", () => ({ agencyProfile: mocks.agencyProfile }));
 vi.mock("@/clients/queries", () => ({
   listClientOptions: mocks.listClientOptions,
 }));
@@ -109,6 +111,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.agencyContext.mockResolvedValue({ orgId: "org-1" });
+  mocks.agencyProfile.mockResolvedValue({
+    id: "org-1",
+    name: "Acme Agency",
+    slug: "acme",
+    defaultCurrency: "USD",
+  });
   mocks.contactsToNotify.mockResolvedValue([]);
   mocks.listClientOptions.mockResolvedValue([
     { id: "client-1", name: "Northwind Coffee" },

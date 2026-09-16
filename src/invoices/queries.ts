@@ -16,11 +16,12 @@ import {
   invoices,
   type InvoiceStatus,
 } from "@/db/schema";
-import { tenantDb, type StaffContext } from "@/db/tenant";
+import { tenantDb, type StaffContext, type TenantContext } from "@/db/tenant";
+import type { BillingAddressClient } from "@/invoices/presentation";
 
 import type { InvoiceRow, LineItemRow } from "./draft";
 import { invoiceId as invoiceIdSchema } from "./schema";
-import { isPastDue } from "./status";
+import { isClientVisible, isPastDue, type ClientVisibleStatus } from "./status";
 
 export const INVOICES_PAGE_SIZE = 25;
 
@@ -194,7 +195,7 @@ export type InvoiceDetail = InvoiceRow & {
     readonly id: string;
     readonly name: string;
     readonly archivedAt: Date | null;
-  };
+  } & BillingAddressClient;
   readonly lines: readonly LineItemRow[];
   /** Newest first. */
   readonly events: readonly InvoiceEventRow[];
@@ -217,7 +218,19 @@ export async function getInvoice(
   const row = await tenantDb(ctx).findFirst(invoices, {
     where: eq(invoices.id, parsed.data),
     with: {
-      client: { columns: { id: true, name: true, archivedAt: true } },
+      client: {
+        columns: {
+          id: true,
+          name: true,
+          archivedAt: true,
+          billingAddressLine1: true,
+          billingAddressLine2: true,
+          billingCity: true,
+          billingRegion: true,
+          billingPostalCode: true,
+          billingCountry: true,
+        },
+      },
       lineItems: {
         orderBy: [asc(invoiceLineItems.position), asc(invoiceLineItems.id)],
       },
@@ -243,6 +256,110 @@ export async function getInvoice(
       actorName: actor === null ? "System" : (actor.name ?? actor.email),
     })),
   };
+}
+
+export type InvoiceDocumentRow = {
+  readonly number: number;
+  readonly status: ClientVisibleStatus;
+  readonly issueDate: string | null;
+  readonly dueDate: string | null;
+  readonly currency: string;
+  readonly taxRateBp: number;
+  readonly subtotalCents: number;
+  readonly taxCents: number;
+  readonly totalCents: number;
+  readonly notes: string | null;
+  readonly paidAt: Date | null;
+  readonly client: { readonly name: string } & BillingAddressClient;
+  readonly lines: readonly LineItemRow[];
+};
+
+/**
+ * The invoice, its client's billing address and its lines, for staff and
+ * client contacts alike, and only when a PDF exists for this status (spec
+ * 0013, AC-1, AC-2, AC-7): `undefined` for a non uuid, for a row the tenant
+ * predicates hide (another agency's, or another client's contact), and for a
+ * status `isClientVisible` refuses. That one function is the whole "has a
+ * PDF" rule; there is no second status list here.
+ */
+export async function getInvoiceDocument(
+  ctx: TenantContext,
+  id: string,
+): Promise<InvoiceDocumentRow | undefined> {
+  const parsed = invoiceIdSchema.safeParse(id);
+
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  // `ctx` stays a `TenantContext` union, so `tenantDb(ctx)` resolves to
+  // `TenantAccessor` (`StaffAccessor | ContactAccessor`): TypeScript cannot
+  // call a generic method across a union of differently constrained
+  // overloads. Branching on `ctx.kind` narrows each call to one accessor, the
+  // same reason `src/app/deliverables/[id]/download/route.ts` never queries
+  // through an unnarrowed context either. The `with` config is inlined
+  // (rather than a shared variable) in both branches, identically, because a
+  // variable's type loses the column literal precision `BuildQueryResult`
+  // needs to know which relation columns were selected.
+  const row =
+    ctx.kind === "staff"
+      ? await tenantDb(ctx).findFirst(invoices, {
+          where: eq(invoices.id, parsed.data),
+          with: {
+            client: {
+              columns: {
+                name: true,
+                billingAddressLine1: true,
+                billingAddressLine2: true,
+                billingCity: true,
+                billingRegion: true,
+                billingPostalCode: true,
+                billingCountry: true,
+              },
+            },
+            lineItems: {
+              orderBy: [
+                asc(invoiceLineItems.position),
+                asc(invoiceLineItems.id),
+              ],
+            },
+          },
+        })
+      : await tenantDb(ctx).findFirst(invoices, {
+          where: eq(invoices.id, parsed.data),
+          with: {
+            client: {
+              columns: {
+                name: true,
+                billingAddressLine1: true,
+                billingAddressLine2: true,
+                billingCity: true,
+                billingRegion: true,
+                billingPostalCode: true,
+                billingCountry: true,
+              },
+            },
+            lineItems: {
+              orderBy: [
+                asc(invoiceLineItems.position),
+                asc(invoiceLineItems.id),
+              ],
+            },
+          },
+        });
+
+  if (row === undefined || !isClientVisible(row.status)) {
+    return undefined;
+  }
+
+  if (row.number === null) {
+    // Unreachable: every client visible status was assigned a number on issue.
+    throw new Error(`invoice ${row.id} is ${row.status} with no number`);
+  }
+
+  const { client, lineItems, status, number, ...rest } = row;
+
+  return { ...rest, status, number, client, lines: lineItems };
 }
 
 /** The most recent notification attempt, by the same order the cooldown reads. */

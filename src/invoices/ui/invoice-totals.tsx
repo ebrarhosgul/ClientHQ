@@ -1,3 +1,4 @@
+import { formatTaxLabel, formatTaxRate } from "@/invoices/presentation";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/ui/lib/cn";
 
@@ -10,17 +11,8 @@ export type InvoiceTotalsProps = {
   readonly className?: string;
 };
 
-/** `725` basis points as `7.25%`, with no trailing zeros past the point. */
-export function formatTaxRate(taxRateBp: number): string {
-  const whole = Math.floor(taxRateBp / 100);
-  const fraction = taxRateBp % 100;
-
-  if (fraction === 0) {
-    return `${whole}%`;
-  }
-
-  return `${whole}.${String(fraction).padStart(2, "0").replace(/0$/, "")}%`;
-}
+/** The tax rate input's prefill needs the bare percent; moved to `presentation.ts` (spec 0013). */
+export { formatTaxRate };
 
 /**
  * Subtotal, tax and total, in the invoice's own currency (spec 0012, AC-4).
@@ -48,9 +40,7 @@ export function InvoiceTotals({
       <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-sm tabular-nums">
         <dt className="text-muted-foreground">Subtotal</dt>
         <dd className="text-right">{formatMoney(subtotalCents, currency)}</dd>
-        <dt className="text-muted-foreground">
-          Tax ({formatTaxRate(taxRateBp)})
-        </dt>
+        <dt className="text-muted-foreground">{formatTaxLabel(taxRateBp)}</dt>
         <dd className="text-right">{formatMoney(taxCents, currency)}</dd>
         <dt className="border-t border-border pt-2 text-base font-semibold">
           Total

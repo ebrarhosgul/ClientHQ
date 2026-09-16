@@ -30,6 +30,8 @@ export type DownloadErrorPage = {
   readonly status: number;
   readonly heading: string;
   readonly body: string;
+  /** One anchor under the body paragraph (spec 0013, AC-6). Every existing caller omits it. */
+  readonly link?: { readonly href: string; readonly label: string };
 };
 
 /**
@@ -67,6 +69,7 @@ export function downloadErrorResponse({
   status,
   heading,
   body,
+  link,
 }: DownloadErrorPage): Response {
   const html = `<!doctype html>
 <html lang="en">
@@ -119,12 +122,18 @@ export function downloadErrorResponse({
     font-size: 0.9375rem;
     line-height: 1.5;
   }
+  a {
+    display: inline-block;
+    margin-top: 1rem;
+    color: var(--foreground);
+  }
 </style>
 </head>
 <body>
 <main>
 <h1>${escapeHtml(heading)}</h1>
 <p>${escapeHtml(body)}</p>
+${link === undefined ? "" : `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`}
 </main>
 </body>
 </html>
