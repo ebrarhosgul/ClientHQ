@@ -26,7 +26,8 @@ import {
 } from "@/contacts/ui/fixtures";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
-import type { InvoiceEventRow } from "@/invoices/queries";
+import type { InvoiceDetail, InvoiceEventRow } from "@/invoices/queries";
+import { InvoiceDocument } from "@/invoices/ui/invoice-document";
 import { InvoiceEventsList } from "@/invoices/ui/invoice-events-list";
 import { InvoiceTotals } from "@/invoices/ui/invoice-totals";
 import { PastDueBadge } from "@/invoices/ui/past-due-badge";
@@ -305,6 +306,60 @@ const INVOICE_EVENTS: readonly InvoiceEventRow[] = [
     actorName: "System",
   },
 ];
+
+/**
+ * The frozen document (spec 0013, AC-4): a paid invoice with a billing
+ * address and the Download PDF link, and a voided one with neither.
+ */
+function invoiceDocumentFixture(
+  overrides: Partial<InvoiceDetail> = {},
+): InvoiceDetail {
+  return {
+    id: "gallery-invoice",
+    orgId: "org",
+    clientId: "client-1",
+    number: 41,
+    status: "paid",
+    issueDate: "2026-08-14",
+    dueDate: "2026-09-13",
+    currency: "USD",
+    subtotalCents: 480000,
+    taxRateBp: 725,
+    taxCents: 34800,
+    totalCents: 514800,
+    paidAt: new Date("2026-08-20"),
+    notes: "Thank you for the quick turnaround on this one.",
+    createdAt: new Date("2026-08-14"),
+    updatedAt: new Date("2026-08-20"),
+    client: {
+      id: "client-1",
+      name: "Northwind Coffee",
+      archivedAt: null,
+      billingAddressLine1: "220 Pike St",
+      billingAddressLine2: "Suite 4",
+      billingCity: "Seattle",
+      billingRegion: "WA",
+      billingPostalCode: "98101",
+      billingCountry: "US",
+    },
+    lines: [
+      {
+        id: "gallery-line-1",
+        orgId: "org",
+        invoiceId: "gallery-invoice",
+        description: "Brand refresh, phase 2",
+        quantity: "1.000",
+        unitAmountCents: 480000,
+        amountCents: 480000,
+        position: 1,
+        createdAt: new Date("2026-08-14"),
+        updatedAt: new Date("2026-08-14"),
+      },
+    ],
+    events: [],
+    ...overrides,
+  };
+}
 
 export function Gallery({ prefix }: { readonly prefix: string }) {
   const scoped = (name: string) => `${prefix}-${name}`;
@@ -1247,6 +1302,33 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               <InvoiceEventsList events={INVOICE_EVENTS} />
               <InvoiceEventsList events={[]} />
             </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              frozen document: paid, with the billing address and the Download
+              PDF link (spec 0013, AC-4)
+            </p>
+            <InvoiceDocument
+              invoice={invoiceDocumentFixture()}
+              agencyName="Acme Agency"
+              todayUtc="2026-09-15"
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              frozen document: void, no PDF and no link (spec 0013, AC-4)
+            </p>
+            <InvoiceDocument
+              invoice={invoiceDocumentFixture({
+                status: "void",
+                number: null,
+                paidAt: null,
+              })}
+              agencyName="Acme Agency"
+              todayUtc="2026-09-15"
+            />
           </div>
         </div>
       </Section>

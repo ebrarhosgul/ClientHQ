@@ -94,6 +94,33 @@ const eslintConfig = defineConfig([
     rules: { "no-restricted-imports": "off" },
   },
 
+  // The same shape again (spec 0013): only the PDF renderer module and its
+  // document and fonts talk to `@react-pdf/renderer`. Everything else,
+  // including the two route handlers, reaches it through
+  // `src/invoices/pdf/render.ts`.
+  {
+    name: "clienthq/react-pdf-boundary",
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@react-pdf/*"],
+              message:
+                'Import the PDF renderer from "@/invoices/pdf/render" instead of "@react-pdf/renderer" directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    name: "clienthq/react-pdf-boundary-invoices-pdf",
+    files: ["src/invoices/pdf/**"],
+    rules: { "no-restricted-imports": "off" },
+  },
+
   // Last, so it wins: turns off every ESLint rule that would argue with
   // Prettier about formatting. ESLint judges code, Prettier decides layout.
   prettierCompat,
