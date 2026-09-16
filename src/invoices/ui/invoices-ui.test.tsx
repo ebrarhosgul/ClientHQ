@@ -8,6 +8,7 @@
  * count, links and empty states.
  */
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InvoiceStatus } from "@/db/schema";
@@ -216,6 +217,39 @@ describe("InvoiceActions", () => {
     expect(
       screen.getByRole("button", { name: "Issue invoice" }),
     ).toBeDisabled();
+  });
+
+  it("keeps the typed void reason on screen after a refused submit (AC-9)", async () => {
+    const user = userEvent.setup();
+    mocks.action.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "validation",
+        message: "Fix the highlighted field.",
+        fieldErrors: { reason: ["Use 500 characters or fewer."] },
+      },
+    });
+
+    render(
+      <InvoiceActions
+        invoiceId="inv"
+        status="draft"
+        issueDate={null}
+        lineCount={1}
+        contactCount={1}
+        today="2026-09-15"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Void" }));
+
+    const reason = screen.getByRole("textbox", { name: "Reason" });
+    await user.type(reason, "Created by mistake");
+    await user.click(screen.getByRole("button", { name: "Void invoice" }));
+
+    await screen.findByText("Use 500 characters or fewer.");
+
+    expect(reason).toHaveValue("Created by mistake");
   });
 });
 

@@ -95,17 +95,14 @@ function VoidDialog({ invoiceId, from, onDone }: MoveProps) {
   const [open, setOpen] = useState(false);
 
   const [state, submit] = useActionState<
-    { readonly error?: ActionError },
+    { readonly reason?: string; readonly error?: ActionError },
     FormData
   >(async (_previous, form) => {
-    const result = await voidInvoice({
-      id: invoiceId,
-      from,
-      reason: String(form.get("reason") ?? ""),
-    });
+    const reason = String(form.get("reason") ?? "");
+    const result = await voidInvoice({ id: invoiceId, from, reason });
 
     if (!result.ok && result.error.code === "validation") {
-      return { error: result.error };
+      return { reason, error: result.error };
     }
 
     setOpen(false);
@@ -146,6 +143,7 @@ function VoidDialog({ invoiceId, from, onDone }: MoveProps) {
                 maxLength={500}
                 rows={3}
                 placeholder="Duplicate of INV-0012"
+                defaultValue={state.reason}
               />
             )}
           </Field>

@@ -358,6 +358,31 @@ describe("the dialog", () => {
       );
     },
   );
+
+  it("keeps its content track bounded, so a field-sizing-content child cannot blow it out", async () => {
+    // A bare `grid` on the content box gives its one implicit column an
+    // `auto` track, which grows to fit the widest child instead of
+    // respecting the dialog's own max-width. A `field-sizing-content`
+    // textarea holding one long, unbroken word (spec 0012's void reason,
+    // AC-9) then balloons past the dialog and off screen. `grid-cols-1`
+    // makes that track `minmax(0, 1fr)`, which is what actually clamps it.
+    const user = userEvent.setup();
+
+    render(
+      <Dialog>
+        <DialogTrigger>Open</DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void this invoice?</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(screen.getByRole("dialog").className).toMatch(/\bgrid-cols-1\b/);
+  });
 });
 
 describe("the sheet", () => {
