@@ -109,12 +109,13 @@ const TENANT_SCOPED = TABLES.filter(
   (table) => !NOT_TENANT_SCOPED.includes(nameOf(table)),
 );
 
-describe("the schema defines exactly the eleven tables spec 0002 names", () => {
-  it("has all eleven, and no twelfth nobody wrote down", () => {
+describe("the schema defines exactly the twelve tables the specs name", () => {
+  it("has all twelve (spec 0002's eleven plus spec 0012's invoice_events), and no thirteenth nobody wrote down", () => {
     expect(TABLES.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
       "deliverables",
+      "invoice_events",
       "invoice_line_items",
       "invoices",
       "memberships",
@@ -135,9 +136,11 @@ describe("the schema defines exactly the eleven tables spec 0002 names", () => {
     }
   });
 
-  it("gives every table but the webhook ledger created_at and updated_at, both timestamptz not null", () => {
+  it("gives every table but the webhook ledger and the append only events created_at and updated_at, both timestamptz not null", () => {
     for (const table of TABLES) {
       if (nameOf(table) === "processed_webhook_events") continue;
+      // Spec 0012: rows are never updated, so there is nothing to stamp.
+      if (nameOf(table) === "invoice_events") continue;
 
       for (const name of ["created_at", "updated_at"]) {
         const column = configOf(table).columns.find(
@@ -157,11 +160,12 @@ describe("the schema defines exactly the eleven tables spec 0002 names", () => {
  * and the sweep is over found tables so a table added later cannot skip it.
  */
 describe("AC-2: every tenant scoped table is scoped by org_id", () => {
-  it("covers the eight tables the spec scopes, and only those", () => {
+  it("covers the nine tables the specs scope, and only those", () => {
     expect(TENANT_SCOPED.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
       "deliverables",
+      "invoice_events",
       "invoice_line_items",
       "invoices",
       "memberships",
@@ -245,6 +249,11 @@ describe("AC-6: every foreign key deletes the way the spec says", () => {
     ["invoices", "client_id", "clients", "restrict"],
     ["invoice_line_items", "org_id", "organizations", "restrict"],
     ["invoice_line_items", "invoice_id", "invoices", "cascade"],
+    // Spec 0012: the history goes with its invoice and its organization; the
+    // actor is cleared if that staff member is deleted.
+    ["invoice_events", "org_id", "organizations", "cascade"],
+    ["invoice_events", "invoice_id", "invoices", "cascade"],
+    ["invoice_events", "actor_user_id", "users", "set null"],
   ];
 
   it.each(FOREIGN_KEYS)(
@@ -342,6 +351,10 @@ describe("AC-8: the CHECK constraints exist, by name", () => {
     ["invoice_line_items", "invoice_line_items_quantity_positive_check"],
     ["invoice_line_items", "invoice_line_items_amount_check"],
     ["invoice_line_items", "invoice_line_items_position_check"],
+    ["invoice_events", "invoice_events_kind_check"],
+    ["invoice_events", "invoice_events_from_status_check"],
+    ["invoice_events", "invoice_events_to_status_check"],
+    ["invoice_events", "invoice_events_statuses_by_kind_check"],
     ["processed_webhook_events", "processed_webhook_events_source_check"],
   ];
 

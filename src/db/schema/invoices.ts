@@ -15,6 +15,7 @@ import {
 
 import { clients } from "./clients";
 import { id, orgId, timestamps } from "./helpers";
+import { users } from "./identity";
 
 export const INVOICE_STATUSES = [
   "draft",
@@ -69,6 +70,13 @@ export const invoices = pgTable(
     totalCents: integer("total_cents").notNull().default(0),
     /** Set by hand when staff mark it paid. Present exactly when `paid`. */
     paidAt: timestamp("paid_at", { withTimezone: true, mode: "date" }),
+    /**
+     * Free text printed under the lines: payment terms, a thank you, a
+     * purchase order reference. Trimmed and capped at 5,000 characters by the
+     * application, blank stored as null; editable while `draft`, frozen on
+     * issue (spec 0012).
+     */
+    notes: text("notes"),
     ...timestamps(),
   },
   (t) => [
@@ -161,5 +169,79 @@ export const invoiceLineItems = pgTable(
       sql`${t.amountCents} = round(${t.quantity} * ${t.unitAmountCents})`,
     ),
     check("invoice_line_items_position_check", sql`${t.position} >= 1`),
+  ],
+);
+
+export const INVOICE_EVENT_KINDS = [
+  "issued",
+  "paid",
+  "voided",
+  "overdue",
+  "notified",
+  "notification_failed",
+] as const;
+export type InvoiceEventKind = (typeof INVOICE_EVENT_KINDS)[number];
+
+/**
+ * The permanent record of what happened to an invoice: every status move and
+ * every notification attempt, one row each, never updated and never deleted
+ * (spec 0012, AC-15). This is the audit log spec 0002 deferred, and the source
+ * of the detail page's history.
+ *
+ * The four status kinds carry both `from_status` and `to_status`; the two
+ * notification kinds carry neither. The CHECK below holds the two halves
+ * together by kind, so a row can never claim a move it does not name.
+ *
+ * `overdue` is written by the nightly sweep (feature 18) with no actor; the
+ * other three status kinds always name the staff member who pressed the
+ * button. There is no `updated_at` because nothing here is ever updated.
+ */
+export const invoiceEvents = pgTable(
+  "invoice_events",
+  {
+    id: id(),
+    orgId: orgId("cascade"),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: INVOICE_EVENT_KINDS }).notNull(),
+    fromStatus: text("from_status", { enum: INVOICE_STATUSES }),
+    toStatus: text("to_status", { enum: INVOICE_STATUSES }),
+    /** The acting staff member; null for the sweep, and cleared if they are deleted. */
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * The void reason, the delivered and refused addresses of a notification
+     * attempt, or the reason a send failed.
+     */
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("invoice_events_org_id_invoice_id_created_at_idx").on(
+      t.orgId,
+      t.invoiceId,
+      t.createdAt,
+    ),
+    check(
+      "invoice_events_kind_check",
+      sql`${t.kind} in ('issued', 'paid', 'voided', 'overdue', 'notified', 'notification_failed')`,
+    ),
+    check(
+      "invoice_events_from_status_check",
+      sql`${t.fromStatus} is null or ${t.fromStatus} in ('draft', 'sent', 'paid', 'overdue', 'void')`,
+    ),
+    check(
+      "invoice_events_to_status_check",
+      sql`${t.toStatus} is null or ${t.toStatus} in ('draft', 'sent', 'paid', 'overdue', 'void')`,
+    ),
+    // Status kinds carry both statuses; notification kinds carry neither.
+    check(
+      "invoice_events_statuses_by_kind_check",
+      sql`(${t.kind} in ('issued', 'paid', 'voided', 'overdue') and ${t.fromStatus} is not null and ${t.toStatus} is not null) or (${t.kind} in ('notified', 'notification_failed') and ${t.fromStatus} is null and ${t.toStatus} is null)`,
+    ),
   ],
 );

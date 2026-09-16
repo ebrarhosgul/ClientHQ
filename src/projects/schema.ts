@@ -10,6 +10,7 @@
 import { z } from "zod";
 
 import { PROJECT_STATUSES } from "@/db/schema";
+import { isRealCalendarDay } from "@/lib/dates";
 
 /** `""` (or whitespace only) becomes `undefined`, so a blank field is absent. */
 function blankToUndefined(value: unknown): unknown {
@@ -22,27 +23,6 @@ function optionalText(max: number) {
     blankToUndefined,
     z.string().trim().max(max, `Use ${max} characters or fewer.`).optional(),
   );
-}
-
-/**
- * `YYYY-MM-DD`, and a real calendar day. Matching the pattern is not enough
- * on its own: `2026-02-30` matches it and is not a real day, so the string is
- * round-tripped through `Date.UTC` and compared back to itself (spec 0010,
- * Value sourcing).
- */
-function isRealCalendarDay(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
-
-  if (match === null) {
-    return false;
-  }
-
-  const [, year, month, day] = match;
-  const asDate = new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day)),
-  );
-
-  return asDate.toISOString().slice(0, 10) === value;
 }
 
 const optionalDueDate = z.preprocess(

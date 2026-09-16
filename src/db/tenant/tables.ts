@@ -21,7 +21,7 @@ import { PgTable, QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import * as schema from "../schema";
 import { clientContacts, clients } from "../schema/clients";
-import { invoiceLineItems, invoices } from "../schema/invoices";
+import { invoiceEvents, invoiceLineItems, invoices } from "../schema/invoices";
 import { deliverables, projects } from "../schema/projects";
 import type { ContactContext } from "./context";
 
@@ -121,7 +121,9 @@ const qb = new QueryBuilder();
  *
  * Three shapes and no fourth (spec 0003, "Feature design"). `memberships` and
  * `subscriptions` have no entry, which is what makes them unreachable from a
- * contact context at compile time.
+ * contact context at compile time. `invoiceEvents` joined as the ninth table
+ * in spec 0012, through its invoice, the same sub select shape as the line
+ * items.
  */
 const CLIENT_PREDICATES = {
   clients: (ctx: ContactContext) => eq(clients.id, ctx.clientId),
@@ -155,6 +157,19 @@ const CLIENT_PREDICATES = {
           ),
         ),
     ),
+  invoiceEvents: (ctx: ContactContext) =>
+    inArray(
+      invoiceEvents.invoiceId,
+      qb
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.clientId, ctx.clientId),
+            eq(invoices.orgId, ctx.orgId),
+          ),
+        ),
+    ),
 } as const satisfies Partial<
   Record<TenantTableKey, (ctx: ContactContext) => SQL>
 >;
@@ -163,7 +178,7 @@ const CLIENT_PREDICATES = {
 export type ContactTableKey = keyof typeof CLIENT_PREDICATES;
 
 /**
- * The six tables with a path to a client. A contact accessor is generic over
+ * The seven tables with a path to a client. A contact accessor is generic over
  * this union, so `memberships` and `subscriptions` do not compile.
  */
 export type ContactTable = Schema[ContactTableKey];

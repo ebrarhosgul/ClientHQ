@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 
 import { clientContacts, clients } from "./clients";
 import { memberships, organizations, subscriptions, users } from "./identity";
-import { invoiceLineItems, invoices } from "./invoices";
+import { invoiceEvents, invoiceLineItems, invoices } from "./invoices";
 import { deliverables, projects } from "./projects";
 
 /**
@@ -22,6 +22,7 @@ export const organizationsRelations = relations(
     deliverables: many(deliverables),
     invoices: many(invoices),
     invoiceLineItems: many(invoiceLineItems),
+    invoiceEvents: many(invoiceEvents),
   }),
 );
 
@@ -32,6 +33,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   clientContacts: many(clientContacts, { relationName: "portalLogin" }),
   invitedContacts: many(clientContacts, { relationName: "invitedBy" }),
   uploadedDeliverables: many(deliverables),
+  invoiceEvents: many(invoiceEvents),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
@@ -117,6 +119,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
     references: [clients.id],
   }),
   lineItems: many(invoiceLineItems),
+  events: many(invoiceEvents),
 }));
 
 export const invoiceLineItemsRelations = relations(
@@ -132,3 +135,18 @@ export const invoiceLineItemsRelations = relations(
     }),
   }),
 );
+
+export const invoiceEventsRelations = relations(invoiceEvents, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [invoiceEvents.orgId],
+    references: [organizations.id],
+  }),
+  invoice: one(invoices, {
+    fields: [invoiceEvents.invoiceId],
+    references: [invoices.id],
+  }),
+  actor: one(users, {
+    fields: [invoiceEvents.actorUserId],
+    references: [users.id],
+  }),
+}));

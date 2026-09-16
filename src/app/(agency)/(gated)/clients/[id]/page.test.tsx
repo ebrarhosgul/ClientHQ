@@ -1,14 +1,16 @@
 /**
- * covers: spec 0006 AC-6, AC-8, AC-9, AC-11, spec 0004 AC-22
+ * covers: spec 0006 AC-6, AC-8, AC-9, AC-11, spec 0004 AC-22, spec 0012 AC-13
  *
- * `getClient` and `listProjectsForClient` are mocked (they have their own
- * tests); this file is about which fields `ClientDetailPage` shows, which of
- * the archive/restore buttons it renders, that a missing client -- which
- * includes another agency's id, and every id at all with no Clerk session --
- * resolves not found rather than a permission error or a blank page (AC-11),
- * and that the client's projects are read once for both the Projects section
- * and the archive confirm's count, with a failed read contained to those two
- * (spec 0010, AC-13, AC-14).
+ * `getClient`, `listProjectsForClient` and `listInvoicesForClient` are
+ * mocked (they have their own tests); this file is about which fields
+ * `ClientDetailPage` shows, which of the archive/restore buttons it renders,
+ * that a missing client -- which includes another agency's id, and every id
+ * at all with no Clerk session -- resolves not found rather than a
+ * permission error or a blank page (AC-11), that the client's projects are
+ * read once for both the Projects section and the archive confirm's count,
+ * and that the client's invoices are read for the Invoices section, with a
+ * failed read contained to its own section in both cases (spec 0010, AC-13,
+ * AC-14; spec 0012, AC-13).
  */
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,8 +20,10 @@ const mocks = vi.hoisted(() => ({
   agencyContext: vi.fn(),
   getClient: vi.fn(),
   listProjectsForClient: vi.fn(),
+  listInvoicesForClient: vi.fn(),
   ArchiveClientButton: vi.fn(),
   ProjectsSection: vi.fn(),
+  InvoicesSection: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
@@ -32,6 +36,10 @@ vi.mock("@/projects/queries", async (importActual) => {
   const actual = await importActual<typeof import("@/projects/queries")>();
   return { ...actual, listProjectsForClient: mocks.listProjectsForClient };
 });
+vi.mock("@/invoices/queries", async (importActual) => {
+  const actual = await importActual<typeof import("@/invoices/queries")>();
+  return { ...actual, listInvoicesForClient: mocks.listInvoicesForClient };
+});
 vi.mock("@/clients/ui/archive-client-button", () => ({
   ArchiveClientButton: (props: unknown) => {
     mocks.ArchiveClientButton(props);
@@ -42,7 +50,8 @@ vi.mock("@/clients/ui/restore-client-button", () => ({
   RestoreClientButton: () => <button type="button">Restore</button>,
 }));
 // The Contacts section runs its own scoped query and has its own tests; the
-// Projects section is handed its rows by this page and has its own tests too.
+// Projects and Invoices sections are each handed their rows by this page and
+// have their own tests too.
 vi.mock("@/contacts/ui/contacts-section", () => ({
   ContactsSection: () => <section aria-label="Contacts" />,
 }));
@@ -50,6 +59,12 @@ vi.mock("@/projects/ui/projects-section", () => ({
   ProjectsSection: (props: unknown) => {
     mocks.ProjectsSection(props);
     return <section aria-label="Projects" />;
+  },
+}));
+vi.mock("@/invoices/ui/invoices-section", () => ({
+  InvoicesSection: (props: unknown) => {
+    mocks.InvoicesSection(props);
+    return <section aria-label="Invoices" />;
   },
 }));
 
@@ -85,6 +100,7 @@ beforeEach(() => {
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.agencyContext.mockResolvedValue({ orgId: "org-1" });
   mocks.listProjectsForClient.mockResolvedValue([]);
+  mocks.listInvoicesForClient.mockResolvedValue([]);
 });
 
 describe("ClientDetailPage", () => {
@@ -153,6 +169,7 @@ describe("ClientDetailPage", () => {
     expect(mocks.agencyContext).not.toHaveBeenCalled();
     expect(mocks.getClient).not.toHaveBeenCalled();
     expect(mocks.listProjectsForClient).not.toHaveBeenCalled();
+    expect(mocks.listInvoicesForClient).not.toHaveBeenCalled();
   });
 
   it("reads the client's projects once, for both the section and the archive confirm's count (spec 0010, AC-13, AC-14)", async () => {
@@ -209,5 +226,66 @@ describe("ClientDetailPage", () => {
     await expect(renderPage()).rejects.toThrow(resolutionFailure);
 
     errorSpy.mockRestore();
+  });
+
+  it("reads the client's invoices for the Invoices section (spec 0012, AC-13)", async () => {
+    const invoices = [{ id: "inv-1" }, { id: "inv-2" }];
+    mocks.getClient.mockResolvedValue(ACTIVE_CLIENT);
+    mocks.listInvoicesForClient.mockResolvedValue(invoices);
+
+    await renderPage();
+
+    expect(mocks.listInvoicesForClient).toHaveBeenCalledTimes(1);
+    expect(mocks.listInvoicesForClient).toHaveBeenCalledWith(
+      { orgId: "org-1" },
+      "client-1",
+      expect.any(String),
+    );
+    expect(mocks.InvoicesSection).toHaveBeenCalledWith(
+      expect.objectContaining({ invoices }),
+    );
+  });
+
+  it("contains a failed invoices read: the section gets no rows, the rest of the page renders (spec 0012, AC-13)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getClient.mockResolvedValue(ACTIVE_CLIENT);
+    mocks.listInvoicesForClient.mockRejectedValue(
+      new Error("connection reset"),
+    );
+
+    await renderPage();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Northwind Coffee" }),
+    ).toBeInTheDocument();
+    expect(mocks.InvoicesSection).toHaveBeenCalledWith(
+      expect.objectContaining({ invoices: undefined }),
+    );
+
+    errorSpy.mockRestore();
+  });
+
+  it("lets a tenant resolution failure on the invoices read propagate to the layout (spec 0012, AC-13)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const resolutionFailure = Object.assign(new Error("no session"), {
+      name: "TenantResolutionError",
+    });
+    mocks.getClient.mockResolvedValue(ACTIVE_CLIENT);
+    mocks.listInvoicesForClient.mockRejectedValue(resolutionFailure);
+
+    await expect(renderPage()).rejects.toThrow(resolutionFailure);
+
+    errorSpy.mockRestore();
+  });
+
+  it("reads projects and invoices concurrently, both passed to their own section", async () => {
+    mocks.getClient.mockResolvedValue(ACTIVE_CLIENT);
+    mocks.listProjectsForClient.mockResolvedValue([{ id: "p1" }]);
+    mocks.listInvoicesForClient.mockResolvedValue([{ id: "inv-1" }]);
+
+    await renderPage();
+
+    expect(screen.getByLabelText("Projects")).toBeInTheDocument();
+    expect(screen.getByLabelText("Invoices")).toBeInTheDocument();
   });
 });

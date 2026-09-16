@@ -27,6 +27,7 @@ import {
   clientContacts,
   clients,
   deliverables,
+  invoiceEvents,
   invoiceLineItems,
   invoices,
   memberships,
@@ -113,6 +114,9 @@ type Fixture = {
   readonly lineA1: string;
   readonly lineA2: string;
   readonly lineB1: string;
+  readonly eventA1: string;
+  readonly eventA2: string;
+  readonly eventB1: string;
   readonly clerkOrgA: string;
   readonly clerkStaffA: string;
   readonly clerkContactA: string;
@@ -153,6 +157,9 @@ async function seed(tx: TransactionExecutor): Promise<Fixture> {
     lineA1: newId(),
     lineA2: newId(),
     lineB1: newId(),
+    eventA1: newId(),
+    eventA2: newId(),
+    eventB1: newId(),
     clerkOrgA: `org_${tag}_a`,
     clerkStaffA: `user_${tag}_staff_a`,
     clerkContactA: `user_${tag}_contact_a`,
@@ -337,6 +344,14 @@ async function seed(tx: TransactionExecutor): Promise<Fixture> {
     { id: ids.lineB1, orgId: ids.orgB, invoiceId: ids.invoiceB1, ...line },
   ]);
 
+  const event = { kind: "notified", note: "no contacts to notify" } as const;
+
+  await tx.insert(invoiceEvents).values([
+    { id: ids.eventA1, orgId: ids.orgA, invoiceId: ids.invoiceA1, ...event },
+    { id: ids.eventA2, orgId: ids.orgA, invoiceId: ids.invoiceA2, ...event },
+    { id: ids.eventB1, orgId: ids.orgB, invoiceId: ids.invoiceB1, ...event },
+  ]);
+
   return ids;
 }
 
@@ -383,7 +398,7 @@ function contactOf(fixture: Fixture): ContactContext {
   };
 }
 
-/** The eight tenant scoped tables, with one A row and one B row each. */
+/** The nine tenant scoped tables, with one A row and one B row each. */
 function everyTable(fixture: Fixture): readonly {
   readonly name: string;
   readonly table: TenantTable;
@@ -439,6 +454,12 @@ function everyTable(fixture: Fixture): readonly {
       mine: fixture.lineA1,
       theirs: fixture.lineB1,
     },
+    {
+      name: "invoice_events",
+      table: invoiceEvents,
+      mine: fixture.eventA1,
+      theirs: fixture.eventB1,
+    },
   ];
 }
 
@@ -459,7 +480,7 @@ describe.skipIf(!url)(
   "the tenant scoping layer against real PostgreSQL",
   () => {
     describe("every statement is scoped", () => {
-      it("carries an org_id predicate on all eight tables, read and write", async () => {
+      it("carries an org_id predicate on all nine tables, read and write", async () => {
         await inRollback(async (tx, fixture) => {
           const db = tenantDb(staffOf(fixture, "A"), tx);
 
@@ -660,6 +681,13 @@ describe.skipIf(!url)(
           ).resolves.toBeUndefined();
 
           await expect(
+            db.findById(invoiceEvents, fixture.eventA1),
+          ).resolves.toBeDefined();
+          await expect(
+            db.findById(invoiceEvents, fixture.eventA2),
+          ).resolves.toBeUndefined();
+
+          await expect(
             db.findById(clientContacts, fixture.contactA1),
           ).resolves.toBeDefined();
           await expect(
@@ -686,6 +714,9 @@ describe.skipIf(!url)(
           ).resolves.toBeUndefined();
           await expect(
             db.findById(invoiceLineItems, fixture.lineB1),
+          ).resolves.toBeUndefined();
+          await expect(
+            db.findById(invoiceEvents, fixture.eventB1),
           ).resolves.toBeUndefined();
         });
       });

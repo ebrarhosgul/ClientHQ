@@ -358,6 +358,59 @@ describe("the dialog", () => {
       );
     },
   );
+
+  it("keeps its content track bounded, so a field-sizing-content child cannot blow it out", async () => {
+    // A bare `grid` on the content box gives its one implicit column an
+    // `auto` track, which grows to fit the widest child instead of
+    // respecting the dialog's own max-width. A `field-sizing-content`
+    // textarea holding one long, unbroken word (spec 0012's void reason,
+    // AC-9) then balloons past the dialog and off screen. `grid-cols-1`
+    // makes that track `minmax(0, 1fr)`, which is what actually clamps it.
+    const user = userEvent.setup();
+
+    render(
+      <Dialog>
+        <DialogTrigger>Open</DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void this invoice?</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(screen.getByRole("dialog").className).toMatch(/\bgrid-cols-1\b/);
+  });
+
+  it("caps its own height and scrolls, so a tall field-sizing-content child cannot push its footer off screen", async () => {
+    // Fixing the width overflow above still leaves the height unbounded: a
+    // maximum length void reason (spec 0012 AC-9) wraps onto many lines and
+    // grows the dialog taller than a short viewport, while Radix locks body
+    // scroll behind it. With no max height and no scroll of its own, the
+    // submit button in the footer ends up below the fold with nothing able
+    // to bring it back into view.
+    const user = userEvent.setup();
+
+    render(
+      <Dialog>
+        <DialogTrigger>Open</DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void this invoice?</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(screen.getByRole("dialog").className).toMatch(
+      /\bmax-h-\[calc\(100%-2rem\)\]/,
+    );
+    expect(screen.getByRole("dialog").className).toMatch(/\boverflow-y-auto\b/);
+  });
 });
 
 describe("the sheet", () => {

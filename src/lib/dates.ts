@@ -1,0 +1,50 @@
+/**
+ * What "today" means, in one place.
+ *
+ * No timezone is modelled (spec 0002's deferred item), so every calendar day
+ * the product computes is the server clock's UTC day: a project's overdue
+ * badge (spec 0010), an invoice's issue date, its due date prefill, the paid
+ * date bounds and the past due badge (spec 0012), and feature 18's nightly
+ * sweep. They all read this function so no two of them can disagree about
+ * what day it is. When an agency timezone lands, this is the one function
+ * that changes.
+ */
+
+/** The server clock's UTC calendar day, `YYYY-MM-DD`. */
+export function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * `day` plus `days` calendar days, in UTC, as `YYYY-MM-DD`. Pure: the day is
+ * a parameter so a test can fix it and so a prefill and the check against it
+ * agree on the same "today".
+ */
+export function addDaysUtc(day: string, days: number): string {
+  const [year, month, date] = day.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1, date + days))
+    .toISOString()
+    .slice(0, 10);
+}
+
+/**
+ * `YYYY-MM-DD`, and a real calendar day. Matching the pattern is not enough
+ * on its own: `2026-02-30` matches it and is not a real day, so the string is
+ * round tripped through `Date.UTC` and compared back to itself (spec 0010 and
+ * spec 0012, Value sourcing).
+ */
+export function isRealCalendarDay(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
+
+  if (match === null) {
+    return false;
+  }
+
+  const [, year, month, day] = match;
+  const asDate = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day)),
+  );
+
+  return asDate.toISOString().slice(0, 10) === value;
+}

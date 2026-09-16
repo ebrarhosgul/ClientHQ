@@ -185,6 +185,30 @@ describe("PageHeader", () => {
       screen.getByRole("button", { name: "New invoice" }),
     ).toBeInTheDocument();
   });
+
+  it("lets a multi button actions group shrink instead of overflowing", () => {
+    render(
+      <PageHeader
+        title="INV-0004"
+        actions={
+          <>
+            <Button>Mark paid</Button>
+            <Button>Resend notification</Button>
+            <Button>Void</Button>
+          </>
+        }
+      />,
+    );
+
+    const actionsGroup = screen.getByRole("button", {
+      name: "Mark paid",
+    }).parentElement;
+
+    // A `shrink-0` actions wrapper keeps its max content width even once
+    // `PageHeader`'s own row has wrapped the actions onto their own line,
+    // which is what overflowed the viewport at 320px (spec 0012, AC-17).
+    expect(actionsGroup?.className).not.toMatch(/\bshrink-0\b/);
+  });
 });
 
 describe("DataTable", () => {

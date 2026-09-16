@@ -1,11 +1,17 @@
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  CircleCheck,
   Ellipsis,
   FileText,
   Pencil,
   Plus,
   Search,
+  Send,
   Trash2,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -20,6 +26,10 @@ import {
 } from "@/contacts/ui/fixtures";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
+import type { InvoiceEventRow } from "@/invoices/queries";
+import { InvoiceEventsList } from "@/invoices/ui/invoice-events-list";
+import { InvoiceTotals } from "@/invoices/ui/invoice-totals";
+import { PastDueBadge } from "@/invoices/ui/past-due-badge";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { formatBytes } from "@/deliverables/format";
 import { typeLabel } from "@/deliverables/file-rules";
@@ -79,6 +89,14 @@ import { Progress } from "@/ui/primitives/progress";
 import { Separator } from "@/ui/primitives/separator";
 import { Skeleton, SkeletonRegion } from "@/ui/primitives/skeleton";
 import { Switch } from "@/ui/primitives/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui/primitives/table";
 import { Textarea } from "@/ui/primitives/textarea";
 
 /**
@@ -249,6 +267,45 @@ const INVOICE_COLUMNS: readonly Column<InvoiceRow>[] = [
  * duplicate id silently breaks `htmlFor`, which is the sort of thing a gallery
  * exists to catch rather than to introduce.
  */
+const INVOICE_EVENTS: readonly InvoiceEventRow[] = [
+  {
+    id: "e3",
+    orgId: "org",
+    invoiceId: "inv",
+    kind: "paid",
+    fromStatus: "sent",
+    toStatus: "paid",
+    actorUserId: "u1",
+    note: null,
+    createdAt: new Date("2026-07-28T14:05:00Z"),
+    actorName: "Sarah Chen",
+  },
+  {
+    id: "e2",
+    orgId: "org",
+    invoiceId: "inv",
+    kind: "notified",
+    fromStatus: null,
+    toStatus: null,
+    actorUserId: "u1",
+    note: "delivered: marcus@lumen.example, finance@lumen.example",
+    createdAt: new Date("2026-07-01T10:30:03Z"),
+    actorName: "Sarah Chen",
+  },
+  {
+    id: "e1",
+    orgId: "org",
+    invoiceId: "inv",
+    kind: "overdue",
+    fromStatus: "sent",
+    toStatus: "overdue",
+    actorUserId: null,
+    note: null,
+    createdAt: new Date("2026-06-15T03:00:00Z"),
+    actorName: "System",
+  },
+];
+
 export function Gallery({ prefix }: { readonly prefix: string }) {
   const scoped = (name: string) => `${prefix}-${name}`;
 
@@ -489,6 +546,10 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
         </Row>
         <Row label="overdue badge">
           <OverdueBadge />
+        </Row>
+        <Row label="sent invoice, past its due date (spec 0012, AC-12)">
+          <InvoiceStatusChip status="sent" />
+          <PastDueBadge />
         </Row>
       </Section>
 
@@ -1001,6 +1062,190 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
                   Downloads are unavailable in this environment.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        id={scoped("invoices")}
+        title="Invoices"
+        description="The draft editor's line row and totals block, the frozen document's history, and the three dialogs' triggers (spec 0012). Opening a dialog needs a client component, so only the triggers show here; the confirm, the paid date and the void reason dialogs are exercised on a real draft."
+      >
+        <div className="flex flex-col gap-6">
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              line rows, with every control named after its line
+            </p>
+            <div className="w-full min-w-0 overflow-x-auto rounded-lg border border-border">
+              <Table>
+                <caption className="sr-only">Line items, 2 of 100</caption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col" className="w-px">
+                      #
+                    </TableHead>
+                    <TableHead scope="col">Description</TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Qty
+                    </TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Unit
+                    </TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Amount
+                    </TableHead>
+                    <TableHead scope="col" className="w-px text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[
+                    {
+                      position: 1,
+                      description: "Discovery workshop",
+                      quantity: "1",
+                      unit: 180000,
+                      amount: 180000,
+                    },
+                    {
+                      position: 2,
+                      description: "Design revisions",
+                      quantity: "3.5",
+                      unit: 12500,
+                      amount: 43750,
+                    },
+                  ].map((line, index, lines) => (
+                    <TableRow key={line.position}>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {line.position}
+                      </TableCell>
+                      <TableCell>{line.description}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {line.quantity}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fixtureMoney(line.unit)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {fixtureMoney(line.amount)}
+                      </TableCell>
+                      <TableCell className="w-px">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Move ${line.description} up`}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Move ${line.description} down`}
+                            disabled={index === lines.length - 1}
+                          >
+                            <ArrowDown />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Edit ${line.description}`}
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Remove ${line.description}`}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              totals block, a polite live region
+            </p>
+            <InvoiceTotals
+              subtotalCents={223750}
+              taxRateBp={725}
+              taxCents={16222}
+              totalCents={239972}
+              currency="USD"
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              actions by status: draft · sent or overdue · paid or void
+            </p>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button>
+                  <Send />
+                  Issue invoice
+                </Button>
+                <Button variant="outline">
+                  <Ban />
+                  Void
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button>
+                  <CircleCheck />
+                  Mark paid
+                </Button>
+                <Button variant="outline">
+                  <Send />
+                  Resend notification
+                </Button>
+                <Button variant="outline">
+                  <Ban />
+                  Void
+                </Button>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                No buttons render on paid or void.
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              notification warning
+            </p>
+            <Alert variant="destructive">
+              <TriangleAlert />
+              <AlertTitle>
+                The client may not have been told about this invoice
+              </AlertTitle>
+              <AlertDescription>
+                <p>
+                  The last notification attempt did not reach everyone:
+                  delivered: priya@northwind.example; failed:
+                  devon@northwind.example (mailbox full).
+                </p>
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              history, newest first, then empty
+            </p>
+            <div className="flex flex-col gap-4">
+              <InvoiceEventsList events={INVOICE_EVENTS} />
+              <InvoiceEventsList events={[]} />
             </div>
           </div>
         </div>

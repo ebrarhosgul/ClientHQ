@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import * as schema from "../schema";
 import { clientContacts, clients } from "../schema/clients";
-import { invoiceLineItems, invoices } from "../schema/invoices";
+import { invoiceEvents, invoiceLineItems, invoices } from "../schema/invoices";
 import { deliverables, projects } from "../schema/projects";
 import { memberships, organizations, users } from "../schema/identity";
 import { processedWebhookEvents } from "../schema/webhooks";
@@ -53,11 +53,12 @@ function render(predicate: Parameters<PgDialect["sqlToQuery"]>[0]): {
 }
 
 describe("TENANT_TABLE_KEYS", () => {
-  it("is exactly the eight tables carrying org_id", () => {
+  it("is exactly the nine tables carrying org_id", () => {
     expect([...TENANT_TABLE_KEYS]).toStrictEqual([
       "clientContacts",
       "clients",
       "deliverables",
+      "invoiceEvents",
       "invoiceLineItems",
       "invoices",
       "memberships",
@@ -102,6 +103,7 @@ describe("relationalKey", () => {
     [deliverables, "deliverables"],
     [invoices, "invoices"],
     [invoiceLineItems, "invoiceLineItems"],
+    [invoiceEvents, "invoiceEvents"],
     [memberships, "memberships"],
   ])("maps a table object onto its db.query key", (table, key) => {
     expect(relationalKey(table as TenantTable)).toBe(key);
@@ -144,6 +146,7 @@ describe("orgPredicate", () => {
     [deliverables, "deliverables"],
     [invoices, "invoices"],
     [invoiceLineItems, "invoice_line_items"],
+    [invoiceEvents, "invoice_events"],
     [memberships, "memberships"],
   ])("names the %s table's own org_id column", (table, sqlName) => {
     expect(render(orgPredicate(table as TenantTable, "org-row-1")).sql).toBe(
@@ -160,6 +163,7 @@ describe("isContactTableKey", () => {
     "invoices",
     "deliverables",
     "invoiceLineItems",
+    "invoiceEvents",
   ])("accepts %s, which has a path to a client", (key) => {
     expect(isContactTableKey(key)).toBe(true);
   });
@@ -192,10 +196,10 @@ describe("isContactTableKey", () => {
     },
   );
 
-  it("agrees with the tenant table list: six of the eight are reachable", () => {
+  it("agrees with the tenant table list: seven of the nine are reachable", () => {
     const reachable = TENANT_TABLE_KEYS.filter(isContactTableKey);
 
-    expect(reachable).toHaveLength(6);
+    expect(reachable).toHaveLength(7);
   });
 });
 
@@ -250,10 +254,24 @@ describe("clientPredicate", () => {
     expect(params).toStrictEqual(["client-row-1", "org-row-1"]);
   });
 
+  it("narrows invoice events through their invoice, scoped by client and organization", () => {
+    const { sql, params } = render(clientPredicate("invoiceEvents", contact));
+
+    expect(sql).toContain('"invoice_events"."invoice_id" in');
+    expect(sql).toContain('from "invoices"');
+    expect(sql).toContain('"invoices"."client_id" = $1');
+    expect(sql).toContain('"invoices"."org_id" = $2');
+    expect(params).toStrictEqual(["client-row-1", "org-row-1"]);
+  });
+
   it("carries the organization into the indirect sub selects too, not the client alone", () => {
     // Without the org_id in the sub select, a project id belonging to another
     // organization that happened to carry the same client id would qualify.
-    for (const key of ["deliverables", "invoiceLineItems"] as const) {
+    for (const key of [
+      "deliverables",
+      "invoiceLineItems",
+      "invoiceEvents",
+    ] as const) {
       expect(render(clientPredicate(key, contact)).params).toContain(
         "org-row-1",
       );
@@ -271,6 +289,7 @@ describe("clientPredicate", () => {
       "invoices",
       "deliverables",
       "invoiceLineItems",
+      "invoiceEvents",
     ] as const satisfies readonly ContactTableKey[]) {
       const { sql, params } = render(clientPredicate(key, forged));
 

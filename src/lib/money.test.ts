@@ -7,11 +7,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MAX_UNIT_AMOUNT_CENTS,
   divideRoundingHalfAwayFromZero,
+  formatMoney,
   invoiceTotals,
   isValidQuantity,
   lineAmountCents,
+  parseMoneyInput,
   parseQuantityThousandths,
+  percentToBasisPoints,
   taxCents,
 } from "./money";
 
@@ -125,5 +129,82 @@ describe("invoiceTotals", () => {
 
   it("refuses a total that does not fit an integer column", () => {
     expect(() => invoiceTotals([2000000000], 10000)).toThrow();
+  });
+});
+
+describe("parseMoneyInput (spec 0012, AC-3)", () => {
+  it.each([
+    ["12.5", 1250],
+    ["12.50", 1250],
+    ["0.07", 7],
+    ["0", 0],
+    [" 1250 ", 125000],
+    ["999999.99", 99999999],
+  ])("parses %s to %d cents without a float", (input, cents) => {
+    expect(parseMoneyInput(input)).toStrictEqual({ ok: true, value: cents });
+  });
+
+  it("parses the classic float trap exactly", () => {
+    // 0.29 * 100 is 28.999999999999996 in floating point.
+    expect(parseMoneyInput("0.29")).toStrictEqual({ ok: true, value: 29 });
+  });
+
+  it.each(["", "1,000", "1.234", "-5", "abc", "1e3", ".5", "5."])(
+    "refuses %s with a message",
+    (input) => {
+      const result = parseMoneyInput(input);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.message).toMatch(/amount/);
+    },
+  );
+
+  it("refuses an amount above the line cap and names the cap", () => {
+    expect(MAX_UNIT_AMOUNT_CENTS).toBe(99_999_999);
+
+    const result = parseMoneyInput("1000000");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("999,999.99");
+  });
+});
+
+describe("percentToBasisPoints (spec 0012, AC-2)", () => {
+  it.each([
+    ["0", 0],
+    ["20", 2000],
+    ["7.25", 725],
+    ["7.2", 720],
+    ["100", 10000],
+    ["100.00", 10000],
+  ])("parses %s percent to %d basis points", (input, bp) => {
+    expect(percentToBasisPoints(input)).toStrictEqual({ ok: true, value: bp });
+  });
+
+  it.each(["7.255", "-1", "abc", "", "20%"])("refuses %s", (input) => {
+    expect(percentToBasisPoints(input).ok).toBe(false);
+  });
+
+  it("refuses anything above 100", () => {
+    expect(percentToBasisPoints("100.01").ok).toBe(false);
+    expect(percentToBasisPoints("101").ok).toBe(false);
+  });
+});
+
+describe("formatMoney (spec 0012, AC-4)", () => {
+  it.each([
+    [123456, "USD", "$1,234.56"],
+    [123456, "EUR", "€1,234.56"],
+    [123456, "GBP", "£1,234.56"],
+    [0, "USD", "$0.00"],
+    [5, "USD", "$0.05"],
+    [-5, "USD", "-$0.05"],
+    [2147483647, "USD", "$21,474,836.47"],
+  ])("formats %d cents in %s as %s", (cents, currency, expected) => {
+    expect(formatMoney(cents, currency)).toBe(expected);
+  });
+
+  it("keeps the spacing a currency code carries", () => {
+    expect(formatMoney(100, "CHF")).toBe("CHF\u00a01.00");
   });
 });

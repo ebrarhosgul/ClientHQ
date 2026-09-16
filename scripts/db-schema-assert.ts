@@ -1,11 +1,12 @@
 /**
- * Prove the applied schema is the one spec 0002 describes, by reading the
+ * Prove the applied schema is the one spec 0002 describes (plus the `notes`
+ * column and `invoice_events` table spec 0012 adds), by reading the
  * PostgreSQL catalogue rather than by eye.
  *
  * CI runs this right after `pnpm db:migrate` against a throwaway container, and
  * you can run it against any database with `pnpm db:schema:assert`. It asserts:
  *
- *   - every one of the eleven tables exists
+ *   - every one of the twelve tables exists
  *   - every tenant scoped table has `org_id uuid not null` and at least one
  *     index whose leading column is `org_id` (AC-2)
  *   - every unique constraint, CHECK constraint and plain index the spec names
@@ -54,6 +55,7 @@ const TABLES: readonly string[] = [
   "deliverables",
   "invoices",
   "invoice_line_items",
+  "invoice_events",
   "processed_webhook_events",
 ];
 
@@ -70,6 +72,7 @@ const TENANT_SCOPED: readonly string[] = [
   "deliverables",
   "invoices",
   "invoice_line_items",
+  "invoice_events",
 ];
 
 const UNIQUE_CONSTRAINTS: Readonly<
@@ -111,6 +114,12 @@ const CHECK_CONSTRAINTS: Readonly<Record<string, readonly string[]>> = {
     "invoice_line_items_amount_check",
     "invoice_line_items_position_check",
   ],
+  invoice_events: [
+    "invoice_events_kind_check",
+    "invoice_events_from_status_check",
+    "invoice_events_to_status_check",
+    "invoice_events_statuses_by_kind_check",
+  ],
   processed_webhook_events: ["processed_webhook_events_source_check"],
 };
 
@@ -141,6 +150,7 @@ const INDEXES: Readonly<Record<string, readonly (readonly string[])[]>> = {
     ["org_id", "status", "due_date"],
   ],
   invoice_line_items: [["org_id", "invoice_id"]],
+  invoice_events: [["org_id", "invoice_id", "created_at"]],
   processed_webhook_events: [["processed_at"]],
 };
 
@@ -247,6 +257,24 @@ const FOREIGN_KEYS: readonly ForeignKey[] = [
     references: "invoices",
     onDelete: "cascade",
   },
+  {
+    table: "invoice_events",
+    column: "org_id",
+    references: "organizations",
+    onDelete: "cascade",
+  },
+  {
+    table: "invoice_events",
+    column: "invoice_id",
+    references: "invoices",
+    onDelete: "cascade",
+  },
+  {
+    table: "invoice_events",
+    column: "actor_user_id",
+    references: "users",
+    onDelete: "set null",
+  },
 ];
 
 /** Types as `format_type()` prints them. */
@@ -260,6 +288,32 @@ const COLUMN_SHAPES: readonly ColumnShape[] = [
   { table: "invoices", column: "number", type: "integer", nullable: true },
   { table: "invoices", column: "issue_date", type: "date", nullable: true },
   { table: "invoices", column: "due_date", type: "date", nullable: true },
+  { table: "invoices", column: "notes", type: "text", nullable: true },
+  { table: "invoice_events", column: "kind", type: "text" },
+  {
+    table: "invoice_events",
+    column: "from_status",
+    type: "text",
+    nullable: true,
+  },
+  {
+    table: "invoice_events",
+    column: "to_status",
+    type: "text",
+    nullable: true,
+  },
+  {
+    table: "invoice_events",
+    column: "actor_user_id",
+    type: "uuid",
+    nullable: true,
+  },
+  { table: "invoice_events", column: "note", type: "text", nullable: true },
+  {
+    table: "invoice_events",
+    column: "created_at",
+    type: "timestamp with time zone",
+  },
   { table: "invoice_line_items", column: "quantity", type: "numeric(12,3)" },
   { table: "invoice_line_items", column: "unit_amount_cents", type: "integer" },
   { table: "invoice_line_items", column: "amount_cents", type: "integer" },

@@ -67,11 +67,8 @@ export function isOverdue(
 }
 
 /**
- * The server clock's UTC calendar day, `YYYY-MM-DD`, what "today" means for
- * `isOverdue`. No timezone column exists (spec 0010, Consequences): feature
- * 18's daily overdue sweep should call this same function so the two notions
- * of "today" never disagree.
+ * What "today" means for `isOverdue`. The function itself moved to
+ * `src/lib/dates.ts` in spec 0012 so projects and invoices share one day
+ * source; re exported here so every existing caller keeps working.
  */
-export function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+export { todayUtc } from "@/lib/dates";

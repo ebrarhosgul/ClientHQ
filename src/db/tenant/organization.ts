@@ -13,11 +13,11 @@
  * the organization is right there in the call, resolved from the Clerk session,
  * never worked out by the query itself.
  */
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { organizations } from "../schema";
 import type { StaffContext } from "./context";
-import { pooledDb, type Executor } from "./executor";
+import { pooledDb, type Executor, type TransactionExecutor } from "./executor";
 
 /** An agency as its own staff see it. */
 export type AgencyProfile = {
@@ -87,4 +87,40 @@ export async function deletedOrganizationClerkIds(
     );
 
   return new Set(rows.map((row) => row.clerkOrgId));
+}
+
+/**
+ * Take the next number from the agency's gapless invoice sequence (spec 0012,
+ * AC-5).
+ *
+ * One statement: `next_invoice_number` is incremented and the value after
+ * the increment comes back, so the number assigned is that value minus one.
+ * The update takes the organization row's lock, which is what serialises two
+ * staff issuing two drafts at the same moment: the second waits, then reads
+ * the counter the first one left. It only ever runs inside the issue
+ * transaction, which is why it takes the transaction rather than the pooled
+ * handle: a refusal later in that transaction rolls the increment back with
+ * it, so the sequence stays gapless.
+ *
+ * `organizations` carries no `org_id`, so `tenantDb()` cannot reach it; like
+ * `agencyProfile`, this is a named door that can only ever touch the caller's
+ * own row.
+ */
+export async function nextInvoiceNumber(
+  ctx: StaffContext,
+  tx: TransactionExecutor,
+): Promise<number> {
+  const [row] = await tx
+    .update(organizations)
+    .set({
+      nextInvoiceNumber: sql`${organizations.nextInvoiceNumber} + 1`,
+    })
+    .where(eq(organizations.id, ctx.orgId))
+    .returning({ next: organizations.nextInvoiceNumber });
+
+  if (row === undefined) {
+    throw new Error("the acting organization has no row to number from");
+  }
+
+  return row.next - 1;
 }
