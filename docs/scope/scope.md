@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Deliverable upload & download | Slice 5 | in-progress |
 | 13 | Invoice authoring & lifecycle | Slice 6 | in-progress |
 | 14 | Invoice PDF | Slice 6 | in-progress |
-| 15 | Client portal | Slice 7 | planned |
+| 15 | Client portal | Slice 7 | in-progress |
 | 16 | Team members & roles | Slice 8 | planned |
 | 17 | Clerk webhook sync | Slice 8 | planned |
 | 18 | Daily cron sweeps | Slice 9 | planned |
@@ -277,10 +277,20 @@ Spec [0013](../specs/0013-invoice-pdf/index.md) · atomic build tasks in its `##
 
 ## Slice 7: Client portal
 
-### 15. Client portal · needs a decision
+### 15. Client portal · in-progress
 The client's own read only view: their projects, the deliverables the agency chose to share, and their invoices. Nothing else is reachable, ever.
 **Done when:** a signed in contact sees only their own client's active projects, only deliverables marked visible and confirmed, and only issued, paid or overdue invoices, with a contact of one client provably unable to reach another client's data, and the whole portal meeting WCAG 2.2 AA.
-- [ ] Design it (spec): `/architect client portal`
+- [x] Design it (spec): `/architect client portal`
+- [ ] Build it: `/develop client portal`
+  - [ ] One thread end to end: the `E2E_CLERK_CONTACT_*` variables and the seed binding (plus the Harbor Lane client and row), `portalAccess` and `portalContext()` with the staff, no contact and unavailable redirects, the `(contact)` route group with the chrome, the overview's Invoices block, the invoice list and the invoice page with its PDF link, a bare unavailable page, both placeholders deleted, and a Playwright walk on the second Clerk user green in CI · AC-1, AC-2, AC-3, AC-4, AC-9, AC-10, AC-16, AC-17
+  - [ ] Projects, files and the overview: the project list, project page and files section with their visibility rules, orders, grouping and paging, database tests under both foreign contexts, then the overview's three capped blocks · AC-5, AC-6, AC-7, AC-8, AC-14
+  - [ ] The switcher and the routes' gate: the `contact-rows.ts` door, `switchContact`, the top bar menu, the gate wired into the download and PDF routes' contact branches, the unavailable page's way back · AC-2, AC-3, AC-11, AC-13
+  - [ ] States, gallery and accessibility: the portal not found page, `error.tsx`, the loading skeletons, the `/design` entries, axe in both themes on every page and state, the keyboard and 320 pixel checks, the tenancy and locked walks in Playwright · AC-12, AC-14, AC-15, AC-16
+- [ ] Verify it: `/check verify client portal`
+- [ ] Test it: `/test client portal`
+- [ ] Review it (fresh model): `/check review client portal`
+- [ ] Document it: `/document client portal`
+Spec [0014](../specs/0014-client-portal/index.md) · atomic build tasks in its `## Build plan`
 
 ## Slice 8: Team & identity sync
 
@@ -330,6 +340,10 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Agency letterhead and locale**: the invoice PDF prints the agency by name only, on A4, with dates in UTC and money in the `en-US` locale, because `organizations` has no address, tax or VAT id, payment instructions, page size or locale columns. An agency settings feature would add those columns, a settings form, and the matching block on the PDF and the screen through `presentInvoice` · from spec 0013 · needs a decision
 - **Invoice PDF attached to the issue email**: spec 0012's notification sends a link to the portal; attaching the PDF means rendering inside the post commit send (and on resend) through Resend's single send endpoint, which supports attachments. Decide once the PDF has been trusted for a while · from spec 0013 · needs a decision
 - **Tagged (accessible) invoice PDF**: `@react-pdf/renderer` sets the title, author and language metadata but produces no tag structure, so a screen reader cannot navigate the file the way it navigates the page. Revisit if a client or a procurement requirement asks for it · from spec 0013 · needs a decision
+- **Staff preview of the client portal**: a `View as client` mode from `/clients/[id]` so staff can see exactly what a contact sees. Needs an impersonation rule in the tenant layer and a persistent banner, so it is its own decision; spec 0014 sends a staff session away from `/portal` instead · from spec 0014 · needs a decision
+- **Contact `last_seen_at`**: a throttled write from the portal so staff can see when a client last visited. Declined in spec 0014 to keep the portal strictly read only; one column and one write when an agency asks · from spec 0014 · needs a decision
+- **Deliverable `shared_at`**: the portal labels a file's date `Added` from `created_at` because flipping visibility records no time. One column set and cleared by `setDeliverableVisibility` would make it an exact `Shared on` · from spec 0014 · needs a decision
+- **Silent client switch on a revoked cookie row**: when the contact cookie names a row that was since removed, the resolver falls back to the person's other row without saying so. Nothing leaks, but a one line notice would stop the surprise · from spec 0014 · needs a decision
 
 ## Legend
 
