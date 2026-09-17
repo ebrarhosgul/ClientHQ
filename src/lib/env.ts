@@ -83,6 +83,17 @@ const serverEnvSchema = z.object({
     .min(1, "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is required"),
 
   /**
+   * Feature 17, the Clerk webhook (spec 0015). The `whsec_...` value of the
+   * Clerk dashboard endpoint (or the local relay's own), used by
+   * `verifyWebhook`. There is no default: the endpoint does not exist until
+   * someone registers it, and this secret is what proves a delivery came from
+   * there.
+   */
+  CLERK_WEBHOOK_SIGNING_SECRET: z
+    .string()
+    .min(1, "CLERK_WEBHOOK_SIGNING_SECRET is required"),
+
+  /**
    * A dedicated user in the Clerk development instance, read only by the
    * browser suite so it has a documented way past the sign in screen. Optional
    * because nothing the application runs needs it, and CI deliberately runs the

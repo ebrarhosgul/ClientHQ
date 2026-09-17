@@ -85,11 +85,24 @@ export {
  */
 export { tenantTransaction, type TenantTransactionScope } from "./transaction";
 
+/**
+ * Feature 17's four extra doors (spec 0015): the organization and membership
+ * halves of the mirror split out on their own, the soft delete and hard
+ * delete the Clerk webhook needs, and the guard error `ensureUserRow` now
+ * throws for a scrubbed row. Same narrower-than-`withSystemAccess` reasoning
+ * as feature 6's two doors above.
+ */
 export {
   createAgencyRows,
+  deleteMembershipRows,
   ensureMirrorRows,
   ensureUserRow,
+  MirrorUserDeleted,
+  softDeleteOrganization,
   suggestedSlug,
+  unbindContactsOfUser,
+  upsertMembershipRow,
+  upsertOrganizationRow,
   type MirrorIds,
   type MirrorOrganization,
   type MirrorUser,

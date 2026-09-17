@@ -78,6 +78,7 @@ describe("the second door stays shut", () => {
     ).filter((file): file is string => file !== undefined);
 
     expect(importers.sort()).toEqual([
+      "src/app/api/webhooks/clerk/route.ts",
       "src/app/api/webhooks/stripe/route.ts",
       "src/db/tenant/system.test.ts",
     ]);

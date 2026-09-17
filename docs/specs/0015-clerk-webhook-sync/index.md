@@ -1,7 +1,7 @@
 # 0015. Clerk webhook sync
 
 **Date**: 2026-09-17
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

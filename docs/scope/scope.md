@@ -304,15 +304,15 @@ Keeping the local mirror of users, organizations and memberships current as they
 **Done when:** each consumed event updates the mirror correctly, a replayed event changes nothing, deletions soft delete rather than destroy, and an event missed during a deploy is recovered without manual intervention.
 - [x] Design it (spec): `/architect Clerk webhook sync`
 - [ ] Build it: `/develop Clerk webhook sync`
-  - [ ] Configuration and one thread end to end on `organization.updated`: `CLERK_WEBHOOK_SIGNING_SECRET`, the Clerk dashboard endpoint with its eight events, the `ClerkGateway` re reads, the route with `withSystemAccess`, the six step handler with the organization upsert only, the log module, proven by renaming an agency through the relay · AC-1, AC-2, AC-3, AC-4, AC-5, AC-12, AC-13, AC-14, AC-15, AC-16
-  - [ ] Deletions: the organization soft delete with its membership removal and subscription status log line, the contact resolution fence for a deleted agency, and the user delete path (scrub, memberships, contact unbind) with the `ensureUserRow` guard · AC-6, AC-7, AC-8, AC-9
-  - [ ] Memberships: the upsert that creates missing organization and user rows from re reads, the `org_deleted` and `user_deleted` refusals, and the membership delete · AC-10, AC-11
-  - [ ] Proof: the fake gateway unit suite, the real PostgreSQL suite for ledger and rollback, cascades and concurrency, and the relay walk of all eight events in `verify.md` · AC-3, AC-4, AC-12, AC-13, AC-16
+  - [x] Configuration and one thread end to end on `organization.updated`: `CLERK_WEBHOOK_SIGNING_SECRET`, the `ClerkGateway` re reads, the route with `withSystemAccess`, the six step handler with the organization upsert only, the log module · AC-1, AC-2, AC-3, AC-4, AC-5, AC-12, AC-13, AC-14, AC-15, AC-16
+  - [x] Deletions: the organization soft delete with its membership removal and subscription status log line, the contact resolution fence for a deleted agency, and the user delete path (scrub, memberships, contact unbind) with the `ensureUserRow` guard · AC-6, AC-7, AC-8, AC-9
+  - [x] Memberships: the upsert that creates missing organization and user rows from re reads, the `org_deleted` and `user_deleted` refusals, and the membership delete · AC-10, AC-11
+  - [ ] Proof: real PostgreSQL suite done (`src/auth/webhook.db.test.ts`, `provisioning.db.test.ts`, `context.db.test.ts`), a separate fake-gateway-only unit file skipped by design (see code review notes); still owed: the Clerk dashboard endpoint, a real delivery through the relay for each of the eight events, and recording that walk in `verify.md` · AC-3, AC-4, AC-12, AC-13, AC-16
 - [ ] Verify it: `/check verify Clerk webhook sync`
 - [ ] Test it: `/test Clerk webhook sync`
 - [ ] Review it (fresh model): `/check review Clerk webhook sync`
 - [ ] Document it: `/document Clerk webhook sync`
-Spec [0015](../specs/0015-clerk-webhook-sync/index.md) · atomic build tasks in its `## Build plan`
+Spec [0015](../specs/0015-clerk-webhook-sync/index.md) · atomic build tasks in its `## Build plan` · code in `src/auth/webhook.ts`, `src/auth/webhook-events.ts`, `src/auth/webhook-log.ts`, `src/auth/clerk.ts`, `src/app/api/webhooks/clerk/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`
 
 ## Slice 9: Operations & release readiness
 

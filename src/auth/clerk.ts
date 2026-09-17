@@ -222,3 +222,68 @@ export async function createClerkOrganization(input: {
     return { clerkOrgId: organization.id };
   }
 }
+
+/** Present with the value the mirror needs, or gone. Nothing in between. */
+export type ClerkPresence<T> =
+  { readonly present: true; readonly value: T } | { readonly present: false };
+
+/**
+ * The three Clerk calls the webhook handler makes, and nothing more (spec
+ * 0015).
+ *
+ * Narrowed to an interface rather than the SDK client, exactly like
+ * `StripeGateway` in `src/payments/webhook.ts`, so verification order, replay
+ * and refusal behaviour can be tested against a fake with no network, no
+ * Clerk key and no account. Each call answers present or gone; a 404 is the
+ * only Clerk failure this mirror treats as "gone", everything else throws.
+ */
+export type ClerkGateway = {
+  readonly getUser: (clerkUserId: string) => Promise<ClerkPresence<MirrorUser>>;
+  readonly getOrganization: (
+    clerkOrgId: string,
+  ) => Promise<ClerkPresence<MirrorOrganization>>;
+  readonly getOrganizationMembership: (input: {
+    readonly clerkOrgId: string;
+    readonly clerkUserId: string;
+  }) => Promise<ClerkPresence<{ readonly role: string }>>;
+};
+
+/** Turn a `not_found` `Result` into `ClerkPresence`. Anything else rethrows. */
+function toPresence<T>(result: Result<T>): ClerkPresence<T> {
+  return result.ok ? { present: true, value: result.data } : { present: false };
+}
+
+/** The real Clerk calls behind `ClerkGateway`, built on the live account. */
+export function liveClerkGateway(): ClerkGateway {
+  return {
+    getUser: async (clerkUserId) => toPresence(await clerkUser(clerkUserId)),
+
+    getOrganization: async (clerkOrgId) =>
+      toPresence(await clerkOrganization(clerkOrgId)),
+
+    getOrganizationMembership: async ({ clerkOrgId, clerkUserId }) => {
+      const clerk = await clerkClient();
+
+      try {
+        const { data } =
+          await clerk.organizations.getOrganizationMembershipList({
+            organizationId: clerkOrgId,
+            userId: [clerkUserId],
+            limit: 1,
+          });
+
+        const [membership] = data;
+
+        return membership === undefined
+          ? { present: false }
+          : { present: true, value: { role: membership.role } };
+      } catch (error) {
+        if (isNotFound(error)) {
+          return { present: false };
+        }
+
+        throw error;
+      }
+    },
+  };
+}

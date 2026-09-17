@@ -1,14 +1,17 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0005 AC-10, AC-12, AC-13, AC-14
+ * covers: spec 0005 AC-10, AC-12, AC-13, AC-14 · spec 0015 AC-6, AC-8, AC-9,
+ * AC-11
  *
  * The mirror, against real SQL.
  *
  * These are the cases that only a database can answer: that three rows land in
  * one transaction, that writing them twice leaves one of each, that a second
  * agency with the same name gets its own slug instead of repeating a unique
- * violation, and that a soft deleted organization stops resolving.
+ * violation, that a soft deleted organization stops resolving, and (spec 0015)
+ * that the four doors the Clerk webhook shares with this file never revive or
+ * rewrite a row this mirror has already erased.
  *
  * Everything runs inside a transaction that is rolled back, the same shape as
  * `tenancy.db.test.ts`, so the suite leaves the database exactly as it found it
@@ -19,6 +22,8 @@
  * proves the upsert is re-entrant rather than proving two web requests race
  * safely. The guarantee under a real race is the unique key plus
  * `onConflictDoUpdate`, and `verify.md` carries the manual check for it.
+ * `src/auth/webhook.db.test.ts` covers a genuine cross connection race for the
+ * webhook's own use of these functions.
  *
  * Skipped when `DIRECT_URL` is not set, so `pnpm test` still runs without a
  * database.
@@ -31,11 +36,27 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import { loadEnvFiles } from "@/lib/load-env-files";
 
 import * as schema from "../schema";
-import { memberships, organizations, users } from "../schema";
+import {
+  clientContacts,
+  clients,
+  memberships,
+  organizations,
+  users,
+} from "../schema";
 import { resolveStaffContext } from "./context";
 import { isTenantResolutionError } from "./errors";
 import type { TransactionExecutor } from "./executor";
-import { createAgencyRows, ensureMirrorRows } from "./provisioning";
+import {
+  createAgencyRows,
+  deleteMembershipRows,
+  ensureMirrorRows,
+  ensureUserRow,
+  MirrorUserDeleted,
+  softDeleteOrganization,
+  unbindContactsOfUser,
+  upsertOrganizationRow,
+} from "./provisioning";
+import { newId } from "@/lib/id";
 
 // The one module `context.ts` reads Clerk through, so a case sets what the
 // session says without going near the SDK.
@@ -436,6 +457,272 @@ describe.skipIf(!url)("provisioning against real PostgreSQL", () => {
           );
 
         expect(rows).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("ensureUserRow's guard against a scrubbed row (spec 0015, AC-8)", () => {
+    it("never revives or rewrites a row with deleted_at set", async () => {
+      await inRollback(async (tx) => {
+        const clerkUserId = clerkId("user");
+
+        const [scrubbed] = await tx
+          .insert(users)
+          .values({
+            id: newId(),
+            clerkUserId,
+            email: `deleted+seed@invalid`,
+            name: "Deleted user",
+            deletedAt: new Date(),
+          })
+          .returning({ id: users.id });
+
+        await expect(
+          ensureUserRow(
+            {
+              clerkUserId,
+              email: "revived@northwind.test",
+              name: "Revived Name",
+              imageUrl: undefined,
+            },
+            tx,
+          ),
+        ).rejects.toBeInstanceOf(MirrorUserDeleted);
+
+        const [row] = await tx
+          .select()
+          .from(users)
+          .where(eq(users.id, scrubbed?.id ?? ""));
+
+        expect(row?.email).toBe("deleted+seed@invalid");
+        expect(row?.name).toBe("Deleted user");
+      });
+    });
+  });
+
+  describe("upsertOrganizationRow's guard against a soft deleted row (spec 0015, AC-10)", () => {
+    it('returns "deleted" and writes nothing', async () => {
+      await inRollback(async (tx) => {
+        const clerkOrgId = clerkId("org");
+
+        await tx.insert(organizations).values({
+          id: newId(),
+          clerkOrgId,
+          name: "Was Deleted",
+          slug: `was-deleted-${clerkOrgId}`,
+          deletedAt: new Date(),
+        });
+
+        const result = await upsertOrganizationRow(
+          { clerkOrgId, name: "Trying To Revive" },
+          tx,
+        );
+
+        expect(result).toBe("deleted");
+
+        const [row] = await tx
+          .select()
+          .from(organizations)
+          .where(eq(organizations.clerkOrgId, clerkOrgId));
+
+        expect(row?.name).toBe("Was Deleted");
+      });
+    });
+  });
+
+  describe("softDeleteOrganization (spec 0015, AC-6)", () => {
+    it("sets deleted_at once and coalesces a second call rather than resetting the clock", async () => {
+      await inRollback(async (tx) => {
+        const clerkOrgId = clerkId("org");
+        const [org] = await tx
+          .insert(organizations)
+          .values({
+            id: newId(),
+            clerkOrgId,
+            name: "Doomed",
+            slug: `doomed-${clerkOrgId}`,
+          })
+          .returning({ id: organizations.id });
+
+        const first = await softDeleteOrganization(clerkOrgId, tx);
+        expect(first).not.toBe("not_found");
+
+        const [afterFirst] = await tx
+          .select({ deletedAt: organizations.deletedAt })
+          .from(organizations)
+          .where(eq(organizations.id, org?.id ?? ""));
+
+        const second = await softDeleteOrganization(clerkOrgId, tx);
+        expect(second).not.toBe("not_found");
+
+        const [afterSecond] = await tx
+          .select({ deletedAt: organizations.deletedAt })
+          .from(organizations)
+          .where(eq(organizations.id, org?.id ?? ""));
+
+        expect(afterSecond?.deletedAt).toEqual(afterFirst?.deletedAt);
+      });
+    });
+
+    it("answers not_found for a clerk_org_id this mirror never held", async () => {
+      await inRollback(async (tx) => {
+        expect(await softDeleteOrganization(clerkId("org"), tx)).toBe(
+          "not_found",
+        );
+      });
+    });
+  });
+
+  describe("deleteMembershipRows (spec 0015, AC-6, AC-9, AC-11)", () => {
+    it("deletes every row for an organization when given only orgId", async () => {
+      await inRollback(async (tx) => {
+        const org = await createAgencyRows(
+          { clerkOrgId: clerkId("org"), name: "Org Scoped Delete" },
+          {
+            clerkUserId: clerkId("user"),
+            email: "a@northwind.test",
+            name: undefined,
+            imageUrl: undefined,
+          },
+          tx,
+        );
+
+        await deleteMembershipRows({ orgId: org.orgId }, tx);
+
+        const rows = await tx
+          .select()
+          .from(memberships)
+          .where(eq(memberships.orgId, org.orgId));
+
+        expect(rows).toHaveLength(0);
+      });
+    });
+
+    it("deletes every row for a user when given only userId", async () => {
+      await inRollback(async (tx) => {
+        const ids = await createAgencyRows(
+          { clerkOrgId: clerkId("org"), name: "User Scoped Delete" },
+          {
+            clerkUserId: clerkId("user"),
+            email: "b@northwind.test",
+            name: undefined,
+            imageUrl: undefined,
+          },
+          tx,
+        );
+
+        await deleteMembershipRows({ userId: ids.userId }, tx);
+
+        const rows = await tx
+          .select()
+          .from(memberships)
+          .where(eq(memberships.userId, ids.userId));
+
+        expect(rows).toHaveLength(0);
+      });
+    });
+
+    it("deletes exactly one (org_id, user_id) pair when given both", async () => {
+      await inRollback(async (tx) => {
+        const orgA = clerkId("org");
+        const clerkUserId = clerkId("user");
+
+        const first = await createAgencyRows(
+          { clerkOrgId: orgA, name: "Pair Delete A" },
+          {
+            clerkUserId,
+            email: "c@northwind.test",
+            name: undefined,
+            imageUrl: undefined,
+          },
+          tx,
+        );
+
+        const second = await ensureMirrorRows(
+          { clerkOrgId: clerkId("org"), name: "Pair Delete B" },
+          {
+            clerkUserId,
+            email: "c@northwind.test",
+            name: undefined,
+            imageUrl: undefined,
+          },
+          "member",
+          tx,
+        );
+
+        await deleteMembershipRows(
+          { orgId: first.orgId, userId: first.userId },
+          tx,
+        );
+
+        expect(
+          await tx
+            .select()
+            .from(memberships)
+            .where(eq(memberships.orgId, first.orgId)),
+        ).toHaveLength(0);
+        // The other agency's membership for the same person is untouched.
+        expect(
+          await tx
+            .select()
+            .from(memberships)
+            .where(eq(memberships.orgId, second.orgId)),
+        ).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("unbindContactsOfUser (spec 0015, AC-9)", () => {
+    it("clears user_id and accepted_at, leaving every other column", async () => {
+      await inRollback(async (tx) => {
+        const ids = await createAgencyRows(
+          { clerkOrgId: clerkId("org"), name: "Contact Unbind Agency" },
+          {
+            clerkUserId: clerkId("user"),
+            email: "staff@northwind.test",
+            name: undefined,
+            imageUrl: undefined,
+          },
+          tx,
+        );
+
+        const [client] = await tx
+          .insert(clients)
+          .values({ id: newId(), orgId: ids.orgId, name: "A Client" })
+          .returning({ id: clients.id });
+
+        const contactUserId = newId();
+        await tx.insert(users).values({
+          id: contactUserId,
+          clerkUserId: clerkId("user"),
+          email: "contact@example.test",
+          name: "Contact Person",
+        });
+
+        const [contact] = await tx
+          .insert(clientContacts)
+          .values({
+            id: newId(),
+            orgId: ids.orgId,
+            clientId: client?.id ?? "",
+            userId: contactUserId,
+            email: "contact@example.test",
+            name: "Contact Person",
+            acceptedAt: new Date(),
+          })
+          .returning({ id: clientContacts.id });
+
+        await unbindContactsOfUser({ userId: contactUserId }, tx);
+
+        const [row] = await tx
+          .select()
+          .from(clientContacts)
+          .where(eq(clientContacts.id, contact?.id ?? ""));
+
+        expect(row?.userId).toBeNull();
+        expect(row?.acceptedAt).toBeNull();
+        expect(row?.email).toBe("contact@example.test");
+        expect(row?.name).toBe("Contact Person");
       });
     });
   });
