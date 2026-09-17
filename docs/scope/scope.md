@@ -334,7 +334,7 @@ One guarded scheduled route doing every daily sweep in sequence: marking invoice
 - [ ] Build it: `/develop daily cron sweeps`
   - [ ] The thread: `CRON_SECRET`, the `cron_runs` table, the runner with per sweep isolation and the run record, the overdue invoice sweep, the guarded route and the `vercel.json` schedule, proven by one scheduled run · AC-1, AC-2, AC-3, AC-4, AC-11
   - [x] Storage and invitations: the abandoned upload sweep (24 hour cutoff, 200 per run, object first, skipped without R2) and the expired invite tidy · AC-5, AC-6
-  - [ ] Stripe reconcile: the shared `applySubscriptionState` with its lock and customer guard, the complete listing and newest per agency rules, the list gateway and fake · AC-7
+  - [x] Stripe reconcile: the shared `applySubscriptionState` with its lock and customer guard, the complete listing and newest per agency rules, the list gateway and fake · AC-7
   - [ ] Clerk reconcile: the pure mappers, the list gateway and fake, the three passes with the complete listing rule and the local user set · AC-8
   - [ ] Retention prune, the overlap and privacy tests, and the `verify.md` walk with one real scheduled run · AC-9, AC-10, AC-12
 - [ ] Verify it: `/check verify daily cron sweeps`
