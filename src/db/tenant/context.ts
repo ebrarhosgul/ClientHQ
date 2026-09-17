@@ -156,6 +156,13 @@ export async function resolveContactContext(
   // told `no_contact`, while one with no mirror row at all is told
   // `no_mirror_row`. Feature 6 routes those two cases differently.
   //
+  // A second left join to `organizations`, added by spec 0015 (AC-7): a
+  // `client_contacts` row cannot be dropped from the `where` the way
+  // `resolveStaffContext` drops a deleted organization, because that would
+  // turn a deleted agency's contact into "no mirror row" for someone who
+  // still has one; folding `deletedAt` into the `owned` filter below instead
+  // treats a deleted agency's contact the same as having no contact at all.
+  //
   // Ordered most recently accepted first, with a null `accepted_at` last and
   // `created_at` breaking a tie, so the fallback row is deterministic.
   const rows = await db
@@ -164,6 +171,7 @@ export async function resolveContactContext(
       contactId: clientContacts.id,
       orgId: clientContacts.orgId,
       clientId: clientContacts.clientId,
+      orgDeletedAt: organizations.deletedAt,
     })
     .from(users)
     .leftJoin(
@@ -173,6 +181,7 @@ export async function resolveContactContext(
         isNotNull(clientContacts.acceptedAt),
       ),
     )
+    .leftJoin(organizations, eq(organizations.id, clientContacts.orgId))
     .where(eq(users.clerkUserId, claims.clerkUserId))
     .orderBy(
       sql`${clientContacts.acceptedAt} desc nulls last`,
@@ -192,7 +201,7 @@ export async function resolveContactContext(
       contactId: string;
       orgId: string;
       clientId: string;
-    } => row.contactId !== null,
+    } => row.contactId !== null && row.orgDeletedAt === null,
   );
 
   const [fallback] = owned;

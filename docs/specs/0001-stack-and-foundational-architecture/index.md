@@ -96,7 +96,7 @@ Stripe events consumed: `checkout.session.completed`, `customer.subscription.cre
 
 Clerk events consumed: `user.created`, `user.updated`, `user.deleted`, `organization.created`, `organization.updated`, `organization.deleted`, `organizationMembership.created`, `organizationMembership.updated`, `organizationMembership.deleted`.
 
-Clerk role mapping: `org:admin` becomes `admin`, `org:member` becomes `member`. On `organization.deleted` the local Organization is soft deleted and its Memberships are removed. On `user.deleted` the User row is soft deleted and its Memberships removed.
+Clerk role mapping: `org:admin` becomes `admin`, `org:member` becomes `member`. On `organization.deleted` the local Organization is soft deleted and its Memberships are removed. On `user.deleted` the User row is soft deleted and its Memberships removed. Amended by [spec 0015](../0015-clerk-webhook-sync/index.md): `user.created` is not subscribed (the webhook only updates people the product already knows, and creates a User row only alongside a membership), `user.deleted` also returns the person's client contacts to not invited, and every event re reads the object from Clerk rather than writing the payload.
 
 **Roles are read from the Clerk session claims, not from the local mirror.** `Membership.role` exists so member lists can be rendered with a join, but a role demoted in Clerk stays stale locally until a webhook lands, and an authorization check must never read a stale role. The session claim is authoritative for every permission decision.
 

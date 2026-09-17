@@ -27,7 +27,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 14 | Invoice PDF | Slice 6 | in-progress |
 | 15 | Client portal | Slice 7 | in-progress |
 | 16 | Team members & roles | Slice 8 | in-progress |
-| 17 | Clerk webhook sync | Slice 8 | planned |
+| 17 | Clerk webhook sync | Slice 8 | in-progress |
 | 18 | Daily cron sweeps | Slice 9 | planned |
 | 19 | Rate limiting | Slice 9 | planned |
 | 20 | Product analytics & error tracking | Slice 9 | planned |
@@ -310,10 +310,20 @@ Growing an agency past one person: invite staff, see the member list, change rol
 - [ ] Document it: `/document team members & roles`
 Spec [0015](../specs/0015-team-members-and-roles/index.md) · atomic build tasks in its `## Build plan` · no migration, `memberships` and `users` from spec 0002 are unchanged; invitations live in Clerk · code in `src/team/`, `src/app/(agency)/(gated)/team/page.tsx`, `src/auth/clerk.ts`, `src/auth/context.ts`, `src/db/tenant/session.ts`, `src/db/tenant/context.ts`, `src/app/design/gallery.tsx`
 
-### 17. Clerk webhook sync · needs a decision
+### 17. Clerk webhook sync · in-progress
 Keeping the local mirror of users, organizations and memberships current as they change in Clerk, on the same verified and idempotent shape as the Stripe webhook.
 **Done when:** each consumed event updates the mirror correctly, a replayed event changes nothing, deletions soft delete rather than destroy, and an event missed during a deploy is recovered without manual intervention.
-- [ ] Design it (spec): `/architect Clerk webhook sync`
+- [x] Design it (spec): `/architect Clerk webhook sync`
+- [ ] Build it: `/develop Clerk webhook sync`
+  - [x] Configuration and one thread end to end on `organization.updated`: `CLERK_WEBHOOK_SIGNING_SECRET`, the `ClerkGateway` re reads, the route with `withSystemAccess`, the six step handler with the organization upsert only, the log module · AC-1, AC-2, AC-3, AC-4, AC-5, AC-12, AC-13, AC-14, AC-15, AC-16
+  - [x] Deletions: the organization soft delete with its membership removal and subscription status log line, the contact resolution fence for a deleted agency, and the user delete path (scrub, memberships, contact unbind) with the `ensureUserRow` guard · AC-6, AC-7, AC-8, AC-9
+  - [x] Memberships: the upsert that creates missing organization and user rows from re reads, the `org_deleted` and `user_deleted` refusals, and the membership delete · AC-10, AC-11
+  - [ ] Proof: real PostgreSQL suite done (`src/auth/webhook.db.test.ts`, `provisioning.db.test.ts`, `context.db.test.ts`), a separate fake-gateway-only unit file skipped by design (see code review notes); still owed: the Clerk dashboard endpoint, a real delivery through the relay for each of the eight events, and recording that walk in `verify.md` · AC-3, AC-4, AC-12, AC-13, AC-16
+- [ ] Verify it: `/check verify Clerk webhook sync`
+- [x] Test it: `/test Clerk webhook sync`
+- [x] Review it (fresh model): `/check review Clerk webhook sync`
+- [ ] Document it: `/document Clerk webhook sync`
+Spec [0015](../specs/0015-clerk-webhook-sync/index.md) · atomic build tasks in its `## Build plan` · code in `src/auth/webhook.ts`, `src/auth/webhook-events.ts`, `src/auth/webhook-log.ts`, `src/auth/clerk.ts`, `src/app/api/webhooks/clerk/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`
 
 ## Slice 9: Operations & release readiness
 
@@ -357,6 +367,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Contact `last_seen_at`**: a throttled write from the portal so staff can see when a client last visited. Declined in spec 0014 to keep the portal strictly read only; one column and one write when an agency asks · from spec 0014 · needs a decision
 - **Deliverable `shared_at`**: the portal labels a file's date `Added` from `created_at` because flipping visibility records no time. One column set and cleared by `setDeliverableVisibility` would make it an exact `Shared on` · from spec 0014 · needs a decision
 - **Silent client switch on a revoked cookie row**: when the contact cookie names a row that was since removed, the resolver falls back to the person's other row without saying so. Nothing leaks, but a one line notice would stop the surprise · from spec 0014 · needs a decision
+- **Deleted agency clean up and Clerk drift**: spec 0015 soft deletes an agency and scrubs a deleted person, and stops there. Three things fall out of that for feature 18's daily sweep: a nightly Clerk reconcile that lists organizations and memberships and repairs any local row that disagrees (the staleness half of the missed event rule; retries and the `no_mirror_row` repair are the absence half), a decision on the Stripe subscription, rows and R2 objects of a soft deleted agency (the webhook only logs the subscription status), and a retention prune for `processed_webhook_events`, now fed by two sources · from spec 0015 · needs a decision
 
 ## Legend
 

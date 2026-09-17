@@ -41,6 +41,9 @@ const VALID = {
   // Added by client contacts & portal invitations (spec 0009): the sending
   // address is required everywhere; the Resend key only in production.
   EMAIL_FROM: "invites@example.com",
+  // Added by Clerk webhook sync (spec 0015): the signing secret `verifyWebhook`
+  // needs, required everywhere since the endpoint has no unconfigured state.
+  CLERK_WEBHOOK_SIGNING_SECRET: "whsec_not_a_real_secret",
 } as const;
 
 // Added by deliverable upload & download (spec 0011): the four R2 variables
@@ -191,6 +194,14 @@ describe("env", () => {
       const env = await freshEnv();
 
       expect(() => env()).toThrow(/CLERK_SECRET_KEY/);
+    });
+
+    it("throws when CLERK_WEBHOOK_SIGNING_SECRET is missing (spec 0015)", async () => {
+      setProcessEnv(withoutKey("CLERK_WEBHOOK_SIGNING_SECRET"));
+
+      const env = await freshEnv();
+
+      expect(() => env()).toThrow(/CLERK_WEBHOOK_SIGNING_SECRET/);
     });
 
     it.each([
