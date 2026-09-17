@@ -11,5 +11,6 @@ export * from "./clients";
 export * from "./projects";
 export * from "./invoices";
 export * from "./webhooks";
+export * from "./cron";
 export * from "./relations";
 export * from "./zod";

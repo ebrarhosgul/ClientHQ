@@ -10,9 +10,16 @@
  * that changes.
  */
 
-/** The server clock's UTC calendar day, `YYYY-MM-DD`. */
-export function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * The server clock's UTC calendar day, `YYYY-MM-DD`.
+ *
+ * `now` defaults to the real clock; the nightly sweep (spec 0017) passes its
+ * own run-start `Date` instead, so every sweep in a run agrees on the day and
+ * a test can fix it, without this function's callers elsewhere noticing a
+ * change.
+ */
+export function todayUtc(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
 }
 
 /**

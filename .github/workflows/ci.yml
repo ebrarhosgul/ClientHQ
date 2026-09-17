@@ -120,6 +120,7 @@ jobs:
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
       CLERK_WEBHOOK_SIGNING_SECRET: whsec_Y2ktcGxhY2Vob2xkZXItc2VjcmV0LXZhbHVl
       EMAIL_FROM: ci@example.com
+      CRON_SECRET: ci-placeholder-cron-secret-value
 
     steps:
       - name: Check out the repository
@@ -202,6 +203,19 @@ jobs:
       - name: Prove the invoice_events CHECKs refuse a malformed row
         if: ${{ !cancelled() }}
         run: pnpm vitest run src/db/invoice-events.db.test.ts
+
+      # The cron run row, per sweep isolation and the report shape (spec 0017)
+      # are claims about a real transaction and a real row, not about
+      # TypeScript's idea of the runner.
+      - name: Prove the cron runner writes and updates the run row
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/cron/runner.db.test.ts
+
+      # The overdue sweep's compare and set, its one transaction with the
+      # event, and its idempotence on a second run (spec 0017, AC-4, AC-12).
+      - name: Prove the overdue invoice sweep moves the right invoices once
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/invoices/overdue-sweep.db.test.ts
 
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would

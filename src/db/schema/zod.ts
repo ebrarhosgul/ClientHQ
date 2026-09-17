@@ -2,6 +2,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 import { clientContacts, clients } from "./clients";
+import { cronRuns } from "./cron";
 import { memberships, organizations, subscriptions, users } from "./identity";
 import { invoiceEvents, invoiceLineItems, invoices } from "./invoices";
 import { deliverables, projects } from "./projects";
@@ -115,3 +116,6 @@ export const insertProcessedWebhookEventSchema = createInsertSchema(
 export const selectProcessedWebhookEventSchema = createSelectSchema(
   processedWebhookEvents,
 );
+
+export const insertCronRunSchema = createInsertSchema(cronRuns);
+export const selectCronRunSchema = createSelectSchema(cronRuns);

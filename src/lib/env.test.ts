@@ -44,6 +44,11 @@ const VALID = {
   // Added by Clerk webhook sync (spec 0015): the signing secret `verifyWebhook`
   // needs, required everywhere since the endpoint has no unconfigured state.
   CLERK_WEBHOOK_SIGNING_SECRET: "whsec_not_a_real_secret",
+  // Added by daily cron sweeps (spec 0017): the bearer token the route
+  // requires, required everywhere for the same reason as the Clerk secret
+  // above, an unset value would otherwise open the route rather than fail
+  // closed.
+  CRON_SECRET: "a-cron-secret-at-least-16-chars",
 } as const;
 
 // Added by deliverable upload & download (spec 0011): the four R2 variables
@@ -202,6 +207,22 @@ describe("env", () => {
       const env = await freshEnv();
 
       expect(() => env()).toThrow(/CLERK_WEBHOOK_SIGNING_SECRET/);
+    });
+
+    it("throws when CRON_SECRET is missing (spec 0017)", async () => {
+      setProcessEnv(withoutKey("CRON_SECRET"));
+
+      const env = await freshEnv();
+
+      expect(() => env()).toThrow(/CRON_SECRET/);
+    });
+
+    it("throws when CRON_SECRET is shorter than 16 characters (spec 0017, AC-1)", async () => {
+      setProcessEnv({ ...VALID, CRON_SECRET: "short" });
+
+      const env = await freshEnv();
+
+      expect(() => env()).toThrow(/CRON_SECRET/);
     });
 
     it.each([
