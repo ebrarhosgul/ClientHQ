@@ -8,6 +8,8 @@
  * that a second run the same day writes nothing. `revalidatePath` is faked;
  * the paths it is called with are not this file's concern.
  */
+import { randomUUID } from "node:crypto";
+
 import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -42,8 +44,14 @@ const TOMORROW = addDaysUtc(TODAY, 1);
 
 const createdOrgs: string[] = [];
 
+/**
+ * Drawn from `randomUUID()` rather than `newId()`'s time ordered bits: this
+ * suite runs concurrently with every other `*.db.test.ts` file against one
+ * shared database, and a millisecond timestamp prefix collides across files
+ * under that load in a way a fully random one does not.
+ */
 function tag(): string {
-  return newId().replace(/-/g, "").slice(0, 12);
+  return randomUUID().replace(/-/g, "").slice(0, 12);
 }
 
 async function makeOrg(): Promise<string> {
