@@ -12,6 +12,13 @@
  * `locked` and `unsubscribed` both mean nothing is being paid for right now,
  * which is why this spec sends both to the same unavailable page (spec 0008
  * only named `locked`).
+ *
+ * This read is marked `audited`: it runs on every portal page view, download
+ * and PDF request, and the escape hatch log exists to make a hand written
+ * query *site* conspicuous, not to record every time an accepted one runs.
+ * Logging it per request would drown that signal in its own noise and log an
+ * identified user on every page they open. The call site itself stays as
+ * grep-able as any other `unsafeTenantQuery` use.
  */
 import { eq } from "drizzle-orm";
 
@@ -53,11 +60,15 @@ export function isPortalReadable(level: AccessLevel): boolean {
 export async function portalAccess(
   ctx: ContactContext,
 ): Promise<AccessVerdict> {
-  const row = await unsafeTenantQuery(ctx, "portal gate", (db) =>
-    db.query.subscriptions.findFirst({
-      where: eq(subscriptions.orgId, ctx.orgId),
-      columns: { status: true, pastDueSince: true },
-    }),
+  const row = await unsafeTenantQuery(
+    ctx,
+    "portal gate",
+    (db) =>
+      db.query.subscriptions.findFirst({
+        where: eq(subscriptions.orgId, ctx.orgId),
+        columns: { status: true, pastDueSince: true },
+      }),
+    { audited: true },
   );
 
   const verdict = accessVerdict(row, new Date());

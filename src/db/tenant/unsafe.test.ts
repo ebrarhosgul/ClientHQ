@@ -97,7 +97,7 @@ describe("unsafeTenantQuery", () => {
       staff,
       "a grouped total inside an existing transaction",
       async (db) => db,
-      tx,
+      { executor: tx },
     );
 
     expect(seen).toBe(tx);
@@ -208,5 +208,47 @@ describe("unsafeTenantQuery", () => {
       "first shape",
       "second shape",
     ]);
+  });
+
+  it("does not log an audited call site, however often it runs", async () => {
+    await unsafeTenantQuery(staff, "a per request read", async () => 0, {
+      audited: true,
+    });
+    await unsafeTenantQuery(staff, "a per request read", async () => 0, {
+      audited: true,
+    });
+
+    expect(warned).toHaveLength(0);
+  });
+
+  it("still runs and returns normally when audited", async () => {
+    const seen = await unsafeTenantQuery(
+      contact,
+      "a per request read",
+      async (db) => db,
+      { audited: true },
+    );
+
+    expect(seen).toStrictEqual(pool.handle);
+  });
+
+  it("still requires a reason when audited", async () => {
+    await expect(
+      unsafeTenantQuery(staff, "", async () => "ran", { audited: true }),
+    ).rejects.toThrow(/needs a reason/u);
+  });
+
+  it("joins the caller's transaction when both an executor and audited are given", async () => {
+    const tx = { marker: "open transaction" } as unknown as Executor;
+
+    const seen = await unsafeTenantQuery(
+      staff,
+      "a per request read inside a transaction",
+      async (db) => db,
+      { executor: tx, audited: true },
+    );
+
+    expect(seen).toBe(tx);
+    expect(warned).toHaveLength(0);
   });
 });

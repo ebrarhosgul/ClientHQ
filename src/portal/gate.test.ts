@@ -21,8 +21,9 @@ vi.mock("@/db/tenant", () => ({
     ctx: unknown,
     reason: string,
     fn: (db: unknown) => unknown,
+    options: unknown,
   ) => {
-    state.unsafeCalls.push({ ctx, reason });
+    state.unsafeCalls.push({ ctx, reason, options });
 
     return fn({ query: { subscriptions: { findFirst: state.findFirst } } });
   },
@@ -87,8 +88,16 @@ describe("portalAccess", () => {
 
     expect(access).toStrictEqual({ level: "full" });
     expect(state.unsafeCalls).toStrictEqual([
-      { ctx: CTX, reason: "portal gate" },
+      { ctx: CTX, reason: "portal gate", options: { audited: true } },
     ]);
+  });
+
+  it("marks the read audited, so it does not log on every page view", async () => {
+    state.findFirst.mockResolvedValue({ status: "active", pastDueSince: null });
+
+    await portalAccess(CTX);
+
+    expect(warned).toHaveLength(0);
   });
 
   it("is unsubscribed with no row", async () => {
