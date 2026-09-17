@@ -98,10 +98,13 @@ jobs:
     # `env()` in src/lib/env.ts parses every required key at once, not only the
     # ones a given test touches: src/invoices/notify.ts calls `env()` for two
     # fields, but that fails the whole parse when anything else required is
-    # missing. None of these are read for real by anything this job runs (the
-    # Stripe gateway and Clerk session are stubbed in every suite here), so
-    # they are placeholders, not credentials, same as the postgres password
-    # above.
+    # missing. Most of these are placeholders, not credentials, same as the
+    # postgres password above, because the Stripe gateway and Clerk session
+    # are stubbed in every suite here. CLERK_WEBHOOK_SIGNING_SECRET is the
+    # exception: src/auth/webhook.db.test.ts signs every delivery for real
+    # through this value (spec 0015 deliberately does not fake signature
+    # verification), so it must be valid base64 after the `whsec_` prefix or
+    # every case in that file fails verification, not just parse `env()`.
     env:
       DIRECT_URL: postgresql://clienthq:clienthq@localhost:5432/clienthq
       DATABASE_URL: postgresql://clienthq:clienthq@localhost:5432/clienthq
@@ -115,7 +118,7 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
       STRIPE_PRICE_ID: price_ci_placeholder
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
-      CLERK_WEBHOOK_SIGNING_SECRET: whsec_ci_placeholder
+      CLERK_WEBHOOK_SIGNING_SECRET: whsec_Y2ktcGxhY2Vob2xkZXItc2VjcmV0LXZhbHVl
       EMAIL_FROM: ci@example.com
 
     steps:
