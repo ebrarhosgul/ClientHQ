@@ -7,6 +7,12 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
+      // Keyboard reachable in its own right: a row can end up with every
+      // control disabled (the last admin's locked row on /team, spec 0015
+      // AC-14), and then no focusable descendant is left to carry a keyboard
+      // user's Tab into this element and scroll it, which is what axe's
+      // scrollable-region-focusable rule catches.
+      tabIndex={0}
       className="relative w-full overflow-x-auto"
     >
       <table

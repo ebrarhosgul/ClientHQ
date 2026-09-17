@@ -304,7 +304,7 @@ Growing an agency past one person: invite staff, see the member list, change rol
   - [x] Roles and removal: `changeTeamMemberRole` and `removeTeamMember` with the last admin rule, the write through to the `memberships` row only, self demotion and leaving, the role select and the confirm dialog · AC-5, AC-6, AC-7, AC-14
   - [x] Failure handling and the repair path: the half done log line, the structured log lines, the three `unavailable` messages, the Clerk error card and member view, and spec 0005's repair path confirming the membership in Clerk before recreating rows · AC-10, AC-11, AC-12, AC-13
   - [ ] Guards, placeholders and tests: the admin claim and subscription gate on all four actions, the `/settings` comment, Vitest on the rules and actions with a stubbed Clerk, Playwright for the admin and member views · AC-8, AC-15 · guards, the comment and 66 Vitest tests are in; the Playwright walk needs a signed in staff user in the browser suite, which only has the contact user today
-- [ ] Verify it: `/check verify team members & roles`
+- [x] Verify it: `/check verify team members & roles` · core flows walked by hand on the deployed app, full test suite green; a handful of edge cases accepted as known gaps, see spec 0015's `verify.md`
 - [ ] Test it: `/test team members & roles`
 - [ ] Review it (fresh model): `/check review team members & roles`
 - [ ] Document it: `/document team members & roles`
