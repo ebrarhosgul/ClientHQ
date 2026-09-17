@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 
 import { formatInvoiceNumber } from "@/invoices/status";
+import { isClerkConfigured } from "@/lib/env";
 import { formatMoney } from "@/lib/money";
 import { INVOICES_LIST_EMPTY } from "@/portal/copy";
 import { portalContext } from "@/portal/context";
-import { listPortalInvoices, type PortalInvoiceRow } from "@/portal/queries";
+import {
+  listPortalInvoices,
+  type PortalInvoiceRow,
+  type PortalListResult,
+} from "@/portal/queries";
 import { parsePageParam } from "@/portal/schema";
 import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
 import { PortalPagination } from "@/portal/ui/portal-pagination";
@@ -51,7 +56,18 @@ const COLUMNS: readonly Column<PortalInvoiceRow>[] = [
   },
 ];
 
+const NO_RESULTS: PortalListResult<PortalInvoiceRow> = {
+  rows: [],
+  page: 1,
+  pageCount: 1,
+  total: 0,
+};
+
 export async function generateMetadata(): Promise<Metadata> {
+  if (!isClerkConfigured()) {
+    return { title: "Invoices · ClientHQ" };
+  }
+
   const { clientName } = await portalContext();
 
   return { title: `Invoices · ${clientName} · ClientHQ` };
@@ -60,16 +76,23 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Every invoice status the contact may see, unpaid before paid, 25 to a page
  * (spec 0014, AC-9).
+ *
+ * With no Clerk publishable key there is no session to resolve a contact
+ * from, so this renders the same empty list a contact with no invoices yet
+ * would see (spec 0004, AC-22).
  */
 export default async function PortalInvoicesPage({
   searchParams,
 }: PageProps<"/portal/invoices">) {
   const { page: rawPage } = await searchParams;
-  const { ctx } = await portalContext();
 
-  const { rows, page, pageCount, total } = await listPortalInvoices(ctx, {
-    pageParam: parsePageParam(Array.isArray(rawPage) ? rawPage[0] : rawPage),
-  });
+  const { rows, page, pageCount, total } = isClerkConfigured()
+    ? await listPortalInvoices((await portalContext()).ctx, {
+        pageParam: parsePageParam(
+          Array.isArray(rawPage) ? rawPage[0] : rawPage,
+        ),
+      })
+    : NO_RESULTS;
 
   return (
     <div className="flex flex-col gap-6">

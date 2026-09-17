@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { formatBytes } from "@/deliverables/format";
+import { isClerkConfigured } from "@/lib/env";
 import { OVERVIEW_FILES_EMPTY } from "@/portal/copy";
 import { portalContext } from "@/portal/context";
-import { groupFilesByProject, listPortalFiles } from "@/portal/queries";
+import {
+  groupFilesByProject,
+  listPortalFiles,
+  type PortalFileRow,
+  type PortalListResult,
+} from "@/portal/queries";
 import { parsePageParam } from "@/portal/schema";
 import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
 import { PortalPagination } from "@/portal/ui/portal-pagination";
@@ -14,7 +20,18 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const NO_RESULTS: PortalListResult<PortalFileRow> = {
+  rows: [],
+  page: 1,
+  pageCount: 1,
+  total: 0,
+};
+
 export async function generateMetadata(): Promise<Metadata> {
+  if (!isClerkConfigured()) {
+    return { title: "Files · ClientHQ" };
+  }
+
   const { clientName } = await portalContext();
 
   return { title: `Files · ${clientName} · ClientHQ` };
@@ -23,17 +40,22 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Every shared file across the client's non archived projects, 25 to a page,
  * grouped under a heading per project (spec 0014, AC-8).
+ *
+ * With no Clerk publishable key there is no session to resolve a contact
+ * from, so this renders the same empty list a contact with no shared files
+ * yet would see (spec 0004, AC-22).
  */
 export default async function PortalFilesPage({
   searchParams,
 }: PageProps<"/portal/files">) {
   const { page: rawPage } = await searchParams;
-  const { ctx } = await portalContext();
 
-  const { rows, page, pageCount } = await listPortalFiles(
-    ctx,
-    parsePageParam(firstParam(rawPage)),
-  );
+  const { rows, page, pageCount } = isClerkConfigured()
+    ? await listPortalFiles(
+        (await portalContext()).ctx,
+        parsePageParam(firstParam(rawPage)),
+      )
+    : NO_RESULTS;
   const groups = groupFilesByProject(rows);
 
   return (

@@ -6,6 +6,7 @@ import { displayNumber, isPastDue } from "@/invoices/status";
 import { InvoiceDocument } from "@/invoices/ui/invoice-document";
 import { PastDueBadge } from "@/invoices/ui/past-due-badge";
 import { todayUtc } from "@/lib/dates";
+import { isClerkConfigured } from "@/lib/env";
 import { portalContext } from "@/portal/context";
 import { portalId } from "@/portal/schema";
 import { InvoiceStatusChip } from "@/ui/patterns/status-chip";
@@ -13,6 +14,10 @@ import { InvoiceStatusChip } from "@/ui/patterns/status-chip";
 export async function generateMetadata({
   params,
 }: PageProps<"/portal/invoices/[id]">): Promise<Metadata> {
+  if (!isClerkConfigured()) {
+    return { title: "Invoice · ClientHQ" };
+  }
+
   const { id } = await params;
   const { ctx, clientName } = await portalContext();
   const parsed = portalId.safeParse(id);
@@ -35,6 +40,10 @@ export async function generateMetadata({
  * malformed one all render not found: `getInvoiceDocument` already refuses
  * every one of them, through the contact accessor and `isClientVisible`
  * together.
+ *
+ * With no Clerk publishable key there is no session to resolve a tenant
+ * from, so no id can ever be this contact's, the same as a foreign one
+ * (spec 0004, AC-22).
  */
 export default async function PortalInvoicePage({
   params,
@@ -42,7 +51,7 @@ export default async function PortalInvoicePage({
   const { id } = await params;
   const parsed = portalId.safeParse(id);
 
-  if (!parsed.success) {
+  if (!isClerkConfigured() || !parsed.success) {
     notFound();
   }
 

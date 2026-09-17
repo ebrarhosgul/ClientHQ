@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 
+import { isClerkConfigured } from "@/lib/env";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { OVERVIEW_PROJECTS_EMPTY } from "@/portal/copy";
 import { portalContext } from "@/portal/context";
-import { listPortalProjects, type PortalProjectRow } from "@/portal/queries";
+import {
+  listPortalProjects,
+  type PortalListResult,
+  type PortalProjectRow,
+} from "@/portal/queries";
 import { parsePageParam } from "@/portal/schema";
 import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
 import { PortalPagination } from "@/portal/ui/portal-pagination";
@@ -43,7 +48,18 @@ const COLUMNS: readonly Column<PortalProjectRow>[] = [
   },
 ];
 
+const NO_RESULTS: PortalListResult<PortalProjectRow> = {
+  rows: [],
+  page: 1,
+  pageCount: 1,
+  total: 0,
+};
+
 export async function generateMetadata(): Promise<Metadata> {
+  if (!isClerkConfigured()) {
+    return { title: "Projects · ClientHQ" };
+  }
+
   const { clientName } = await portalContext();
 
   return { title: `Projects · ${clientName} · ClientHQ` };
@@ -52,17 +68,22 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Every non archived project of the contact's client, in every status
  * (spec 0014, AC-6).
+ *
+ * With no Clerk publishable key there is no session to resolve a contact
+ * from, so this renders the same empty list a contact with no projects yet
+ * would see (spec 0004, AC-22).
  */
 export default async function PortalProjectsPage({
   searchParams,
 }: PageProps<"/portal/projects">) {
   const { page: rawPage } = await searchParams;
-  const { ctx } = await portalContext();
 
-  const { rows, page, pageCount, total } = await listPortalProjects(
-    ctx,
-    parsePageParam(firstParam(rawPage)),
-  );
+  const { rows, page, pageCount, total } = isClerkConfigured()
+    ? await listPortalProjects(
+        (await portalContext()).ctx,
+        parsePageParam(firstParam(rawPage)),
+      )
+    : NO_RESULTS;
 
   return (
     <div className="flex flex-col gap-6">

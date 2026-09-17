@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { formatBytes } from "@/deliverables/format";
+import { isClerkConfigured } from "@/lib/env";
 import { portalContext } from "@/portal/context";
 import { getPortalProject, listProjectFiles } from "@/portal/queries";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
@@ -12,6 +13,10 @@ import { ProjectStatusChip } from "@/ui/patterns/status-chip";
 export async function generateMetadata({
   params,
 }: PageProps<"/portal/projects/[id]">): Promise<Metadata> {
+  if (!isClerkConfigured()) {
+    return { title: "Project · ClientHQ" };
+  }
+
   const { id } = await params;
   const { ctx, clientName } = await portalContext();
   const project = await getPortalProject(ctx, id);
@@ -43,10 +48,18 @@ function Detail({
  * One project and the files shared on it (spec 0014, AC-7). An archived
  * project, a project of another client, a missing id and a malformed one all
  * render not found: `getPortalProject` refuses every one of them.
+ *
+ * With no Clerk publishable key there is no session to resolve a tenant
+ * from, so no id can ever be this contact's, the same as a foreign one
+ * (spec 0004, AC-22).
  */
 export default async function PortalProjectPage({
   params,
 }: PageProps<"/portal/projects/[id]">) {
+  if (!isClerkConfigured()) {
+    notFound();
+  }
+
   const { id } = await params;
   const { ctx } = await portalContext();
   const project = await getPortalProject(ctx, id);
