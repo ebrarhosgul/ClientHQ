@@ -1,7 +1,7 @@
 # 0017. Daily cron sweeps
 
 **Date**: 2026-09-17
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
