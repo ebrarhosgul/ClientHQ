@@ -25,6 +25,7 @@ const queries = vi.hoisted(() => ({ count: 0 }));
 vi.mock("./session", () => ({
   CONTACT_COOKIE_NAME: "clienthq_contact",
   CLERK_ADMIN_ROLE: "org:admin",
+  CLERK_MEMBER_ROLE: "org:member",
   sessionClaims: async () => session.claims,
   contactCookie: async () => undefined,
 }));
@@ -114,5 +115,26 @@ describe("toMembershipRole", () => {
     expect(toMembershipRole("org:member")).toBe("member");
     expect(toMembershipRole("org:billing_wizard")).toBe("member");
     expect(toMembershipRole(undefined)).toBe("member");
+  });
+});
+
+describe("toClerkRole (spec 0015, AC-2, AC-5)", () => {
+  it("maps admin onto the Clerk admin role", async () => {
+    const { toClerkRole } = await import("./context");
+
+    expect(toClerkRole("admin")).toBe("org:admin");
+  });
+
+  it("maps member onto the Clerk member role", async () => {
+    const { toClerkRole } = await import("./context");
+
+    expect(toClerkRole("member")).toBe("org:member");
+  });
+
+  it("round trips through toMembershipRole for both roles", async () => {
+    const { toClerkRole, toMembershipRole } = await import("./context");
+
+    expect(toMembershipRole(toClerkRole("admin"))).toBe("admin");
+    expect(toMembershipRole(toClerkRole("member"))).toBe("member");
   });
 });
