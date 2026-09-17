@@ -217,6 +217,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm vitest run src/invoices/overdue-sweep.db.test.ts
 
+      # Object before row, the failed row left in place, and the 200 row cap
+      # with the fake object store (spec 0017, AC-5).
+      - name: Prove the abandoned upload sweep removes object then row
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/deliverables/abandoned-sweep.db.test.ts
+
+      # The 30 day cutoff, in one statement, against a real row (spec 0017,
+      # AC-6).
+      - name: Prove the expired invite sweep clears only what is past the cutoff
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/contacts/expired-invites-sweep.db.test.ts
+
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would
   # never run on a push and the suite would rot unnoticed.
