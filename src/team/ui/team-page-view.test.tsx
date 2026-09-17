@@ -97,16 +97,20 @@ describe("TeamPageView as an admin (AC-1, AC-14)", () => {
 
   it("locks the solo admin's own controls with the reason as visible text", () => {
     renderView({ team: { members: SOLO_ADMIN_FIXTURES, invitations: [] } });
+    const reason = "You are the only admin. Make someone else an admin first.";
 
     expect(
       screen.getByRole("combobox", { name: "Role for you" }),
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Leave agency" })).toBeDisabled();
-    expect(
-      screen.getByText(
-        "You are the only admin. Make someone else an admin first.",
-      ),
-    ).toBeInTheDocument();
+
+    const removeButton = screen.getByRole("button", { name: "Leave agency" });
+    expect(removeButton).toBeDisabled();
+    // Visible once, beside the role select, and tied to the disabled remove
+    // button as its accessible description rather than a `title` tooltip
+    // (AC-14): both carry the same reason, one visibly and one only for
+    // assistive tech, so `getAllByText` sees it twice.
+    expect(screen.getAllByText(reason)).toHaveLength(2);
+    expect(removeButton).toHaveAccessibleDescription(reason);
     expect(screen.getByText("No pending invitations.")).toBeInTheDocument();
   });
 });

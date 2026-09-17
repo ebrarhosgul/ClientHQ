@@ -2,7 +2,7 @@
 
 import { Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import type { ActionError } from "@/db/tenant";
 import type { MembershipRole } from "@/db/schema";
@@ -61,7 +61,6 @@ export function InviteForm({
       }
 
       router.refresh();
-      emailRef.current?.focus();
 
       return {
         email: "",
@@ -71,6 +70,20 @@ export function InviteForm({
     },
     { email: "", generation: 0 },
   );
+
+  // The `key={state.generation}` below remounts the form on success, so
+  // focusing at submit time (before the remount) would focus an input that
+  // is about to be torn down. Wait for the remount to land, then focus the
+  // fresh one. Skipped on the initial mount, when generation hasn't changed.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    emailRef.current?.focus();
+  }, [state.generation]);
 
   const fieldErrors = state.error?.fieldErrors;
   const generalError =

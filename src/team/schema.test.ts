@@ -40,13 +40,13 @@ describe("inviteInput (AC-2)", () => {
     expect(result.data?.role).toBe("admin");
   });
 
-  it("rejects an empty address with its own message", () => {
+  it("rejects an empty address with its own message, and only that one", () => {
     const result = inviteInput.safeParse({ email: "" });
 
     expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors.email).toContain(
+    expect(result.error?.flatten().fieldErrors.email).toStrictEqual([
       "Enter an email address.",
-    );
+    ]);
   });
 
   it("rejects an address over 254 characters with its own message", () => {

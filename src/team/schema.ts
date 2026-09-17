@@ -16,7 +16,7 @@ export const inviteInput = z.object({
     .toLowerCase()
     .min(1, "Enter an email address.")
     .max(254, "That email address is too long.")
-    .email("Enter a valid email address."),
+    .pipe(z.email("Enter a valid email address.")),
   role: roleInput.default("member"),
 });
 

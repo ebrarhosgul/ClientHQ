@@ -2,6 +2,7 @@
 
 import { LogOut, UserMinus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useId } from "react";
 
 import { removeTeamMember } from "@/team/remove-team-member";
 import { LAST_ADMIN_REASON } from "@/team/rules";
@@ -33,20 +34,30 @@ export function RemoveMemberButton({
 }: RemoveMemberButtonProps) {
   const router = useRouter();
   const session = useSessionSync();
+  const reasonId = useId();
 
   const label = self ? "Leave agency" : `Remove ${memberName}`;
 
   if (lockedAsLastAdmin) {
     return (
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        disabled
-        aria-label={label}
-        title={LAST_ADMIN_REASON}
-      >
-        {self ? <LogOut /> : <UserMinus />}
-      </Button>
+      <>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          disabled
+          aria-label={label}
+          aria-describedby={reasonId}
+        >
+          {self ? <LogOut /> : <UserMinus />}
+        </Button>
+        {/* Not a tooltip (AC-14): a `title` on a disabled button is not
+            keyboard reachable, not shown on touch, and inconsistently
+            exposed by screen readers. The Role cell already carries this
+            reason as visible text; this ties it to the button itself. */}
+        <span id={reasonId} className="sr-only">
+          {LAST_ADMIN_REASON}
+        </span>
+      </>
     );
   }
 

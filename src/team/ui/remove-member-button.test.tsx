@@ -11,6 +11,8 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LAST_ADMIN_REASON } from "@/team/rules";
+
 const mocks = vi.hoisted(() => ({
   removeTeamMember: vi.fn(),
   refresh: vi.fn(),
@@ -92,7 +94,7 @@ describe("RemoveMemberButton", () => {
     });
   });
 
-  it("is disabled with no dialog when the person is the last admin", () => {
+  it("is disabled with no dialog when the person is the last admin, with the reason as an accessible description rather than a tooltip", () => {
     render(
       <RemoveMemberButton
         membershipId="orgmem_1"
@@ -103,7 +105,11 @@ describe("RemoveMemberButton", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Leave agency" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Leave agency" });
+
+    expect(button).toBeDisabled();
+    expect(button).not.toHaveAttribute("title");
+    expect(button).toHaveAccessibleDescription(LAST_ADMIN_REASON);
     expect(mocks.confirmDialogProps).toHaveLength(0);
   });
 

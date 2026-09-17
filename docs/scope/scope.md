@@ -306,7 +306,7 @@ Growing an agency past one person: invite staff, see the member list, change rol
   - [ ] Guards, placeholders and tests: the admin claim and subscription gate on all four actions, the `/settings` comment, Vitest on the rules and actions with a stubbed Clerk, Playwright for the admin and member views · AC-8, AC-15 · guards, the comment and 66 Vitest tests are in; the Playwright walk needs a signed in staff user in the browser suite, which only has the contact user today
 - [x] Verify it: `/check verify team members & roles` · core flows walked by hand on the deployed app, full test suite green; a handful of edge cases accepted as known gaps, see spec 0015's `verify.md`
 - [x] Test it: `/test team members & roles`
-- [ ] Review it (fresh model): `/check review team members & roles`
+- [x] Review it (fresh model): `/check review team members & roles`
 - [ ] Document it: `/document team members & roles`
 Spec [0015](../specs/0015-team-members-and-roles/index.md) · atomic build tasks in its `## Build plan` · no migration, `memberships` and `users` from spec 0002 are unchanged; invitations live in Clerk · code in `src/team/`, `src/app/(agency)/(gated)/team/page.tsx`, `src/auth/clerk.ts`, `src/auth/context.ts`, `src/db/tenant/session.ts`, `src/db/tenant/context.ts`, `src/app/design/gallery.tsx`
 

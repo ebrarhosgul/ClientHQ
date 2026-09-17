@@ -95,6 +95,25 @@ describe("InviteForm (AC-2)", () => {
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("returns focus to the address field after a successful invite, even though the form remounts", async () => {
+    mocks.inviteTeamMember.mockResolvedValue({
+      ok: true,
+      data: { invitationId: "orginv_new" },
+    });
+    const user = userEvent.setup();
+
+    render(<InviteForm agencyName="Northwind Studio" />);
+    await user.type(
+      screen.getByRole("textbox", { name: /email/i }),
+      "sam@northwind.example",
+    );
+    await user.click(screen.getByRole("button", { name: "Send invitation" }));
+
+    await screen.findByText("Invitation sent to sam@northwind.example.");
+
+    expect(screen.getByRole("textbox", { name: /email/i })).toHaveFocus();
+  });
+
   it("shows a duplicate address as a field error beside the email, not a general alert (AC-3)", async () => {
     mocks.inviteTeamMember.mockResolvedValue({
       ok: false,

@@ -147,6 +147,10 @@ export function MembersTable({
           columns={columns}
           rows={members}
           rowKey={(member) => member.membershipId}
+          // A member viewer gets no row link and no row actions, and an
+          // admin who is the only member has just their own locked row: both
+          // leave the table with no focusable descendant at all (AC-14).
+          scrollFocusable={!canManage || count === 1}
           rowActions={
             canManage
               ? (member) => {
