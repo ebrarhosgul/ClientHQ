@@ -286,9 +286,9 @@ The client's own read only view: their projects, the deliverables the agency cho
   - [x] Projects, files and the overview: the project list, project page and files section with their visibility rules, orders, grouping and paging, database tests under both foreign contexts, then the overview's three capped blocks · AC-5, AC-6, AC-7, AC-8, AC-14 · 40 tests in `src/portal` (19 against real PostgreSQL) plus a real signed in walk of all three overview blocks and both list pages
   - [x] The switcher and the routes' gate: the `contact-rows.ts` door, `switchContact`, the top bar menu, the gate wired into the download and PDF routes' contact branches, the unavailable page's way back · AC-2, AC-3, AC-11, AC-13 · walked signed in for real between Priya's two seeded rows; the unavailable branch itself proven only by mocked tests, since the seeded Harbor Lane row currently reads as `grace`, not `locked`
   - [x] States, gallery and accessibility: the portal not found page, `error.tsx`, the loading skeletons, the `/design` entries, axe in both themes on every page and state, the keyboard and 320 pixel checks, the tenancy and locked walks in Playwright · AC-12, AC-14, AC-15, AC-16 · a third seeded agency (locked, unconditionally) makes the locked walk real for the first time; 25 new component tests plus 12 new Playwright tests, all green; one real gap found and documented, not hidden: Next 16 answers `200`, not `404`, for a `notFound()` thrown from a streamed page
-- [ ] Verify it: `/check verify client portal`
-- [ ] Test it: `/test client portal`
-- [ ] Review it (fresh model): `/check review client portal`
+- [x] Verify it: `/check verify client portal`
+- [x] Test it: `/test client portal`
+- [x] Review it (fresh model): `/check review client portal`
 - [ ] Document it: `/document client portal`
 Spec [0014](../specs/0014-client-portal/index.md) · atomic build tasks in its `## Build plan`
 
