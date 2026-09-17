@@ -34,7 +34,7 @@ import {
 import { resolveStaffContext } from "@/db/tenant/context";
 import { sessionClaims } from "@/db/tenant/session";
 
-import { clerkOrganization, clerkUser } from "./clerk";
+import { agencyMemberships, clerkOrganization, clerkUser } from "./clerk";
 
 /** Was this the one failure a repair can fix? */
 function isMissingMirror(error: unknown): boolean {
@@ -44,11 +44,16 @@ function isMissingMirror(error: unknown): boolean {
 /**
  * Put the three rows back from Clerk, which is authoritative for all of them.
  *
- * Two Clerk calls, not three: the membership role comes from the session's own
- * organization claim through `toMembershipRole()`, which spec 0003 already
- * provides. A 404 on either record means the organization was deleted or this
- * person was removed from it, so there is nothing to repair and `/onboarding`
- * is where they belong. Any other Clerk failure propagates (AC-21).
+ * Three Clerk reads, together: the organization and the user records, which
+ * `ensureMirrorRows` needs in full, and the person's own membership list,
+ * which decides whether there is anything to repair at all (spec 0015,
+ * AC-12). The role comes from that membership, not the session claim: a
+ * token outlives a removal or a demotion by up to a minute, and a repair
+ * that trusted it would rebuild a membership Clerk no longer has, or with a
+ * role it no longer grants. A 404 on either record, or no membership for
+ * this organization, means the person does not belong here, so there is
+ * nothing to repair and `/onboarding` is where they belong. Any other Clerk
+ * failure propagates (spec 0005, AC-21).
  */
 async function repairMirror(): Promise<void> {
   const claims = await sessionClaims();
@@ -58,19 +63,26 @@ async function repairMirror(): Promise<void> {
     redirect("/onboarding");
   }
 
-  const [organization, user] = await Promise.all([
-    clerkOrganization(claims.clerkOrgId),
+  const clerkOrgId = claims.clerkOrgId;
+
+  const [organization, user, memberships] = await Promise.all([
+    clerkOrganization(clerkOrgId),
     clerkUser(claims.clerkUserId),
+    agencyMemberships(claims.clerkUserId),
   ]);
 
-  if (!organization.ok || !user.ok) {
+  const membership = memberships.find(
+    (candidate) => candidate.clerkOrgId === clerkOrgId,
+  );
+
+  if (!organization.ok || !user.ok || membership === undefined) {
     redirect("/onboarding");
   }
 
   await ensureMirrorRows(
     organization.data,
     user.data,
-    toMembershipRole(claims.clerkOrgRole),
+    toMembershipRole(membership.clerkOrgRole),
   );
 }
 

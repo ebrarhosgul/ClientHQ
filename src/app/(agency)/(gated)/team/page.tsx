@@ -1,16 +1,51 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+
+import { agencyContext, currentAgency } from "@/auth/context";
+import { isClerkConfigured } from "@/lib/env";
+import { loadTeam } from "@/team/queries";
+import { ClerkSessionSync } from "@/team/ui/session-sync";
+import { TeamPageView } from "@/team/ui/team-page-view";
+
+export const metadata: Metadata = {
+  title: "Team",
+};
 
 /**
- * `/team`, reserved.
+ * `/team` (spec 0015, AC-1): who is in the agency, read live from Clerk, with
+ * the invite card and the row controls for an admin and the read only view
+ * for a member. The organization comes from the session, never the URL.
  *
- * The sidebar links to every path this product commits to (AC-23), including
- * the ones still to be built. This page keeps that honest: it hands off to the
- * route group's `not-found.tsx`, so the link lands inside the shell with an
- * explanation and a way back rather than on a bare 404, and the response is
- * still a real 404 rather than a page pretending the section exists.
+ * When Clerk cannot be reached the page frame still renders and the list
+ * area shows the error card (AC-11); nothing falls back to the mirror.
  *
- * **Feature 16, "Team members & roles", replaces this file.**
+ * With no Clerk publishable key there is no session and no team to read, so
+ * this renders the error card a brand new environment would see rather than
+ * resolving a tenant context that cannot exist (spec 0004, AC-22).
  */
-export default function TeamPlaceholder(): never {
-  notFound();
+export default async function TeamPage() {
+  if (!isClerkConfigured()) {
+    return (
+      <TeamPageView
+        agencyName="your agency"
+        clerkOrgId=""
+        viewerClerkUserId=""
+        viewerRole="member"
+        team={undefined}
+      />
+    );
+  }
+
+  const [ctx, agency] = await Promise.all([agencyContext(), currentAgency()]);
+  const loaded = await loadTeam(ctx);
+
+  return (
+    <TeamPageView
+      agencyName={agency?.name ?? "your agency"}
+      clerkOrgId={ctx.clerkOrgId}
+      viewerClerkUserId={ctx.clerkUserId}
+      viewerRole={ctx.role}
+      team={loaded.ok ? loaded.team : undefined}
+      wrap={(children) => <ClerkSessionSync>{children}</ClerkSessionSync>}
+    />
+  );
 }

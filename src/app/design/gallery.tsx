@@ -21,6 +21,17 @@ import { GraceBanner } from "@/access/ui/grace-banner";
 import { AcceptInvitationCard } from "@/contacts/ui/accept-invitation-card";
 import { ContactsSectionView } from "@/contacts/ui/contacts-section-view";
 import {
+  FIXTURE_AGENCY_NAME,
+  FIXTURE_CLERK_ORG_ID,
+  INVITATION_FIXTURES,
+  MEMBER_FIXTURES,
+  SOLO_ADMIN_FIXTURES,
+  VIEWER_CLERK_USER_ID,
+} from "@/team/ui/fixtures";
+import { InviteForm } from "@/team/ui/invite-form";
+import { MembersTable } from "@/team/ui/members-table";
+import { PendingInvitationsTable } from "@/team/ui/pending-invitations-table";
+import {
   ACCEPT_STATE_FIXTURES,
   CONTACT_FIXTURES,
 } from "@/contacts/ui/fixtures";
@@ -929,6 +940,53 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
                 The inline add form sits here on the real page.
               </p>
             }
+          />
+        </div>
+      </Section>
+
+      <Section
+        id={scoped("team")}
+        title="Team"
+        description="The three sections of /team (spec 0015). First as an admin sees them: the invite card, the members with a role select and a remove button on every row, and the pending invitations. Then the solo admin, whose own controls are locked with the reason as text. Then the member view, with the role as text and no controls. Controls here call the real actions, which refuse with no session."
+      >
+        <div className="flex flex-col gap-4">
+          <InviteForm
+            agencyName={FIXTURE_AGENCY_NAME}
+            headingId={scoped("team-invite-heading")}
+          />
+          <MembersTable
+            headingId={scoped("team-members-heading")}
+            members={MEMBER_FIXTURES}
+            agencyName={FIXTURE_AGENCY_NAME}
+            clerkOrgId={FIXTURE_CLERK_ORG_ID}
+            viewerClerkUserId={VIEWER_CLERK_USER_ID}
+            viewerRole="admin"
+          />
+          <PendingInvitationsTable
+            headingId={scoped("team-pending-heading")}
+            invitations={INVITATION_FIXTURES}
+            agencyName={FIXTURE_AGENCY_NAME}
+          />
+          <PendingInvitationsTable
+            headingId={scoped("team-pending-empty-heading")}
+            invitations={[]}
+            agencyName={FIXTURE_AGENCY_NAME}
+          />
+          <MembersTable
+            headingId={scoped("team-solo-heading")}
+            members={SOLO_ADMIN_FIXTURES}
+            agencyName={FIXTURE_AGENCY_NAME}
+            clerkOrgId={FIXTURE_CLERK_ORG_ID}
+            viewerClerkUserId={VIEWER_CLERK_USER_ID}
+            viewerRole="admin"
+          />
+          <MembersTable
+            headingId={scoped("team-member-view-heading")}
+            members={MEMBER_FIXTURES}
+            agencyName={FIXTURE_AGENCY_NAME}
+            clerkOrgId={FIXTURE_CLERK_ORG_ID}
+            viewerClerkUserId="user_grace"
+            viewerRole="member"
           />
         </div>
       </Section>

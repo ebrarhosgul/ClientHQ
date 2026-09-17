@@ -299,16 +299,16 @@ Growing an agency past one person: invite staff, see the member list, change rol
 **Done when:** an admin can invite, list, re role and remove staff, a member is refused billing and member management at the server and not just hidden in the UI, and permission checks read the authoritative session role rather than the local mirror.
 - [x] Design it (spec): `/architect team members & roles`
 - [ ] Build it: `/develop team members & roles`
-  - [ ] One thread end to end: the six Clerk calls in `src/auth/clerk.ts` (paged reads, 404 and 429 told apart), the `/team` page listing members from Clerk, the invite card and `inviteTeamMember` with the `/sign-up` redirect, proven on the deployed app by a real invitation accepted by a new person and by an existing account · AC-1, AC-2, AC-9
-  - [ ] Pending invitations and the invite guards: the pending table, `revokeTeamInvitation`, the duplicate pre check with its two conflict messages and the mapping of Clerk's own refusal · AC-1, AC-3, AC-4
-  - [ ] Roles and removal: `changeTeamMemberRole` and `removeTeamMember` with the last admin rule, the write through to the `memberships` row only, self demotion and leaving, the role select and the confirm dialog · AC-5, AC-6, AC-7, AC-14
-  - [ ] Failure handling and the repair path: the half done log line, the structured log lines, the three `unavailable` messages, the Clerk error card and member view, and spec 0005's repair path confirming the membership in Clerk before recreating rows · AC-10, AC-11, AC-12, AC-13
-  - [ ] Guards, placeholders and tests: the admin claim and subscription gate on all four actions, the `/settings` comment, Vitest on the rules and actions with a stubbed Clerk, Playwright for the admin and member views · AC-8, AC-15
+  - [ ] One thread end to end: the six Clerk calls in `src/auth/clerk.ts` (paged reads, 404 and 429 told apart), the `/team` page listing members from Clerk, the invite card and `inviteTeamMember` with the `/sign-up` redirect, proven on the deployed app by a real invitation accepted by a new person and by an existing account · AC-1, AC-2, AC-9 · built and green locally (wrappers, page, invite action, 14 wrapper tests); the deployed app walk of a real invitation is still to do, see spec 0015's `verify.md`
+  - [x] Pending invitations and the invite guards: the pending table, `revokeTeamInvitation`, the duplicate pre check with its two conflict messages and the mapping of Clerk's own refusal · AC-1, AC-3, AC-4
+  - [x] Roles and removal: `changeTeamMemberRole` and `removeTeamMember` with the last admin rule, the write through to the `memberships` row only, self demotion and leaving, the role select and the confirm dialog · AC-5, AC-6, AC-7, AC-14
+  - [x] Failure handling and the repair path: the half done log line, the structured log lines, the three `unavailable` messages, the Clerk error card and member view, and spec 0005's repair path confirming the membership in Clerk before recreating rows · AC-10, AC-11, AC-12, AC-13
+  - [ ] Guards, placeholders and tests: the admin claim and subscription gate on all four actions, the `/settings` comment, Vitest on the rules and actions with a stubbed Clerk, Playwright for the admin and member views · AC-8, AC-15 · guards, the comment and 66 Vitest tests are in; the Playwright walk needs a signed in staff user in the browser suite, which only has the contact user today
 - [ ] Verify it: `/check verify team members & roles`
 - [ ] Test it: `/test team members & roles`
 - [ ] Review it (fresh model): `/check review team members & roles`
 - [ ] Document it: `/document team members & roles`
-Spec [0015](../specs/0015-team-members-and-roles/index.md) · atomic build tasks in its `## Build plan` · no migration, `memberships` and `users` from spec 0002 are unchanged; invitations live in Clerk
+Spec [0015](../specs/0015-team-members-and-roles/index.md) · atomic build tasks in its `## Build plan` · no migration, `memberships` and `users` from spec 0002 are unchanged; invitations live in Clerk · code in `src/team/`, `src/app/(agency)/(gated)/team/page.tsx`, `src/auth/clerk.ts`, `src/auth/context.ts`, `src/db/tenant/session.ts`, `src/db/tenant/context.ts`, `src/app/design/gallery.tsx`
 
 ### 17. Clerk webhook sync · needs a decision
 Keeping the local mirror of users, organizations and memberships current as they change in Clerk, on the same verified and idempotent shape as the Stripe webhook.
