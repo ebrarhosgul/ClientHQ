@@ -229,6 +229,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm vitest run src/contacts/expired-invites-sweep.db.test.ts
 
+      # The complete listing rule, the newest per agency rule, and the shared
+      # applySubscriptionState lock and customer id guard, against real SQL
+      # with Stripe faked (spec 0017, AC-7).
+      - name: Prove the Stripe reconcile resolves, picks the newest, and applies once
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/payments/reconcile.db.test.ts
+
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would
   # never run on a push and the suite would rot unnoticed.

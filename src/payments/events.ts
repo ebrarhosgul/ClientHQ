@@ -55,6 +55,12 @@ export const retrievedSubscription = z.object({
   customer: stripeRef,
   status: z.string().min(1),
   cancel_at_period_end: z.boolean(),
+  /**
+   * When Stripe created this subscription. The webhook never reads it; the
+   * nightly reconcile does, to pick the newest of several subscriptions that
+   * resolve to the same agency (spec 0017, AC-7).
+   */
+  created: stripeTimestamp,
   metadata: z.record(z.string(), z.string()).nullish(),
   items: z.object({
     data: z

@@ -40,23 +40,23 @@
  * poison event, it is this code being wrong about Stripe's shapes, and it is
  * worth the retries and the loud failure. See `events.ts`.
  */
-import { eq, sql } from "drizzle-orm";
-
-import { processedWebhookEvents, subscriptions } from "@/db/schema";
+import { processedWebhookEvents } from "@/db/schema";
 import type { Database } from "@/db/tenant";
 import { newId } from "@/lib/id";
 
 import {
   checkoutSessionCompleted,
   invoiceEvent,
-  orgIdFromMetadata,
-  primaryItem,
   retrievedSubscription,
   subscriptionEvent,
   type RetrievedSubscription,
 } from "./events";
 import { logStripeWebhook, type StripeWebhookOutcome } from "./log";
 import { organizationExists } from "./organizations";
+import {
+  applySubscriptionState,
+  resolveOrgId as resolveMirrorOrgId,
+} from "./subscription-mirror";
 
 /**
  * The six events this endpoint is subscribed to, and the only ones it acts on.
@@ -189,8 +189,9 @@ function referencesOf(event: VerifiedEvent): {
  * Whose row is this?
  *
  * The session's `client_reference_id` when there is one, because it is the only
- * value that binds a Stripe customer to an agency. Otherwise the row already
- * holding this customer id. Otherwise the `org_id` this app wrote into
+ * value that binds a Stripe customer to an agency. Otherwise the same fallback
+ * the nightly reconcile uses (`src/payments/subscription-mirror.ts`): the row
+ * already holding this customer id, else the `org_id` this app wrote into
  * `subscription_data.metadata` when it started Checkout, which is what lets a
  * subscription event that outran its session still land (AC-22).
  */
@@ -199,67 +200,7 @@ async function resolveOrgId(
   subscription: RetrievedSubscription,
   orgIdFromSession: string | undefined,
 ): Promise<string | undefined> {
-  if (orgIdFromSession !== undefined) {
-    return orgIdFromSession;
-  }
-
-  const [existing] = await db
-    .select({ orgId: subscriptions.orgId })
-    .from(subscriptions)
-    .where(eq(subscriptions.stripeCustomerId, subscription.customer))
-    .limit(1);
-
-  return existing?.orgId ?? orgIdFromMetadata(subscription);
-}
-
-/**
- * Apply the retrieved state to the agency's row, inside the open transaction
- * and behind its lock.
- *
- * `past_due_since` is the only value this feature derives rather than mirrors,
- * and it is derived on the **database** clock. Feature 9 measures a grace
- * window from it, and a window measured from a serverless instance's own clock
- * could drift. The `coalesce` is what keeps a repeated `past_due` event from
- * silently extending that window: first move in sets it, later ones leave it,
- * and anything other than `past_due` clears it.
- */
-function applyState(
-  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
-  orgId: string,
-  subscription: RetrievedSubscription,
-): Promise<unknown> {
-  const item = primaryItem(subscription);
-  const pastDue = subscription.status === "past_due";
-
-  const mirrored = {
-    stripeCustomerId: subscription.customer,
-    stripeSubscriptionId: subscription.id,
-    stripePriceId: item.price.id,
-    status: subscription.status,
-    currentPeriodEnd: item.current_period_end,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-  } as const;
-
-  return tx
-    .insert(subscriptions)
-    .values({
-      id: newId(),
-      orgId,
-      ...mirrored,
-      pastDueSince: pastDue ? sql`now()` : null,
-    })
-    .onConflictDoUpdate({
-      target: subscriptions.orgId,
-      set: {
-        ...mirrored,
-        pastDueSince: pastDue
-          ? sql`coalesce(${subscriptions.pastDueSince}, now())`
-          : null,
-        // `$onUpdate` only fires for `.update()`, and the database clock is the
-        // same one `past_due_since` just used.
-        updatedAt: sql`now()`,
-      },
-    });
+  return orgIdFromSession ?? (await resolveMirrorOrgId(db, subscription));
 }
 
 /** Log and answer. Every non `handled` outcome leaves exactly one line. */
@@ -397,26 +338,15 @@ export async function handleStripeWebhook(
           } as const;
         }
 
-        // 5. Lock, then apply. Two concurrent deliveries queue here rather than
-        // both reading the old row and committing in whichever order they land.
-        const [existing] = await tx
-          .select({ stripeCustomerId: subscriptions.stripeCustomerId })
-          .from(subscriptions)
-          .where(eq(subscriptions.orgId, orgId))
-          .for("update")
-          .limit(1);
+        // 5. Lock, guard and apply, all inside `applySubscriptionState`,
+        // which the nightly reconcile shares (spec 0017, AC-7). Two
+        // concurrent deliveries queue at its lock rather than both reading
+        // the old row and committing in whichever order they land.
+        const outcome = await applySubscriptionState(tx, orgId, subscription);
 
-        // One agency, at most one Stripe customer. A stored id is never quietly
-        // replaced by a different one: that would move a paying agency onto
-        // someone else's customer and lose the first (AC-27).
-        if (
-          existing !== undefined &&
-          existing.stripeCustomerId !== subscription.customer
-        ) {
+        if (outcome === "customer_id_conflict") {
           throw new WebhookRefusal("customer_id_conflict");
         }
-
-        await applyState(tx, orgId, subscription);
 
         // 6. Commit.
         return { status: 200, outcome: "handled", reason: "applied" } as const;
