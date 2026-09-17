@@ -115,6 +115,7 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
       STRIPE_PRICE_ID: price_ci_placeholder
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      CLERK_WEBHOOK_SIGNING_SECRET: whsec_ci_placeholder
       EMAIL_FROM: ci@example.com
 
     steps:
@@ -162,6 +163,20 @@ jobs:
       # here against real SQL. Stripe itself is faked; the transaction is not.
       - name: Prove the Stripe webhook survives replay, reordering and rollback
         run: pnpm vitest run src/payments/webhook.db.test.ts
+
+      # Same claims as the Stripe webhook above, proven for Clerk: signature
+      # verification, the eight event filter, replay, out of order delivery,
+      # both refusals, the cascades and the concurrency claim (spec 0015).
+      - name: Prove the Clerk webhook survives replay, reordering and rollback
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/auth/webhook.db.test.ts
+
+      # The tenant context resolver and the org/user/membership upserts the
+      # Clerk webhook writes through, proven against real SQL rather than
+      # TypeScript's idea of what the query does.
+      - name: Prove tenant context resolution and provisioning hold
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/db/tenant/context.db.test.ts src/db/tenant/provisioning.db.test.ts
 
       # Two simultaneous issues of one draft get consecutive numbers and only
       # one succeeds; a line removal racing an issue is refused; agency B

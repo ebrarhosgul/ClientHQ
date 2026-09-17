@@ -310,7 +310,7 @@ Keeping the local mirror of users, organizations and memberships current as they
   - [ ] Proof: real PostgreSQL suite done (`src/auth/webhook.db.test.ts`, `provisioning.db.test.ts`, `context.db.test.ts`), a separate fake-gateway-only unit file skipped by design (see code review notes); still owed: the Clerk dashboard endpoint, a real delivery through the relay for each of the eight events, and recording that walk in `verify.md` · AC-3, AC-4, AC-12, AC-13, AC-16
 - [ ] Verify it: `/check verify Clerk webhook sync`
 - [x] Test it: `/test Clerk webhook sync`
-- [ ] Review it (fresh model): `/check review Clerk webhook sync`
+- [x] Review it (fresh model): `/check review Clerk webhook sync`
 - [ ] Document it: `/document Clerk webhook sync`
 Spec [0015](../specs/0015-clerk-webhook-sync/index.md) · atomic build tasks in its `## Build plan` · code in `src/auth/webhook.ts`, `src/auth/webhook-events.ts`, `src/auth/webhook-log.ts`, `src/auth/clerk.ts`, `src/app/api/webhooks/clerk/`, `src/db/tenant/provisioning.ts`, `src/db/tenant/context.ts`, `src/lib/env.ts`
 

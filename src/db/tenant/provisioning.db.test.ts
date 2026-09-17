@@ -670,6 +670,20 @@ describe.skipIf(!url)("provisioning against real PostgreSQL", () => {
         ).toHaveLength(1);
       });
     });
+
+    it("refuses neither field rather than deleting every row", async () => {
+      await inRollback(async (tx) => {
+        // The type rules this out at compile time; cast past it to prove the
+        // runtime backstop holds if something bypasses the type (an unsafe
+        // cast, or a caller threading through an object of unknowns).
+        await expect(
+          deleteMembershipRows(
+            {} as unknown as Parameters<typeof deleteMembershipRows>[0],
+            tx,
+          ),
+        ).rejects.toThrow(/requires orgId, userId, or both/);
+      });
+    });
   });
 
   describe("unbindContactsOfUser (spec 0015, AC-9)", () => {

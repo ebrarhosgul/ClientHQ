@@ -266,16 +266,25 @@ export async function softDeleteOrganization(
 }
 
 /**
+ * At least one of `orgId` or `userId` is always given; the union below makes
+ * the empty case a type error rather than a documented expectation.
+ */
+type DeleteMembershipRowsInput =
+  | { readonly orgId: string; readonly userId?: never }
+  | { readonly orgId?: never; readonly userId: string }
+  | { readonly orgId: string; readonly userId: string };
+
+/**
  * Every membership row an organization delete or a user delete removes, or
  * (both fields given) the single `(org_id, user_id)` row a membership delete
- * removes (spec 0015, AC-11). At least one of the two is always given.
+ * removes (spec 0015, AC-11).
  *
  * Required alongside `softDeleteOrganization` and `scrubUser` for the same
  * reason: a soft delete is an `UPDATE`, so the `memberships` foreign key
  * cascade never fires on its own (AC-6, AC-9).
  */
 export async function deleteMembershipRows(
-  input: { readonly orgId?: string; readonly userId?: string },
+  input: DeleteMembershipRowsInput,
   executor?: Executor,
 ): Promise<void> {
   const db = executor ?? (await pooledDb());
@@ -286,6 +295,14 @@ export async function deleteMembershipRows(
       ? eq(memberships.userId, input.userId)
       : undefined,
   ].filter((condition) => condition !== undefined);
+
+  // The type above already rules this out; kept as a runtime backstop since
+  // an unqualified DELETE here would remove every tenant's membership rows.
+  if (conditions.length === 0) {
+    throw new Error(
+      "deleteMembershipRows requires orgId, userId, or both, never neither.",
+    );
+  }
 
   await db.delete(memberships).where(and(...conditions));
 }
