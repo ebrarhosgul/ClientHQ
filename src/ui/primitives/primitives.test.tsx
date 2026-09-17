@@ -281,6 +281,43 @@ describe.each(THEMES)("every primitive in the %s theme", (theme) => {
   });
 });
 
+describe("the table container", () => {
+  it("is not a tab stop by default, so a normal table gains no extra stop", () => {
+    render(
+      <Table>
+        <caption>Invoices</caption>
+        <TableBody>
+          <TableRow>
+            <TableCell>INV-0001</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    expect(screen.getByRole("table").parentElement).not.toHaveAttribute(
+      "tabIndex",
+    );
+  });
+
+  it("is keyboard focusable when opted in, so a row with every control disabled still scrolls (spec 0015, AC-14)", () => {
+    render(
+      <Table scrollFocusable>
+        <caption>Invoices</caption>
+        <TableBody>
+          <TableRow>
+            <TableCell>INV-0001</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    expect(screen.getByRole("table").parentElement).toHaveAttribute(
+      "tabIndex",
+      "0",
+    );
+  });
+});
+
 describe("the dialog", () => {
   it("opens, names itself, traps focus and closes on Escape", async () => {
     const user = userEvent.setup();

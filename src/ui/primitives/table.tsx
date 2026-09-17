@@ -3,10 +3,25 @@
 import * as React from "react";
 import { cn } from "@/ui/lib/cn";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+type TableProps = React.ComponentProps<"table"> & {
+  /**
+   * Makes the scroll container its own tab stop. Off by default: almost
+   * every table already has a focusable descendant (a row link or a row
+   * action), which already carries a keyboard user's Tab into it. Pass this
+   * only for the rare table that can end up with no focusable descendant at
+   * all (the last admin's row on `/team`, spec 0015 AC-14, with every
+   * control disabled and no other row) — otherwise axe's
+   * scrollable-region-focusable rule is trading a real, narrow gap for an
+   * extra, unnamed tab stop on every other table in the product.
+   */
+  readonly scrollFocusable?: boolean;
+};
+
+function Table({ className, scrollFocusable, ...props }: TableProps) {
   return (
     <div
       data-slot="table-container"
+      tabIndex={scrollFocusable ? 0 : undefined}
       className="relative w-full overflow-x-auto"
     >
       <table

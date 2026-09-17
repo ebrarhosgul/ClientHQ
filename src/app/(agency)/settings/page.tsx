@@ -9,7 +9,8 @@ import { notFound } from "next/navigation";
  * explanation and a way back rather than on a bare 404, and the response is
  * still a real 404 rather than a page pretending the section exists.
  *
- * **Feature 16, "Team members & roles", replaces this file.**
+ * **A later agency settings feature replaces this file** (agency name and
+ * default currency). Spec 0015 built `/team` and deliberately left this one.
  */
 export default function SettingsPlaceholder(): never {
   notFound();

@@ -39,6 +39,7 @@ export {
   contactContext,
   staffContext,
   tenantContext,
+  toClerkRole,
   toMembershipRole,
   type ContactContext,
   type StaffContext,

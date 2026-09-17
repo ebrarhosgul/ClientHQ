@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0005 AC-12, AC-21
+ * covers: spec 0005 AC-12, AC-21 · spec 0015 AC-12
  *
  * Where each of the repair's outcomes ends up.
  *
@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   agencyProfile: vi.fn(),
   clerkOrganization: vi.fn(),
   clerkUser: vi.fn(),
+  agencyMemberships: vi.fn(),
   claims: {
     clerkUserId: "user_1" as string | undefined,
     clerkOrgId: "org_1" as string | undefined,
@@ -70,6 +71,7 @@ vi.mock("@/db/tenant", async () => {
 vi.mock("./clerk", () => ({
   clerkOrganization: mocks.clerkOrganization,
   clerkUser: mocks.clerkUser,
+  agencyMemberships: mocks.agencyMemberships,
 }));
 
 const { agencyContext, isClientContact } = await import("./context");
@@ -106,6 +108,9 @@ beforeEach(() => {
       imageUrl: undefined,
     },
   });
+  mocks.agencyMemberships.mockResolvedValue([
+    { clerkOrgId: "org_1", name: "Northwind", clerkOrgRole: "org:admin" },
+  ]);
   mocks.ensureMirrorRows.mockResolvedValue({
     orgId: "local-org",
     userId: "local-user",
@@ -134,8 +139,12 @@ describe("agencyContext", () => {
     expect(mocks.redirected).toEqual([]);
   });
 
-  it("takes the membership role from the session claim, not a third Clerk call", async () => {
-    mocks.claims = { ...mocks.claims, clerkOrgRole: "org:member" };
+  it("takes the membership role from Clerk's membership, not the session claim (spec 0015, AC-12)", async () => {
+    // A stale token still says admin; Clerk says member. Clerk wins.
+    mocks.claims = { ...mocks.claims, clerkOrgRole: "org:admin" };
+    mocks.agencyMemberships.mockResolvedValue([
+      { clerkOrgId: "org_1", name: "Northwind", clerkOrgRole: "org:member" },
+    ]);
     mocks.staffContext.mockRejectedValue(missingMirror());
     mocks.resolveStaffContext.mockResolvedValue({ ...STAFF, role: "member" });
 
@@ -146,9 +155,27 @@ describe("agencyContext", () => {
       expect.objectContaining({ email: "ada@northwind.test" }),
       "member",
     );
-    // Two calls, the organization and the user. Never a third for the role.
     expect(mocks.clerkOrganization).toHaveBeenCalledTimes(1);
     expect(mocks.clerkUser).toHaveBeenCalledTimes(1);
+    expect(mocks.agencyMemberships).toHaveBeenCalledWith("user_1");
+  });
+
+  it("sends a removed person to /onboarding without recreating their membership (spec 0015, AC-12)", async () => {
+    // The token still names org_1, but Clerk no longer lists a membership
+    // for it: the person was removed in the last minute.
+    mocks.agencyMemberships.mockResolvedValue([
+      {
+        clerkOrgId: "org_other",
+        name: "Elsewhere",
+        clerkOrgRole: "org:member",
+      },
+    ]);
+    mocks.staffContext.mockRejectedValue(missingMirror());
+
+    await expect(agencyContext()).rejects.toThrow(REDIRECTED);
+
+    expect(mocks.redirected).toEqual(["/onboarding"]);
+    expect(mocks.ensureMirrorRows).not.toHaveBeenCalled();
   });
 
   it.each([
