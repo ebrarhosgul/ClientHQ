@@ -23,6 +23,12 @@ export const CONTACT_COOKIE_NAME = "clienthq_contact";
 /** The Clerk organization role that maps onto an agency admin. */
 export const CLERK_ADMIN_ROLE = "org:admin";
 
+/** The Clerk organization role that maps onto an agency member. */
+export const CLERK_MEMBER_ROLE = "org:member";
+
+/** The two Clerk role strings this product ever sends or reads. */
+export type ClerkOrgRole = typeof CLERK_ADMIN_ROLE | typeof CLERK_MEMBER_ROLE;
+
 /** The raw claims, normalised to `undefined` so nothing downstream sees null. */
 export type SessionClaims = {
   readonly clerkUserId: string | undefined;

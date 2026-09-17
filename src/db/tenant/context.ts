@@ -17,7 +17,13 @@ import { clientContacts, organizations, users } from "../schema";
 import { tenantResolutionError, type ResolutionErrorKind } from "./errors";
 import { pooledDb, type Executor } from "./executor";
 import { logRefusal } from "./log";
-import { CLERK_ADMIN_ROLE, contactCookie, sessionClaims } from "./session";
+import {
+  CLERK_ADMIN_ROLE,
+  CLERK_MEMBER_ROLE,
+  contactCookie,
+  sessionClaims,
+  type ClerkOrgRole,
+} from "./session";
 
 /** An agency user acting inside one Clerk organization. */
 export type StaffContext = {
@@ -61,6 +67,20 @@ export function toMembershipRole(
   clerkOrgRole: string | undefined,
 ): MembershipRole {
   return clerkOrgRole === CLERK_ADMIN_ROLE ? "admin" : "member";
+}
+
+/**
+ * The other direction, for the calls that write a role to Clerk (spec 0015,
+ * AC-2, AC-5). Exhaustive over the enum, so a third local role cannot be
+ * added without deciding what Clerk should be told.
+ */
+export function toClerkRole(role: MembershipRole): ClerkOrgRole {
+  switch (role) {
+    case "admin":
+      return CLERK_ADMIN_ROLE;
+    case "member":
+      return CLERK_MEMBER_ROLE;
+  }
 }
 
 /**

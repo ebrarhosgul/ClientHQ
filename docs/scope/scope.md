@@ -26,7 +26,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 13 | Invoice authoring & lifecycle | Slice 6 | in-progress |
 | 14 | Invoice PDF | Slice 6 | in-progress |
 | 15 | Client portal | Slice 7 | in-progress |
-| 16 | Team members & roles | Slice 8 | planned |
+| 16 | Team members & roles | Slice 8 | in-progress |
 | 17 | Clerk webhook sync | Slice 8 | in-progress |
 | 18 | Daily cron sweeps | Slice 9 | planned |
 | 19 | Rate limiting | Slice 9 | planned |
@@ -294,10 +294,21 @@ Spec [0014](../specs/0014-client-portal/index.md) · atomic build tasks in its `
 
 ## Slice 8: Team & identity sync
 
-### 16. Team members & roles · needs a decision
+### 16. Team members & roles · in-progress
 Growing an agency past one person: invite staff, see the member list, change roles, remove people, and enforce what an admin may do that a member may not.
 **Done when:** an admin can invite, list, re role and remove staff, a member is refused billing and member management at the server and not just hidden in the UI, and permission checks read the authoritative session role rather than the local mirror.
-- [ ] Design it (spec): `/architect team members & roles`
+- [x] Design it (spec): `/architect team members & roles`
+- [ ] Build it: `/develop team members & roles`
+  - [ ] One thread end to end: the six Clerk calls in `src/auth/clerk.ts` (paged reads, 404 and 429 told apart), the `/team` page listing members from Clerk, the invite card and `inviteTeamMember` with the `/sign-up` redirect, proven on the deployed app by a real invitation accepted by a new person and by an existing account · AC-1, AC-2, AC-9 · built and green locally (wrappers, page, invite action, 14 wrapper tests); the deployed app walk of a real invitation is still to do, see spec 0015's `verify.md`
+  - [x] Pending invitations and the invite guards: the pending table, `revokeTeamInvitation`, the duplicate pre check with its two conflict messages and the mapping of Clerk's own refusal · AC-1, AC-3, AC-4
+  - [x] Roles and removal: `changeTeamMemberRole` and `removeTeamMember` with the last admin rule, the write through to the `memberships` row only, self demotion and leaving, the role select and the confirm dialog · AC-5, AC-6, AC-7, AC-14
+  - [x] Failure handling and the repair path: the half done log line, the structured log lines, the three `unavailable` messages, the Clerk error card and member view, and spec 0005's repair path confirming the membership in Clerk before recreating rows · AC-10, AC-11, AC-12, AC-13
+  - [ ] Guards, placeholders and tests: the admin claim and subscription gate on all four actions, the `/settings` comment, Vitest on the rules and actions with a stubbed Clerk, Playwright for the admin and member views · AC-8, AC-15 · guards, the comment and 66 Vitest tests are in; the Playwright walk needs a signed in staff user in the browser suite, which only has the contact user today
+- [x] Verify it: `/check verify team members & roles` · core flows walked by hand on the deployed app, full test suite green; a handful of edge cases accepted as known gaps, see spec 0015's `verify.md`
+- [x] Test it: `/test team members & roles`
+- [x] Review it (fresh model): `/check review team members & roles`
+- [ ] Document it: `/document team members & roles`
+Spec [0015](../specs/0015-team-members-and-roles/index.md) · atomic build tasks in its `## Build plan` · no migration, `memberships` and `users` from spec 0002 are unchanged; invitations live in Clerk · code in `src/team/`, `src/app/(agency)/(gated)/team/page.tsx`, `src/auth/clerk.ts`, `src/auth/context.ts`, `src/db/tenant/session.ts`, `src/db/tenant/context.ts`, `src/app/design/gallery.tsx`
 
 ### 17. Clerk webhook sync · in-progress
 Keeping the local mirror of users, organizations and memberships current as they change in Clerk, on the same verified and idempotent shape as the Stripe webhook.
@@ -341,6 +352,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
 - **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
+- **Agency settings page**: `/settings` stays a placeholder. Spec 0015 relabels it (the placeholder comment used to say feature 16 replaces it) and leaves agency name and default currency editing to a feature of its own · from spec 0015 · needs a decision
+- **Audit history in the product**: team changes, contact invitations and billing actions are recorded as structured log lines only. Spec 0015 chose not to start an `audit_events` table inside one feature; if a queryable history is wanted it is a cross cutting decision taken once · from spec 0015 · needs a decision
 - **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · needs a decision
 - **Gate re check on client side navigation**: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately by the wrapper, so the gap is read only and bounded. Worth measuring once real agencies exist; `template.tsx` in the `(gated)` group is the first thing to try if it matters · from spec 0008 · needs a decision
 - **Preview environment file storage**: R2's CORS rule is per bucket and per origin, so each Vercel preview URL that needs real uploads needs its own bucket run through `pnpm r2:setup`, or previews run with storage unconfigured (which spec 0011 supports with a visible notice). Decide between one shared preview bucket with a wildcard origin rule and per preview buckets if previews ever need real files · from spec 0011 · needs a decision

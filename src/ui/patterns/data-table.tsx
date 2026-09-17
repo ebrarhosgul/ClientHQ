@@ -62,6 +62,11 @@ export type DataTableProps<TRow> = {
   readonly rowActions?: (row: TRow) => ReactNode;
   readonly rowActionsLabel?: string;
   readonly className?: string;
+  /**
+   * Passed through to `Table` for the rare case this table can render with
+   * no focusable descendant anywhere in it. See `Table`'s own doc comment.
+   */
+  readonly scrollFocusable?: boolean;
 };
 
 const PRIORITY_CLASS: Readonly<Record<ColumnPriority, string>> = {
@@ -80,6 +85,7 @@ export function DataTable<TRow>({
   rowActions,
   rowActionsLabel = "Actions",
   className,
+  scrollFocusable,
 }: DataTableProps<TRow>) {
   return (
     <div
@@ -88,7 +94,7 @@ export function DataTable<TRow>({
         className,
       )}
     >
-      <Table>
+      <Table scrollFocusable={scrollFocusable}>
         <caption className="sr-only">{caption}</caption>
         <TableHeader>
           <TableRow>
