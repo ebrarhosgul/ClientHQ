@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { InvoiceStatus } from "@/db/schema";
 import { formatMoney } from "@/lib/money";
 import {
   Table,
@@ -14,10 +15,35 @@ import {
   billingAddressLines,
   displayQuantity,
   presentInvoice,
+  type BillingAddressClient,
 } from "../presentation";
-import type { InvoiceDetail } from "../queries";
+import type { LineItemRow } from "../queries";
 import { displayNumber, isClientVisible } from "../status";
 import { InvoiceTotals } from "./invoice-totals";
+
+/**
+ * The narrow shape the document actually reads, satisfied by both the
+ * staff `getInvoice` row (spec 0012) and the contact safe `getInvoiceDocument`
+ * row (spec 0013), so one component renders both (spec 0014, AC-10). Neither
+ * a database id nor a client id belongs here: the two callers link the
+ * document to their own PDF route and their own client page, if they have
+ * one, through `pdfHref` and `clientHref` below.
+ */
+export type InvoiceDocumentInvoice = {
+  readonly status: InvoiceStatus;
+  readonly number: number | null;
+  readonly issueDate: string | null;
+  readonly dueDate: string | null;
+  readonly currency: string;
+  readonly subtotalCents: number;
+  readonly taxRateBp: number;
+  readonly taxCents: number;
+  readonly totalCents: number;
+  readonly notes: string | null;
+  readonly paidAt: Date | null;
+  readonly client: { readonly name: string } & BillingAddressClient;
+  readonly lines: readonly LineItemRow[];
+};
 
 function Detail({
   label,
@@ -58,10 +84,15 @@ export function InvoiceDocument({
   invoice,
   agencyName,
   todayUtc,
+  pdfHref,
+  clientHref,
 }: {
-  readonly invoice: InvoiceDetail;
+  readonly invoice: InvoiceDocumentInvoice;
   readonly agencyName: string;
   readonly todayUtc: string;
+  readonly pdfHref: string;
+  /** Omitted for a client contact, who has no page to link the name to. */
+  readonly clientHref?: string;
 }) {
   const presentation =
     isClientVisible(invoice.status) && invoice.number !== null
@@ -89,12 +120,16 @@ export function InvoiceDocument({
           <Detail
             label="Client"
             value={
-              <Link
-                href={`/clients/${invoice.client.id}`}
-                className="font-medium underline underline-offset-2"
-              >
-                {invoice.client.name}
-              </Link>
+              clientHref === undefined ? (
+                invoice.client.name
+              ) : (
+                <Link
+                  href={clientHref}
+                  className="font-medium underline underline-offset-2"
+                >
+                  {invoice.client.name}
+                </Link>
+              )
             }
           />
           {addressLines.length > 0 ? (
@@ -138,7 +173,7 @@ export function InvoiceDocument({
 
         {presentation ? (
           <Link
-            href={`/invoices/${invoice.id}/pdf`}
+            href={pdfHref}
             className="shrink-0 text-sm font-medium underline underline-offset-2"
           >
             Download PDF

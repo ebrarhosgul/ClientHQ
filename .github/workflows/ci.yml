@@ -189,11 +189,27 @@ jobs:
   # browser, so without this the Playwright side of spec 0004's AC-19 would
   # never run on a push and the suite would rot unnoticed.
   #
-  # It needs no provider credential: `/` renders without a database and without
-  # a Clerk session, and the shell degrades to its signed out state.
+  # It needs no provider credential for the signed out suite: `/` renders
+  # without a database and without a Clerk session, and the shell degrades to
+  # its signed out state. The client portal's own signed in suite (spec 0014,
+  # `e2e/portal-contact.spec.ts`) is the one exception: `playwright.config.ts`
+  # only defines that project when the five secrets below are all set, so a
+  # fork or a run with none of them configured behaves exactly as before.
+  #
+  # Those five secrets alone are not enough to turn that suite green here: it
+  # also needs a real, seeded database, which this job does not provision
+  # (unlike `migrations-apply` above). Wiring that up is a follow up, tracked
+  # in spec 0014.
   browser:
     name: Browser suite and axe
     runs-on: ubuntu-latest
+
+    env:
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      E2E_CLERK_CONTACT_USERNAME: ${{ secrets.E2E_CLERK_CONTACT_USERNAME }}
+      E2E_CLERK_CONTACT_PASSWORD: ${{ secrets.E2E_CLERK_CONTACT_PASSWORD }}
+      E2E_CLERK_CONTACT_USER_ID: ${{ secrets.E2E_CLERK_CONTACT_USER_ID }}
 
     steps:
       - name: Check out the repository

@@ -26,6 +26,7 @@ import {
 } from "@/contacts/ui/fixtures";
 import { LockedNotice } from "@/access/ui/locked-notice";
 import type { InvoiceStatus } from "@/db/schema";
+import type { AcceptedContactRow } from "@/db/tenant";
 import type { InvoiceDetail, InvoiceEventRow } from "@/invoices/queries";
 import { InvoiceDocument } from "@/invoices/ui/invoice-document";
 import { InvoiceEventsList } from "@/invoices/ui/invoice-events-list";
@@ -34,6 +35,15 @@ import { PastDueBadge } from "@/invoices/ui/past-due-badge";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { formatBytes } from "@/deliverables/format";
 import { typeLabel } from "@/deliverables/file-rules";
+import {
+  OVERVIEW_FILES_EMPTY,
+  OVERVIEW_INVOICES_EMPTY,
+  OVERVIEW_PROJECTS_EMPTY,
+} from "@/portal/copy";
+import { ClientSwitcher } from "@/portal/ui/client-switcher";
+import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
+import { PortalTopBar } from "@/portal/ui/portal-top-bar";
+import { SectionNav } from "@/portal/ui/section-nav";
 import { AddressFields } from "@/ui/patterns/address-fields";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
@@ -360,6 +370,24 @@ function invoiceDocumentFixture(
     ...overrides,
   };
 }
+
+/** The switcher's two rows, one full level and one locked (spec 0014, AC-11). */
+const PORTAL_CONTACT_ROWS: readonly AcceptedContactRow[] = [
+  {
+    contactId: "gallery-contact-northwind",
+    clientId: "gallery-client-northwind",
+    orgId: "gallery-org-studio-north",
+    clientName: "Northwind Traders",
+    agencyName: "Studio North",
+  },
+  {
+    contactId: "gallery-contact-cinder",
+    clientId: "gallery-client-cinder",
+    orgId: "gallery-org-anchor-ridge",
+    clientName: "Cinder Media",
+    agencyName: "Anchor Ridge",
+  },
+];
 
 export function Gallery({ prefix }: { readonly prefix: string }) {
   const scoped = (name: string) => `${prefix}-${name}`;
@@ -932,6 +960,68 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
       </Section>
 
       <Section
+        id={scoped("client-portal-shell")}
+        title="Client portal shell"
+        description="No sidebar, ever (spec 0014, AC-4): a top bar with the client's name, plain text with one accepted row and a Switch client menu with more than one (AC-11), then a three link section strip. The three describing empty states never invite an action."
+      >
+        <div className="flex flex-col gap-6">
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              top bar and section strip, one accepted row: plain text
+            </p>
+            <div className="overflow-hidden rounded-lg border border-border">
+              <PortalTopBar
+                clientName="Northwind Traders"
+                rows={[PORTAL_CONTACT_ROWS[0]!]}
+                currentContactId={PORTAL_CONTACT_ROWS[0]!.contactId}
+              />
+              <SectionNav />
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              top bar, more than one accepted row: the Switch client menu
+            </p>
+            <div className="overflow-hidden rounded-lg border border-border">
+              <PortalTopBar
+                clientName="Northwind Traders"
+                rows={PORTAL_CONTACT_ROWS}
+                currentContactId={PORTAL_CONTACT_ROWS[0]!.contactId}
+              />
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              the switcher on its own, closed (opening it needs a client
+              component, exercised in the shell and by the manual pass)
+            </p>
+            <ClientSwitcher
+              rows={PORTAL_CONTACT_ROWS}
+              currentContactId={PORTAL_CONTACT_ROWS[0]!.contactId}
+              clientName="Northwind Traders"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <PortalEmptyState
+              heading={OVERVIEW_PROJECTS_EMPTY.heading}
+              description={OVERVIEW_PROJECTS_EMPTY.description}
+            />
+            <PortalEmptyState
+              heading={OVERVIEW_FILES_EMPTY.heading}
+              description={OVERVIEW_FILES_EMPTY.description}
+            />
+            <PortalEmptyState
+              heading={OVERVIEW_INVOICES_EMPTY.heading}
+              description={OVERVIEW_INVOICES_EMPTY.description}
+            />
+          </div>
+        </div>
+      </Section>
+
+      <Section
         id={scoped("empty-and-error-states")}
         title="Empty and error states"
         description="Every list has both. The error state never shows a stack trace or a digest, and always offers a way forward."
@@ -1313,6 +1403,8 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               invoice={invoiceDocumentFixture()}
               agencyName="Acme Agency"
               todayUtc="2026-09-15"
+              pdfHref="/invoices/gallery-invoice/pdf"
+              clientHref="/clients/client-1"
             />
           </div>
 
@@ -1328,6 +1420,8 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               })}
               agencyName="Acme Agency"
               todayUtc="2026-09-15"
+              pdfHref="/invoices/gallery-invoice/pdf"
+              clientHref="/clients/client-1"
             />
           </div>
         </div>

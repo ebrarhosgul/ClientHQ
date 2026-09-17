@@ -13,7 +13,22 @@
  * A second, much smaller agency sits beside it (spec 0008): one admin and a
  * subscription in `past_due` since an hour before the seed ran, so the grace
  * window banner is one seed away in development, and the lockout is one seed
- * plus a week away with nothing else run.
+ * plus a week away with nothing else run. It also carries one client of its
+ * own, Fernwood Clinic, with one accepted contact bound to the same person as
+ * Northwind's Priya Patel (spec 0014).
+ *
+ * A third agency, Anchor Ridge, is smaller still: one admin, one client
+ * (Cinder Media), and a subscription that is simply `canceled`, so it reads as
+ * `locked` from the moment the seed runs rather than after a week's wait like
+ * the grace org above. Priya holds an accepted row there too, so the client
+ * portal's test user has three rows across three agencies: one `full`, one
+ * `grace`, one `locked`, which is what the switcher and the locked agency's
+ * unavailable page both need to be walked for real (spec 0014, AC-11, AC-16).
+ *
+ * `E2E_CLERK_CONTACT_USER_ID`, when set, is written as Priya's `clerk_user_id`
+ * so every one of her rows binds to a real Clerk development account the
+ * browser suite can sign in as (spec 0014, AC-16); unset, she keeps the fixed
+ * seed id every other run has used.
  *
  * Every id is a hardcoded constant, and every row is written with "insert, or
  * update on conflict", which is what makes running it twice an update rather
@@ -86,30 +101,43 @@ const fixedId = (block: number, n: number): string =>
 const ORG = fixedId(1, 1);
 /** The agency in its grace window. */
 const PAST_DUE_ORG = fixedId(1, 2);
+/** The agency a locked contact's walk needs (spec 0014, AC-16): `canceled`, not time dependent like the grace org above. */
+const LOCKED_ORG = fixedId(1, 3);
 const USER = {
   admin: fixedId(2, 1),
   member: fixedId(2, 2),
   contactPriya: fixedId(2, 3),
   contactMarcus: fixedId(2, 4),
   pastDueAdmin: fixedId(2, 5),
+  lockedAdmin: fixedId(2, 6),
 };
 const MEMBERSHIP = {
   admin: fixedId(3, 1),
   member: fixedId(3, 2),
   pastDueAdmin: fixedId(3, 3),
+  lockedAdmin: fixedId(3, 4),
 };
 const SUBSCRIPTION = fixedId(4, 1);
 const PAST_DUE_SUBSCRIPTION = fixedId(4, 2);
+const LOCKED_SUBSCRIPTION = fixedId(4, 3);
 const CLIENT = {
   northwind: fixedId(5, 1),
   lumen: fixedId(5, 2),
   archivedHarbor: fixedId(5, 3),
+  /** Harbor Lane's own client (spec 0014), not to be confused with `archivedHarbor` above. */
+  fernwood: fixedId(5, 4),
+  /** Cinder Media, under the locked agency below (spec 0014, AC-16). */
+  cinder: fixedId(5, 5),
 };
 const CONTACT = {
   priya: fixedId(6, 1),
   marcus: fixedId(6, 2),
   invited: fixedId(6, 3),
   notInvited: fixedId(6, 4),
+  /** Priya's second accepted row, for Fernwood Clinic under Harbor Lane. */
+  priyaFernwood: fixedId(6, 5),
+  /** Priya's third accepted row, for Cinder Media under the locked agency. */
+  priyaCinder: fixedId(6, 6),
 };
 const PROJECT = {
   brandRefresh: fixedId(7, 1),
@@ -420,6 +448,7 @@ const INVOICE_EVENTS: readonly (typeof schema.invoiceEvents.$inferInsert)[] = [
 
 function dataset() {
   const built = INVOICES.map(buildInvoice);
+  const priyaClerkUserId = env().E2E_CLERK_CONTACT_USER_ID ?? "user_seed_priya";
 
   return {
     organizations: [
@@ -439,6 +468,13 @@ function dataset() {
         slug: "harbor-lane",
         defaultCurrency: "USD",
       },
+      {
+        id: LOCKED_ORG,
+        clerkOrgId: "org_seed_anchor_ridge",
+        name: "Anchor Ridge",
+        slug: "anchor-ridge",
+        defaultCurrency: "USD",
+      },
     ] satisfies (typeof schema.organizations.$inferInsert)[],
 
     users: [
@@ -456,7 +492,7 @@ function dataset() {
       },
       {
         id: USER.contactPriya,
-        clerkUserId: "user_seed_priya",
+        clerkUserId: priyaClerkUserId,
         email: "priya.patel@northwind.example",
         name: "Priya Patel",
       },
@@ -472,6 +508,12 @@ function dataset() {
         email: "dana.reyes@harbor-lane.example",
         name: "Dana Reyes",
       },
+      {
+        id: USER.lockedAdmin,
+        clerkUserId: "user_seed_locked_admin",
+        email: "morgan.blake@anchor-ridge.example",
+        name: "Morgan Blake",
+      },
     ] satisfies (typeof schema.users.$inferInsert)[],
 
     memberships: [
@@ -486,6 +528,12 @@ function dataset() {
         id: MEMBERSHIP.pastDueAdmin,
         orgId: PAST_DUE_ORG,
         userId: USER.pastDueAdmin,
+        role: "admin",
+      },
+      {
+        id: MEMBERSHIP.lockedAdmin,
+        orgId: LOCKED_ORG,
+        userId: USER.lockedAdmin,
         role: "admin",
       },
     ] satisfies (typeof schema.memberships.$inferInsert)[],
@@ -514,6 +562,18 @@ function dataset() {
         // own in a week: `grace` today, `locked` after 7 days, no job needed.
         pastDueSince: new Date(Date.now() - 60 * 60 * 1000),
       },
+      {
+        id: LOCKED_SUBSCRIPTION,
+        orgId: LOCKED_ORG,
+        stripeCustomerId: "cus_seed_anchor_ridge",
+        stripeSubscriptionId: "sub_seed_anchor_ridge",
+        stripePriceId: "price_seed_monthly",
+        // `canceled` locks unconditionally (`src/access/level.ts`), with no
+        // clock to wait on, unlike the grace org's `past_due` above.
+        status: "canceled",
+        currentPeriodEnd: new Date("2026-08-01T00:00:00Z"),
+        cancelAtPeriodEnd: false,
+      },
     ] satisfies (typeof schema.subscriptions.$inferInsert)[],
 
     clients: [
@@ -537,6 +597,18 @@ function dataset() {
         companyEmail: "team@harbor.example",
         notes: "Engagement ended June 2026.",
         archivedAt: new Date("2026-07-05T09:00:00Z"),
+      },
+      {
+        id: CLIENT.fernwood,
+        orgId: PAST_DUE_ORG,
+        name: "Fernwood Clinic",
+        companyEmail: "hello@fernwood-clinic.example",
+      },
+      {
+        id: CLIENT.cinder,
+        orgId: LOCKED_ORG,
+        name: "Cinder Media",
+        companyEmail: "hello@cinder-media.example",
       },
     ] satisfies (typeof schema.clients.$inferInsert)[],
 
@@ -579,6 +651,32 @@ function dataset() {
         clientId: CLIENT.lumen,
         email: "finance@lumen.example",
         name: "Lumen Finance",
+      },
+      {
+        id: CONTACT.priyaFernwood,
+        orgId: PAST_DUE_ORG,
+        clientId: CLIENT.fernwood,
+        userId: USER.contactPriya,
+        email: "priya.patel@fernwood-clinic.example",
+        name: "Priya Patel",
+        // Accepted before the Northwind row below, on purpose: the fallback
+        // resolver (spec 0003, AC-5) picks the most recently accepted row
+        // with no cookie, and the walk's "lands on the Northwind overview"
+        // (spec 0014, AC-16) depends on Northwind staying that default.
+        invitedAt: new Date("2026-07-20T10:00:00Z"),
+        acceptedAt: new Date("2026-07-20T16:00:00Z"),
+      },
+      {
+        id: CONTACT.priyaCinder,
+        orgId: LOCKED_ORG,
+        clientId: CLIENT.cinder,
+        userId: USER.contactPriya,
+        email: "priya.patel@cinder-media.example",
+        name: "Priya Patel",
+        // Accepted before both rows above, so Northwind stays the
+        // cookie-less fallback (see the note on the Fernwood row).
+        invitedAt: new Date("2026-07-01T10:00:00Z"),
+        acceptedAt: new Date("2026-07-01T16:00:00Z"),
       },
     ] satisfies (typeof schema.clientContacts.$inferInsert)[],
 

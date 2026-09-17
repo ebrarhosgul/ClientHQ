@@ -216,6 +216,8 @@ export default async function InvoiceDetailPage({
           invoice={invoice}
           agencyName={agency?.name ?? ""}
           todayUtc={today}
+          pdfHref={`/invoices/${invoice.id}/pdf`}
+          clientHref={`/clients/${invoice.client.id}`}
         />
       )}
 

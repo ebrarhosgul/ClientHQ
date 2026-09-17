@@ -1,12 +1,13 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0013 AC-1, AC-2, AC-6, AC-7
+ * covers: spec 0013 AC-1, AC-2, AC-6, AC-7; spec 0014 AC-13
  *
  * `handleInvoicePdfRequest` with every dependency mocked: the 404 rule for a
  * bad id, no Clerk key, a resolution error and a missing row or agency; the
- * gate redirect for staff only; the 200 headers; and the 500 page with its
- * context aware link and its one log line, on a throwing renderer.
+ * gate redirect for staff, and `portalAccess`'s own redirect for a contact;
+ * the 200 headers; and the 500 page with its context aware link and its one
+ * log line, on a throwing renderer.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   isClerkConfigured: vi.fn(),
   tenantContext: vi.fn(),
   agencyAccess: vi.fn(),
+  portalAccess: vi.fn(),
   agencyProfile: vi.fn(),
   getInvoiceDocument: vi.fn(),
   renderInvoicePdf: vi.fn(),
@@ -33,6 +35,11 @@ class FakeResolutionError extends Error {}
 vi.mock("@/lib/env", () => ({ isClerkConfigured: mocks.isClerkConfigured }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/access/gate", () => ({ agencyAccess: mocks.agencyAccess }));
+vi.mock("@/portal/gate", () => ({
+  portalAccess: mocks.portalAccess,
+  isPortalReadable: (level: string) => level === "full" || level === "grace",
+  PORTAL_UNAVAILABLE_PATH: "/portal/unavailable",
+}));
 vi.mock("@/db/tenant", () => ({
   tenantContext: mocks.tenantContext,
   agencyProfile: mocks.agencyProfile,
@@ -102,6 +109,7 @@ beforeEach(() => {
   mocks.isClerkConfigured.mockReturnValue(true);
   mocks.tenantContext.mockResolvedValue(STAFF);
   mocks.agencyAccess.mockResolvedValue({ level: "full", role: "admin" });
+  mocks.portalAccess.mockResolvedValue({ level: "full" });
   mocks.getInvoiceDocument.mockResolvedValue(DOCUMENT);
   mocks.agencyProfile.mockResolvedValue(AGENCY);
   mocks.renderInvoicePdf.mockResolvedValue(Buffer.from("%PDF-fake"));
@@ -164,13 +172,46 @@ describe("handleInvoicePdfRequest", () => {
     },
   );
 
-  it("never checks the gate for a contact context", async () => {
+  it("never checks the staff gate for a contact context", async () => {
     mocks.tenantContext.mockResolvedValue(CONTACT);
 
     const response = await handleInvoicePdfRequest(VALID_ID);
 
     expect(response.status).toBe(200);
     expect(mocks.agencyAccess).not.toHaveBeenCalled();
+    expect(mocks.portalAccess).toHaveBeenCalledWith(CONTACT);
+  });
+
+  it.each(["unsubscribed", "locked"] as const)(
+    "redirects a contact to /portal/unavailable when the gate level is %s (spec 0014, AC-13)",
+    async (level) => {
+      mocks.tenantContext.mockResolvedValue(CONTACT);
+      mocks.portalAccess.mockResolvedValue({ level });
+
+      await expect(handleInvoicePdfRequest(VALID_ID)).rejects.toThrow(
+        "NEXT_REDIRECT",
+      );
+      expect(mocks.redirect).toHaveBeenCalledWith("/portal/unavailable");
+      expect(mocks.getInvoiceDocument).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["full", "grace"] as const)(
+    "does not redirect a contact when the gate level is %s",
+    async (level) => {
+      mocks.tenantContext.mockResolvedValue(CONTACT);
+      mocks.portalAccess.mockResolvedValue({ level });
+
+      const response = await handleInvoicePdfRequest(VALID_ID);
+
+      expect(response.status).toBe(200);
+    },
+  );
+
+  it("never checks the contact gate for a staff context", async () => {
+    await handleInvoicePdfRequest(VALID_ID);
+
+    expect(mocks.portalAccess).not.toHaveBeenCalled();
   });
 
   it("answers 404 when there is no PDF for this status or tenant", async () => {

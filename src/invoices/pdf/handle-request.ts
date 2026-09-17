@@ -3,10 +3,12 @@
  *
  * Same order as `src/app/deliverables/[id]/download/route.ts`: the id and
  * Clerk configuration first (no session can ever resolve without a
- * publishable key, spec 0004 AC-22), then the tenant context, the
- * subscription gate for a staff context only, the row and the agency's own
- * name, the render, and only then the response headers. The rules follow the
- * resolved context kind, never the URL that reached this handler.
+ * publishable key, spec 0004 AC-22), then the tenant context, the access gate
+ * (the subscription gate for staff; `portalAccess` for a contact, spec 0014
+ * AC-13, answering `302` to `/portal/unavailable` when locked or
+ * unsubscribed), the row and the agency's own name, the render, and only then
+ * the response headers. The rules follow the resolved context kind, never the
+ * URL that reached this handler.
  */
 import { redirect } from "next/navigation";
 
@@ -25,6 +27,11 @@ import { getInvoiceDocument } from "@/invoices/queries";
 import { invoiceId as invoiceIdSchema } from "@/invoices/schema";
 import { todayUtc } from "@/lib/dates";
 import { isClerkConfigured } from "@/lib/env";
+import {
+  isPortalReadable,
+  portalAccess,
+  PORTAL_UNAVAILABLE_PATH,
+} from "@/portal/gate";
 
 import { renderInvoicePdf } from "./render";
 
@@ -54,6 +61,12 @@ export async function handleInvoicePdfRequest(
 
     if (access.level === "unsubscribed" || access.level === "locked") {
       redirect("/billing");
+    }
+  } else {
+    const access = await portalAccess(ctx);
+
+    if (!isPortalReadable(access.level)) {
+      redirect(PORTAL_UNAVAILABLE_PATH);
     }
   }
 

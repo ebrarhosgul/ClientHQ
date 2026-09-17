@@ -321,6 +321,57 @@ describe("InvoiceTotals", () => {
   });
 });
 
+describe("InvoiceDocument", () => {
+  it("links the client name to clientHref when given (the agency page, spec 0012 AC-10)", () => {
+    render(
+      <InvoiceDocument
+        invoice={detail("overdue")}
+        agencyName="Acme Agency"
+        todayUtc="2026-09-15"
+        pdfHref="/invoices/inv/pdf"
+        clientHref="/clients/c1"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Northwind" })).toHaveAttribute(
+      "href",
+      "/clients/c1",
+    );
+  });
+
+  it("renders the client name as plain text, never a link, with no clientHref (the portal page, spec 0014 AC-10, AC-14)", () => {
+    render(
+      <InvoiceDocument
+        invoice={detail("overdue")}
+        agencyName="Acme Agency"
+        todayUtc="2026-09-15"
+        pdfHref="/portal/invoices/inv/pdf"
+      />,
+    );
+
+    expect(screen.getByText("Northwind")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Northwind" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("downloads the PDF at exactly the given pdfHref, not one derived from the invoice id", () => {
+    render(
+      <InvoiceDocument
+        invoice={detail("overdue")}
+        agencyName="Acme Agency"
+        todayUtc="2026-09-15"
+        pdfHref="/portal/invoices/some-other-id/pdf"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /^Download PDF/ })).toHaveAttribute(
+      "href",
+      "/portal/invoices/some-other-id/pdf",
+    );
+  });
+});
+
 describe("InvoicesSection", () => {
   it("counts the rows in the heading and links each one (AC-13)", () => {
     render(<InvoicesSection client={CLIENT} invoices={CLIENT_ROWS} />);
@@ -414,6 +465,8 @@ describe.each(THEMES)("in the %s theme", (theme) => {
           invoice={detail("overdue")}
           agencyName="Acme Agency"
           todayUtc="2026-09-15"
+          pdfHref="/invoices/inv/pdf"
+          clientHref="/clients/c1"
         />
         <InvoiceEventsList events={EVENTS} />
         <InvoiceEventsList events={[]} />
