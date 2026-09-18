@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { sessionClaims } from "@/db/tenant/session";
+import { isClerkConfigured } from "@/lib/env";
 import { Button } from "@/ui/primitives/button";
 import { BrandMark } from "@/ui/patterns/brand";
 import { ThemeControl } from "@/ui/patterns/theme-control";
@@ -20,8 +23,25 @@ export const metadata: Metadata = {
  * Both links point at routes feature 6 builds. They are real hrefs on purpose:
  * the paths are fixed here (AC-23) so that feature has no choice to make and no
  * chance to pick a different one.
+ *
+ * `/` is on the proxy's public list, so it renders for a signed in visitor too,
+ * unlike every other route: the root `not-found.tsx` sends here on purpose
+ * (its only way back), and a person who follows it while already signed in
+ * must not land back on a Sign in button. `/sign-in` only checks this for
+ * someone with an active organization; a client contact has none, so without
+ * this check here they would end up on Clerk's real sign in form despite
+ * already holding a session. `/onboarding` is the one place that already
+ * knows where a signed in person with no organization claim belongs.
  */
-export default function Home() {
+export default async function Home() {
+  if (isClerkConfigured()) {
+    const { clerkUserId } = await sessionClaims();
+
+    if (clerkUserId !== undefined) {
+      redirect("/onboarding");
+    }
+  }
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="flex items-center justify-between px-6 py-5">
