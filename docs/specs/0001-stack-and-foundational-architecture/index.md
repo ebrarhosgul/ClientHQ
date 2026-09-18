@@ -34,7 +34,7 @@ One deployable Next.js application using React Server Components for reads and S
 | File storage | Cloudflare R2 | 10GB free with zero egress fees, so client downloads never generate a bill, and it is S3 compatible so there is no lock in. |
 | Email | Resend | 3,000 emails a month free with React Email templates, so emails are components like the rest of the app. |
 | Background work | One daily Vercel Cron route plus a database idempotency table | A single scheduled route runs every sweep in sequence, staying inside the Hobby limit of two slots, and webhook safety comes from recording event ids rather than a queue vendor. |
-| Rate limiting | Upstash Redis | Free tier limiting for invite sends and upload URL signing. Sign in is hosted by Clerk and rate limited there, so it is out of scope. |
+| Rate limiting | A Postgres counter table (amended by spec 0018; Upstash Redis was the original pick) | Fixed clock windows counted by one atomic upsert in the app's own database, so no extra provider. Sign in is hosted by Clerk and rate limited there, so it is out of scope. |
 | Observability | Sentry (student Team plan) | Errors and traces across server and browser, with session replay only on errors to protect the quota. |
 | Hosting | Vercel Hobby | Built by the Next.js team, so App Router, streaming, and image optimization work with no configuration. |
 | Testing | Vitest plus Playwright | Unit tests on the money and permission logic, end to end tests on sign up, invite, and checkout. |
@@ -206,7 +206,7 @@ The portal shows, for the signed in contact's client only: projects that are not
 - `STRIPE_PRICE_ID`: the monthly subscription price
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`: Cloudflare R2 credentials
 - `RESEND_API_KEY`, `EMAIL_FROM`: transactional email
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: rate limiting
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: rate limiting (dropped by spec 0018, never added to `env.ts`)
 - `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`: error tracking and source map upload
 - `CRON_SECRET`: shared secret the daily cron route requires
 - `INVITE_TOKEN_SECRET`: signs client portal invitation tokens
@@ -251,7 +251,7 @@ The portal shows, for the signed in contact's client only: projects that are not
 - [ ] Revisit Clerk Billing if the hand rolled sync proves burdensome. It does exist and it does cover organization plans, so the door is open. Two reasons it was not chosen: its billing APIs are marked experimental by Clerk, and plans live in Clerk rather than syncing to Stripe, which would move the source of truth away from Stripe.
 - [ ] Consider a read only public demo account once seed data exists, so a reviewer can walk the app without signing up.
 - [ ] Add an audit log table if the multi tenancy story becomes a talking point. It was deliberately left out of the first schema.
-- [ ] Reconsider whether Upstash earns its place. After correcting the scope, it covers only invite sends and upload URL signing, which a Postgres counter could also do, removing one provider from the eight.
+- [x] Reconsider whether Upstash earns its place. After correcting the scope, it covers only invite sends and upload URL signing, which a Postgres counter could also do, removing one provider from the eight. Settled by spec 0018: a Postgres counter table, and the `UPSTASH_*` variables are dropped.
 
 ## Rationale
 
