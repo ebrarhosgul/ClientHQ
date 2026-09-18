@@ -4,22 +4,43 @@ _Steps derived from spec 0019 acceptance criteria. `/check verify` runs these; `
 
 Two kinds of step. The **Commands** run on any machine with no provider account. The **preview and production walk** needs the dashboards: a Sentry project (Next.js platform) with its region chosen, a PostHog project in the EU cloud with a personal API key scoped to person deletion, the nine variables set in Vercel (the auth token on the build environment only), and Vercel's "automatically expose system environment variables" left on. Record what you find in the two blanks below so the next reader does not have to look.
 
-- Sentry region: `________` (EU or US, chosen at project creation; the notice on `/privacy` says both are possible)
+- Sentry region: `EU (Frankfurt / de.sentry.io)` (EU or US, chosen at project creation; the notice on `/privacy` says both are possible)
 - Sentry alert rule: email on every new issue, filtered to `environment:production`: `[ ]` created
 
 ## Commands
 
-- [ ] `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm format:check` → all three green → AC-9 (the plain `string` property is a compile error; see `src/analytics/properties.ts`)
-- [ ] `corepack pnpm vitest run src/observability` → `sentryEnabled` passes all five cases (production, preview, development, test, unset), `scrubEvent` strips headers, cookies, body, query string and `user.email` and keeps `user.id` and `org_id`, `tracesSampler` returns 0 for `/api/cron` and `/api/webhooks` → AC-2, AC-4, AC-5
-- [ ] `corepack pnpm vitest run src/analytics` → the catalogue test finds no forbidden key and no portal event with a person id, the client never throws on a failing sink and logs `analytics.failed` once per call, the default client is silent under `NODE_ENV=test`, `readConsent` reads a missing or malformed cookie as `undecided`, the provider initialises cookieless through `/ingest` and captures one `$pageview` per pathname with no query or hash, the banner is a named region with equal buttons and is absent under `/portal` → AC-9, AC-12, AC-14, AC-17, AC-18, AC-21, AC-22
-- [ ] `corepack pnpm vitest run src/db/tenant/action-track.test.ts` → the `track` slot fires once after the commit and not on a parse failure, a role refusal, a subscription refusal or a thrown handler → AC-10
-- [ ] `corepack pnpm vitest run src/payments/subscription-transition.test.ts` → `started` on every move into `active`, `none` when unchanged, `changed` otherwise → AC-11
-- [ ] `corepack pnpm vitest run src/cron/analytics-erasure.test.ts src/cron/daily.test.ts` → the sweep re issues `deletePerson`, counts `persons_deleted` and `persons_failed`, skips with `analytics_unconfigured`, and sits after `clerk_reconcile` and before `retention_prune` → AC-20
-- [ ] `corepack pnpm vitest run src/ui/patterns` → `ErrorState` shows `Reference: <id>` only when given one, axe clean in both themes → AC-7
-- [ ] `corepack pnpm test:e2e -- e2e/analytics-consent.spec.ts` → no request leaves for `/ingest`, `sentry.io` or `posthog.com` from `/`, `/dashboard`, `/privacy` or `/portal`; Decline and Accept hide the banner in place and write `clienthq_consent` (`HttpOnly`, `SameSite=Lax`, `Path=/`, one year); Cookie settings on `/privacy` brings it back; `/portal` has no banner, no PostHog chunk and no `ph_` cookie; `/privacy` is 200, names both collectors, the identifiers and the cookie, is linked from `/sign-in` and `/sign-up`, and passes axe in both themes → AC-14, AC-17, AC-18, AC-19, AC-22
-- [ ] `SENTRY_AUTH_TOKEN= corepack pnpm build` → completes with no upload step and no failure, and `ls .next/static/chunks/*.map` finds nothing → AC-3
+_Ran 2026-09-18, all green; see the /check verify session for the raw output._
+
+- [x] `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm format:check` → all three green → AC-9 (the plain `string` property is a compile error; see `src/analytics/properties.ts`)
+- [x] `corepack pnpm vitest run src/observability` → `sentryEnabled` passes all five cases (production, preview, development, test, unset), `scrubEvent` strips headers, cookies, body, query string and `user.email` and keeps `user.id` and `org_id`, `tracesSampler` returns 0 for `/api/cron` and `/api/webhooks` → AC-2, AC-4, AC-5 (3 files, 17 tests passed)
+- [x] `corepack pnpm vitest run src/analytics` → the catalogue test finds no forbidden key and no portal event with a person id, the client never throws on a failing sink and logs `analytics.failed` once per call, the default client is silent under `NODE_ENV=test`, `readConsent` reads a missing or malformed cookie as `undecided`, the provider initialises cookieless through `/ingest` and captures one `$pageview` per pathname with no query or hash, the banner is a named region with equal buttons and is absent under `/portal` → AC-9, AC-12, AC-14, AC-17, AC-18, AC-21, AC-22 (8 files, 39 tests passed)
+- [x] `corepack pnpm vitest run src/db/tenant/action-track.test.ts` → the `track` slot fires once after the commit and not on a parse failure, a role refusal, a subscription refusal or a thrown handler → AC-10 (7 tests passed)
+- [x] `corepack pnpm vitest run src/payments/subscription-transition.test.ts` → `started` on every move into `active`, `none` when unchanged, `changed` otherwise → AC-11 (3 tests passed)
+- [x] `corepack pnpm vitest run src/cron/analytics-erasure.test.ts src/cron/daily.test.ts` → the sweep re issues `deletePerson`, counts `persons_deleted` and `persons_failed`, skips with `analytics_unconfigured`, and sits after `clerk_reconcile` and before `retention_prune` → AC-20 (7 tests passed)
+- [x] `corepack pnpm vitest run src/ui/patterns` → `ErrorState` shows `Reference: <id>` only when given one, axe clean in both themes → AC-7 (108 tests passed)
+- [x] `corepack pnpm test:e2e -- e2e/analytics-consent.spec.ts` → no request leaves for `/ingest`, `sentry.io` or `posthog.com` from `/`, `/dashboard`, `/privacy` or `/portal`; Decline and Accept hide the banner in place and write `clienthq_consent` (`HttpOnly`, `SameSite=Lax`, `Path=/`, one year); Cookie settings on `/privacy` brings it back; `/portal` has no banner, no PostHog chunk and no `ph_` cookie; `/privacy` is 200, names both collectors, the identifiers and the cookie, is linked from `/sign-in` and `/sign-up`, and passes axe in both themes → AC-14, AC-17, AC-18, AC-19, AC-22 (16 of 16 passed, run as `npx playwright test e2e/analytics-consent.spec.ts` since pnpm forwarded the `--` literally and pulled in the whole suite)
+- [x] `SENTRY_AUTH_TOKEN= corepack pnpm build` → completes with no upload step and no failure, and `ls .next/static/chunks/*.map` finds nothing → AC-3 (build succeeded, no Sentry/upload/sourcemap mention in the log, no `.map` files produced)
 
 ## Preview and production walk (manual)
+
+**Status as of 2026-09-18: accepted with gaps.** The engineer confirmed the two pipelines end to end on the live deploy: PostHog EU (the consent banner renders, Accept writes the cookie, and live events reach PostHog) and Sentry EU (a test error reached the envelope endpoint with a 200 OK and the issue appeared on the Sentry dashboard; region recorded above). The remaining bullets below were not individually exercised and are logged as post deploy verification gaps rather than ticked:
+
+- Sentry: the other four throw types (Server Component, route handler, `src/proxy.ts`, client component) beyond the one already proven, each with the right `runtime` tag → AC-1
+- the source map upload making the stack trace show the original `.ts` file rather than a minified bundle → AC-3
+- scrubbing on a live event (no headers, cookies, body, query string, or emails) → AC-4
+- the sampler excluding `/api/cron` and `/api/webhooks` while other routes sample near a tenth → AC-5
+- one masked Replay on the client error, none on a clean session → AC-5
+- the three engineered issues: a stuck `past_due` invariant, a broken Stripe webhook payload, a failed cron sweep → AC-6
+- the production only email alert, and creating the alert rule itself (still unchecked above) → AC-8
+- the full PostHog event catalogue walk (`agency.created`, `invoice.issued` with `is_first`, `checkout.started`, `subscription.started`/`.changed`, the client/project/deliverable/contact/team events, the portal events) with their exact properties → AC-11, AC-12, AC-13
+- the funnel not double counting a reload, and person/group property values (`role`, `subscription_status`, `team_size`, `trial_ends_at`, `subscribed_at`) → AC-11, AC-13
+- pageviews as `$current_url` = origin + pathname with no query or hash, one per pathname, only `/ingest/...` in the network tab → AC-15, AC-16
+- Cookie settings actually bringing the banner back after Accept → AC-18
+- the erasure sweep firing on a real Clerk delete, and the blank key `analytics_unconfigured` behaviour on a live preview → AC-20
+- the blank `NEXT_PUBLIC_POSTHOG_KEY` walk on a live preview → AC-21
+- the screen reader and keyboard passes on `/privacy` and the banner → AC-18, AC-19
+
+Close these out post deploy when there is time to work through them; none blocks this verify pass, which the engineer has accepted on the strength of the two pipelines proven live.
 
 _Sentry_
 

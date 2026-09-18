@@ -368,7 +368,7 @@ Knowing what happens in production: errors and traces across server and browser,
   - [x] The full catalogue: every server event on its action, webhook, route or page, person and group properties, portal events anonymous · AC-11, AC-12, AC-13
   - [x] Browser and consent: page views through the `/ingest` proxy, the cookieless start, the consent cookie and banner, `/privacy` · AC-14, AC-15, AC-16, AC-17, AC-18, AC-19
   - [x] Erasure and the verify walk: `deletePerson` from the scrub path, the `analytics_erasure` sweep, the alert rule and `verify.md` · AC-8, AC-20
-- [ ] Verify it: `/check verify product analytics & error tracking`
+- [x] Verify it: `/check verify product analytics & error tracking` · commands all green, PostHog and Sentry proven end to end on the live deploy; the rest of the manual walk accepted with gaps, tracked in `verify.md`
 - [ ] Test it: `/test product analytics & error tracking`
 - [ ] Review it (fresh model): `/check review product analytics & error tracking`
 - [ ] Document it: `/document product analytics & error tracking`
