@@ -27,6 +27,7 @@
  */
 import { redirect } from "next/navigation";
 
+import { subscriptionStatusProperty } from "@/analytics";
 import { subscriptions } from "@/db/schema";
 import { tenantActionError, withTenantAction, type Result } from "@/db/tenant";
 import { env } from "@/lib/env";
@@ -53,7 +54,13 @@ const createCheckoutSession = withTenantAction({
   // how a lapsed agency pays, so it has to work at every level. The admin
   // guard above still applies.
   subscription: "any",
-  handler: async ({ ctx, db }): Promise<{ readonly url: string }> => {
+  handler: async ({
+    ctx,
+    db,
+  }): Promise<{
+    readonly url: string;
+    readonly subscriptionStatus: string | undefined;
+  }> => {
     const existing = await db.findFirst(subscriptions);
     const appUrl = env().NEXT_PUBLIC_APP_URL;
 
@@ -93,7 +100,17 @@ const createCheckoutSession = withTenantAction({
       });
     }
 
-    return { url: session.url };
+    return { url: session.url, subscriptionStatus: existing?.status };
+  },
+  // The fourth step of the funnel (spec 0019, AC-11, AC-13), stamped with
+  // the status the agency had when it started paying.
+  track: {
+    event: "checkout.started",
+    properties: (_input, session) => ({
+      subscription_status: subscriptionStatusProperty(
+        session.subscriptionStatus,
+      ),
+    }),
   },
 });
 

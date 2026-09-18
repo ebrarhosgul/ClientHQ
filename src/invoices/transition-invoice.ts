@@ -109,6 +109,10 @@ export const markInvoicePaid = withTenantAction({
 
     return { id: row.id, status: row.status };
   },
+  track: {
+    event: "invoice.paid",
+    properties: (_input, paid) => ({ invoice_id: paid.id }),
+  },
 });
 
 export const voidInvoice = withTenantAction({
@@ -143,5 +147,9 @@ export const voidInvoice = withTenantAction({
     });
 
     return { id: row.id, status: row.status };
+  },
+  track: {
+    event: "invoice.voided",
+    properties: (_input, voided) => ({ invoice_id: voided.id }),
   },
 });

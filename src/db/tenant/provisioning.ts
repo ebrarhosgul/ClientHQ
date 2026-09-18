@@ -207,17 +207,29 @@ export async function upsertMembershipRow(
   userId: string,
   role: MembershipRole,
   executor?: Executor,
-): Promise<void> {
+): Promise<MembershipUpsertResult> {
   const db = executor ?? (await pooledDb());
 
-  await db
+  // `xmax = 0` is PostgreSQL's tell for a row this statement inserted rather
+  // than updated: a fresh row has no deleting transaction id. It is what
+  // lets a caller fire `team_member.joined` for a real join and stay quiet
+  // on a role change (spec 0019, AC-12).
+  const [row] = await db
     .insert(memberships)
     .values({ id: newId(), orgId, userId, role })
     .onConflictDoUpdate({
       target: [memberships.orgId, memberships.userId],
       set: { role, updatedAt: new Date() },
-    });
+    })
+    .returning({ inserted: sql<boolean>`(xmax = 0)` });
+
+  return { inserted: row?.inserted === true };
 }
+
+export type MembershipUpsertResult = {
+  /** True when the row is new, false when an existing one was updated. */
+  readonly inserted: boolean;
+};
 
 /** All three rows, upserted on their unique keys. Always inside a transaction. */
 async function upsertMirror(

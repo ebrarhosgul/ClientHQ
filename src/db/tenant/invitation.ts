@@ -37,6 +37,7 @@ export type InspectOutcome =
       readonly kind: "acceptable";
       readonly contactId: string;
       readonly orgId: string;
+      readonly clientId: string;
       readonly clientName: string;
       readonly agencyName: string;
       readonly contactEmail: string;
@@ -45,6 +46,7 @@ export type InspectOutcome =
       readonly kind: "already_yours";
       readonly contactId: string;
       readonly orgId: string;
+      readonly clientId: string;
     }
   | {
       readonly kind: "wrong_account";
@@ -62,6 +64,8 @@ export type AcceptOutcome =
       readonly kind: "accepted" | "already_yours";
       readonly contactId: string;
       readonly orgId: string;
+      /** For the `contact.accepted` analytics event (spec 0019, AC-12). */
+      readonly clientId: string;
     }
   | {
       readonly kind: "refused";
@@ -75,6 +79,7 @@ async function fetchRow(executor: Executor, contactId: string) {
     .select({
       id: clientContacts.id,
       orgId: clientContacts.orgId,
+      clientId: clientContacts.clientId,
       email: clientContacts.email,
       userId: clientContacts.userId,
       inviteTokenHash: clientContacts.inviteTokenHash,
@@ -111,6 +116,7 @@ function classify(
   }
 
   const ids = { contactId: row.id, orgId: row.orgId };
+  const owned = { ...ids, clientId: row.clientId };
 
   if (row.inviteTokenHash === null && row.userId === null) {
     return { kind: "invalid", ...ids };
@@ -122,7 +128,7 @@ function classify(
   // nothing.
   if (row.userId !== null) {
     return row.loginClerkUserId === identity.clerkUserId
-      ? { kind: "already_yours", ...ids }
+      ? { kind: "already_yours", ...owned }
       : { kind: "invalid", ...ids };
   }
 
@@ -147,7 +153,7 @@ function classify(
 
   return {
     kind: "acceptable",
-    ...ids,
+    ...owned,
     clientName: row.clientName,
     agencyName: row.agencyName,
     contactEmail: row.email,
@@ -223,7 +229,12 @@ export async function acceptInvitation(
   });
 
   if (bound) {
-    return { kind: "accepted", contactId: first.contactId, orgId: first.orgId };
+    return {
+      kind: "accepted",
+      contactId: first.contactId,
+      orgId: first.orgId,
+      clientId: first.clientId,
+    };
   }
 
   // Someone got there first. Read again to find out who.

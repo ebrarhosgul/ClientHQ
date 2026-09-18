@@ -16,6 +16,7 @@ import { subscriptions } from "@/db/schema";
 
 import type { Sweep, SweepInput, SweepReport } from "@/cron/sweep";
 
+import { reportSubscriptionMirror } from "./analytics";
 import type { RetrievedSubscription } from "./events";
 import { organizationExists } from "./organizations";
 import { applySubscriptionState, resolveOrgId } from "./subscription-mirror";
@@ -118,11 +119,11 @@ async function run(
 
   for (const { orgId, subscription } of byOrg.values()) {
     try {
-      const outcome = await db.transaction((tx) =>
+      const mirror = await db.transaction((tx) =>
         applySubscriptionState(tx, orgId, subscription),
       );
 
-      if (outcome === "customer_id_conflict") {
+      if (mirror.outcome === "customer_id_conflict") {
         customerConflict += 1;
         logItem("customer_conflict", {
           orgId,
@@ -130,6 +131,9 @@ async function run(
         });
       } else {
         applied += 1;
+        // After the commit, so a missed webhook's conversion is still
+        // counted exactly once (spec 0019, AC-11).
+        await reportSubscriptionMirror(db, orgId, subscription, mirror);
       }
     } catch (thrown) {
       errors += 1;

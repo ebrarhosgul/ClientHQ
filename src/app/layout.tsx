@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { ConsentProvider } from "@/analytics/consent-context";
+import { CONSENT_COOKIE_NAME, readConsent } from "@/analytics/consent-state";
+import { AnalyticsGate } from "@/analytics/analytics-gate";
+import { CookieBanner } from "@/analytics/ui/cookie-banner";
 import { clerkAppearance } from "@/auth/ui/clerk-appearance";
 import { isClerkConfigured } from "@/lib/env";
 import { Toaster } from "@/ui/primitives/sonner";
@@ -47,13 +51,22 @@ export const metadata: Metadata = {
  * time.
  */
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const theme = readStoredTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const jar = await cookies();
+  const theme = readStoredTheme(jar.get(THEME_COOKIE)?.value);
+  // The cookie choice is read here, on the server, so a returning visitor
+  // never sees the banner flash before it is honoured (spec 0019, AC-18).
+  const consent = readConsent(jar.get(CONSENT_COOKIE_NAME)?.value);
   const clerkLive = isClerkConfigured();
 
+  // Page views and the consent banner, both of which decide for themselves
+  // to do nothing under `/portal`. The provider needs Clerk's hooks when
+  // Clerk is live, so it sits inside `ClerkProvider` with the rest.
   const tree = (
     <>
       {children}
       <Toaster />
+      <AnalyticsGate />
+      <CookieBanner />
     </>
   );
 
@@ -79,11 +92,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           product's tokens without being told to (spec 0005, AC-3).
         */}
         <IdentityProvider clerkLive={clerkLive}>
-          {clerkLive ? (
-            <ClerkProvider appearance={clerkAppearance}>{tree}</ClerkProvider>
-          ) : (
-            tree
-          )}
+          <ConsentProvider initial={consent}>
+            {clerkLive ? (
+              <ClerkProvider appearance={clerkAppearance}>{tree}</ClerkProvider>
+            ) : (
+              tree
+            )}
+          </ConsentProvider>
         </IdentityProvider>
       </body>
     </html>

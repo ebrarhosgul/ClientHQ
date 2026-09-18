@@ -40,6 +40,11 @@ export function AuthFrame({ children }: AuthFrameProps) {
           and invoices. Invited client contacts sign in here too, and land in
           their own portal.
         </p>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          <Link href="/privacy" className="underline underline-offset-4">
+            Privacy notice
+          </Link>
+        </p>
       </footer>
     </div>
   );

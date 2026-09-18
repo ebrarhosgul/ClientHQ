@@ -31,9 +31,15 @@ import {
   type MirrorOrganization,
   type MirrorUser,
 } from "@/db/tenant";
+import { afterResponse, analytics } from "@/analytics";
 import { scrubUser } from "@/lib/scrub";
 
 import type { Sweep, SweepInput, SweepReport } from "@/cron/sweep";
+
+import {
+  reportMembershipChange,
+  type MembershipChange,
+} from "./membership-analytics";
 
 export type ClerkListGateway = {
   /** Every Clerk organization, to the end. Throws on any page failure. */
@@ -227,6 +233,7 @@ async function runOneOrganizationMemberships(
       listedUserIds.add(member.clerkUserId);
 
       let scrubbed = false;
+      let change: MembershipChange | undefined;
 
       const ok = await attempt(
         db,
@@ -252,7 +259,20 @@ async function runOneOrganizationMemberships(
             throw thrown;
           }
 
-          await upsertMembershipRow(orgId, userId, member.role, tx);
+          const { inserted } = await upsertMembershipRow(
+            orgId,
+            userId,
+            member.role,
+            tx,
+          );
+
+          change = {
+            orgId,
+            userId,
+            clerkUserId: member.clerkUserId,
+            kind: inserted ? "joined" : "role",
+            role: member.role,
+          };
         },
       );
 
@@ -260,6 +280,12 @@ async function runOneOrganizationMemberships(
         skippedScrubbed += 1;
       } else if (ok) {
         upserted += 1;
+
+        // After the commit: a join the webhook missed is still counted once
+        // (spec 0019, AC-12, AC-13).
+        if (change !== undefined) {
+          await reportMembershipChange(change);
+        }
       }
     }
 
@@ -294,6 +320,12 @@ async function runOneOrganizationMemberships(
 
       if (ok) {
         removed += 1;
+        await reportMembershipChange({
+          orgId,
+          userId: row.userId,
+          clerkUserId: row.clerkUserId,
+          kind: "removed",
+        });
       }
     }
   }
@@ -413,6 +445,13 @@ async function runUsersPass(
 
       if (ok) {
         scrubbed += 1;
+        // The provider side of the scrub (spec 0019, AC-20), queued for
+        // after the response; `analytics_erasure` runs next and retries.
+        afterResponse(() =>
+          analytics()
+            .deletePerson(row.clerkUserId)
+            .then(() => undefined),
+        );
       }
     }
   }

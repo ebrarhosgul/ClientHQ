@@ -30,7 +30,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 17 | Clerk webhook sync | Slice 8 | in-progress |
 | 18 | Daily cron sweeps | Slice 9 | in-progress |
 | 19 | Rate limiting | Slice 9 | in-progress |
-| 20 | Product analytics & error tracking | Slice 9 | planned |
+| 20 | Product analytics & error tracking | Slice 9 | in-progress |
 
 ## Foundations
 
@@ -358,15 +358,26 @@ Putting a ceiling on the actions a signed in user could otherwise abuse: request
 - [ ] Document it: `/document rate limiting`
 Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `## Build plan` · code in `src/rate-limit/`, `src/db/schema/rate-limit.ts`, `src/db/tenant/rate-limit.ts`, `src/db/tenant/action.ts`, `src/deliverables/request-upload.ts`, `src/invoices/issue-invoice.ts`, `src/invoices/resend-invoice-notification.ts`, `src/auth/agency.ts`, `src/cron/retention-sweep.ts`
 
-### 20. Product analytics & error tracking · needs a decision
+### 20. Product analytics & error tracking · in-progress
 Knowing what happens in production: errors and traces across server and browser, plus product analytics for which signups actually activate and which convert to a subscription.
 **Done when:** server and browser errors arrive with useful context and source maps, the conversion events you care about are recorded, and neither collector leaks personal data or blows through a free tier quota.
-- [ ] Design it (spec): `/architect product analytics & error tracking`
+- [x] Design it (spec): `/architect product analytics & error tracking`
+- [x] Build it: `/develop product analytics & error tracking` · code in `src/observability/`, `src/analytics/`, the three Sentry config files, `src/instrumentation.ts`, `src/app/privacy/`, `src/cron/analytics-erasure.ts` and the `track` slot in `src/db/tenant/action.ts`
+  - [x] The thread: Sentry in all three runtimes with source maps and the `enabled` predicate, the analytics client and catalogue, the `track` slot on `withTenantAction`, `agency.created` and `subscription.started` proven on a preview deploy · AC-1, AC-2, AC-3, AC-9, AC-10, AC-11, AC-21, AC-22, AC-23
+  - [x] Sentry privacy and signals: the scrub, `org_id` and `user.id` tags, sampling and masked replay on error, the four promoted log signals, the error boundaries with a reference id · AC-4, AC-5, AC-6, AC-7
+  - [x] The full catalogue: every server event on its action, webhook, route or page, person and group properties, portal events anonymous · AC-11, AC-12, AC-13
+  - [x] Browser and consent: page views through the `/ingest` proxy, the cookieless start, the consent cookie and banner, `/privacy` · AC-14, AC-15, AC-16, AC-17, AC-18, AC-19
+  - [x] Erasure and the verify walk: `deletePerson` from the scrub path, the `analytics_erasure` sweep, the alert rule and `verify.md` · AC-8, AC-20
+- [x] Verify it: `/check verify product analytics & error tracking` · commands all green, PostHog and Sentry proven end to end on the live deploy; the rest of the manual walk accepted with gaps, tracked in `verify.md`
+- [ ] Test it: `/test product analytics & error tracking`
+- [x] Review it (fresh model): `/check review product analytics & error tracking`
+- [ ] Document it: `/document product analytics & error tracking`
+Spec [0019](../specs/0019-product-analytics-and-error-tracking/index.md) · atomic build tasks in its `## Build plan`
 
 ## Deferred
 Out of scope for the current build pass, kept so the plan stays honest.
 - **Marketing landing page & SEO**: a public page with metadata, sitemap and social cards. You left it out, so `/` stays a minimal entry point to sign in and sign up · needs a decision
-- **Legal pages & cookie consent**: privacy policy, terms, consent banner. Becomes required rather than optional if real agencies ever sign up · needs a decision
+- **Legal pages & cookie consent**: privacy policy, terms, consent banner. Becomes required rather than optional if real agencies ever sign up · partly settled: spec 0019 ships the consent banner and a plain `/privacy` notice; terms of service and a lawyer reviewed policy remain · needs a decision
 - **Seeded demo account**: a read only account with realistic data so a reviewer can walk the app without signing up. Spec 0001 lists this as a follow up. Spec 0002 ships a guarded local seed script, which is most of the data work · needs a decision
 - **Agency timezone**: no timezone is modelled, so invoice issue dates and the overdue sweep use UTC. An invoice issued late in the evening on the west coast gets tomorrow's date. Spec 0002 has the application supply both dates, so the fix is one `organizations.timezone` column plus a helper. Spec 0010 reuses the UTC day for a project's overdue badge and its `isOverdue` already takes today as a parameter, so the same column fixes both · from spec 0002 and spec 0010 · needs a decision
 - **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision

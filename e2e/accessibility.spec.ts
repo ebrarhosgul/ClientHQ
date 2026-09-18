@@ -184,8 +184,10 @@ test.describe("the entry page", () => {
       stops.push(stop);
     }
 
-    // Five controls: three theme buttons, then the two ways in.
-    expect(stops).toHaveLength(5);
+    // Eight controls: three theme buttons, the two ways in, then the consent
+    // banner's privacy link and its two buttons (spec 0019, AC-18), last in
+    // document order because the banner is a landmark, not a dialog.
+    expect(stops).toHaveLength(8);
 
     // A stop with no ring is somewhere a keyboard user is lost. globals.css
     // declares exactly one, unlayered, so no component can weaken it.

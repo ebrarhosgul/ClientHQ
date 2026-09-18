@@ -4,6 +4,7 @@ import { formatInvoiceNumber } from "@/invoices/status";
 import { isClerkConfigured } from "@/lib/env";
 import { formatMoney } from "@/lib/money";
 import { INVOICES_LIST_EMPTY } from "@/portal/copy";
+import { trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import {
   listPortalInvoices,
@@ -86,13 +87,20 @@ export default async function PortalInvoicesPage({
 }: PageProps<"/portal/invoices">) {
   const { page: rawPage } = await searchParams;
 
-  const { rows, page, pageCount, total } = isClerkConfigured()
-    ? await listPortalInvoices((await portalContext()).ctx, {
-        pageParam: parsePageParam(
-          Array.isArray(rawPage) ? rawPage[0] : rawPage,
-        ),
-      })
-    : NO_RESULTS;
+  const portal = isClerkConfigured() ? await portalContext() : undefined;
+
+  if (portal !== undefined) {
+    trackPortalView(portal.ctx, "/portal/invoices");
+  }
+
+  const { rows, page, pageCount, total } =
+    portal !== undefined
+      ? await listPortalInvoices(portal.ctx, {
+          pageParam: parsePageParam(
+            Array.isArray(rawPage) ? rawPage[0] : rawPage,
+          ),
+        })
+      : NO_RESULTS;
 
   return (
     <div className="flex flex-col gap-6">

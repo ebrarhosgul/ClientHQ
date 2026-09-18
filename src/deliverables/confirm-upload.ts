@@ -23,6 +23,9 @@ export type ConfirmedUpload = {
   readonly status: "ready";
   readonly sizeBytes: number;
   readonly contentType: string;
+  readonly projectId: string;
+  /** True when this call flipped the row; false for a repeat confirm. */
+  readonly confirmed: boolean;
 };
 
 function isWithinRules(head: {
@@ -54,6 +57,8 @@ export const confirmUpload = withTenantAction({
         status: "ready",
         sizeBytes: row.sizeBytes,
         contentType: row.contentType,
+        projectId: row.projectId,
+        confirmed: false,
       };
     }
 
@@ -119,6 +124,17 @@ export const confirmUpload = withTenantAction({
       status: "ready",
       sizeBytes: updated.sizeBytes,
       contentType: updated.contentType,
+      projectId: updated.projectId,
+      confirmed: true,
     };
+  },
+  // Once per real upload (spec 0019, AC-12): a repeat confirm is silent.
+  track: {
+    event: "deliverable.uploaded",
+    when: (_input, result) => result.confirmed,
+    properties: (input, result) => ({
+      deliverable_id: input.deliverableId,
+      project_id: result.projectId,
+    }),
   },
 });

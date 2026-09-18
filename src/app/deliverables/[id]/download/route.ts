@@ -10,6 +10,7 @@ import {
   notFoundResponse,
 } from "@/deliverables/download-error-page";
 import { isClerkConfigured } from "@/lib/env";
+import { trackPortalFileDownload } from "@/portal/analytics";
 import {
   isPortalReadable,
   portalAccess,
@@ -113,6 +114,9 @@ export async function GET(
   ) {
     return notFoundResponse();
   }
+
+  // On the client, never on the person (spec 0019, AC-12).
+  trackPortalFileDownload(ctx, row.id);
 
   return respondWithSignedDownload(storage, row);
 }

@@ -12,6 +12,8 @@
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { cache } from "react";
 
+import { setTenantScope } from "@/observability";
+
 import type { MembershipRole } from "../schema";
 import { clientContacts, organizations, users } from "../schema";
 import { tenantResolutionError, type ResolutionErrorKind } from "./errors";
@@ -130,6 +132,10 @@ export async function resolveStaffContext(
     refuse("no_mirror_row", "tenantContext.staff");
   }
 
+  // The one place a Clerk session meets a local `orgId` for staff, so the
+  // one place an error event learns which agency it hit (spec 0019, AC-4).
+  setTenantScope({ orgId: row.orgId, clerkUserId: claims.clerkUserId });
+
   return {
     kind: "staff",
     orgId: row.orgId,
@@ -215,6 +221,10 @@ export async function resolveContactContext(
   // the fallback wins. It can never supply an organization or a client.
   const wanted = await contactCookie();
   const chosen = owned.find((row) => row.contactId === wanted) ?? fallback;
+
+  // The same for a contact (spec 0019, AC-4): the agency and the Clerk user
+  // id, never the client or the contact row.
+  setTenantScope({ orgId: chosen.orgId, clerkUserId: claims.clerkUserId });
 
   return {
     kind: "contact",

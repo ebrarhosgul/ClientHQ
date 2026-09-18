@@ -33,6 +33,8 @@ import {
   PORTAL_UNAVAILABLE_PATH,
 } from "@/portal/gate";
 
+import { analytics } from "@/analytics";
+
 import { renderInvoicePdf } from "./render";
 
 export async function handleInvoicePdfRequest(
@@ -116,6 +118,17 @@ export async function handleInvoicePdfRequest(
               href: `/portal/invoices/${parsedId.data}`,
               label: "Back to the portal",
             },
+    });
+  }
+
+  // The staff download is a product event on the person (spec 0019, AC-12);
+  // the contact's download of the same PDF is deliberately not one, because
+  // the catalogue names no portal event for it.
+  if (ctx.kind === "staff") {
+    analytics().track("invoice.pdf_downloaded", {
+      distinctId: { kind: "user", clerkUserId: ctx.clerkUserId },
+      orgId: ctx.orgId,
+      properties: { invoice_id: parsedId.data },
     });
   }
 

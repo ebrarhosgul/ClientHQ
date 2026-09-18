@@ -44,6 +44,9 @@ import { processedWebhookEvents } from "@/db/schema";
 import type { Database } from "@/db/tenant";
 import { newId } from "@/lib/id";
 
+import { reportException } from "@/observability";
+
+import { reportSubscriptionMirror } from "./analytics";
 import {
   checkoutSessionCompleted,
   invoiceEvent,
@@ -56,6 +59,7 @@ import { organizationExists } from "./organizations";
 import {
   applySubscriptionState,
   resolveOrgId as resolveMirrorOrgId,
+  type SubscriptionMirrorResult,
 } from "./subscription-mirror";
 
 /**
@@ -287,7 +291,12 @@ export async function handleStripeWebhook(
     }
 
     // Includes a parse failure, which means Stripe's shapes moved under this
-    // code. Loud on purpose: see the note at the top of `events.ts`.
+    // code. Loud on purpose: see the note at the top of `events.ts`. Reported
+    // before the rethrow so Sentry has it while Stripe retries (spec 0019,
+    // AC-6); no `org_id` yet, since nothing has been resolved.
+    reportException(thrown, {
+      fingerprint: ["stripe_webhook", "retrieve_subscription"],
+    });
     throw thrown;
   }
 
@@ -310,8 +319,13 @@ export async function handleStripeWebhook(
   }
 
   try {
-    return answer(
-      await db.transaction(async (tx) => {
+    const committed = await db.transaction(
+      async (
+        tx,
+      ): Promise<{
+        readonly result: StripeWebhookResult;
+        readonly mirror: SubscriptionMirrorResult | undefined;
+      }> => {
         // 4. Ledger first, and without raising: a unique violation here would
         // poison the transaction it exists to protect (AC-23).
         const claimed = await tx
@@ -332,27 +346,41 @@ export async function handleStripeWebhook(
 
         if (claimed.length === 0) {
           return {
-            status: 200,
-            outcome: "duplicate",
-            reason: "already_processed",
-          } as const;
+            result: {
+              status: 200,
+              outcome: "duplicate",
+              reason: "already_processed",
+            },
+            mirror: undefined,
+          };
         }
 
         // 5. Lock, guard and apply, all inside `applySubscriptionState`,
         // which the nightly reconcile shares (spec 0017, AC-7). Two
         // concurrent deliveries queue at its lock rather than both reading
         // the old row and committing in whichever order they land.
-        const outcome = await applySubscriptionState(tx, orgId, subscription);
+        const mirror = await applySubscriptionState(tx, orgId, subscription);
 
-        if (outcome === "customer_id_conflict") {
+        if (mirror.outcome === "customer_id_conflict") {
           throw new WebhookRefusal("customer_id_conflict");
         }
 
         // 6. Commit.
-        return { status: 200, outcome: "handled", reason: "applied" } as const;
-      }),
-      event,
+        return {
+          result: { status: 200, outcome: "handled", reason: "applied" },
+          mirror,
+        };
+      },
     );
+
+    // 7. Only now, with the row committed, does the funnel hear about it
+    // (spec 0019, AC-11): `subscription.started` exactly once per real
+    // transition, whichever of this handler or the nightly reconcile sees it.
+    if (committed.mirror !== undefined) {
+      await reportSubscriptionMirror(db, orgId, subscription, committed.mirror);
+    }
+
+    return answer(committed.result, event);
   } catch (thrown) {
     if (thrown instanceof WebhookRefusal) {
       // Rolled back, ledger row included, so nothing half applied survives.
@@ -373,7 +401,13 @@ export async function handleStripeWebhook(
 
     // Everything else might work next time, and Stripe should try again. The
     // whole transaction rolled back, so the redelivery is processed rather than
-    // skipped as a duplicate (AC-10).
+    // skipped as a duplicate (AC-10). Sentry hears about it first, with the
+    // agency it concerned (spec 0019, AC-6).
+    reportException(thrown, {
+      tags: { org_id: orgId },
+      fingerprint: ["stripe_webhook", event.type],
+    });
+
     return answer(
       {
         status: 500,

@@ -1,9 +1,11 @@
 import type { Database } from "@/db/tenant";
 
 /**
- * The six sweeps `/api/cron/daily` runs, in the fixed order spec 0017 (AC-3)
- * requires. Every run walks this whole list even when an early build only
- * wires a prefix of it (`src/cron/daily.ts`).
+ * The seven sweeps `/api/cron/daily` runs, in the fixed order spec 0017
+ * (AC-3) requires, plus `analytics_erasure` where spec 0019 (AC-20) places
+ * it: after the Clerk reconcile that scrubs, before the prune. Every run
+ * walks this whole list even when an early build only wires a prefix of it
+ * (`src/cron/daily.ts`).
  */
 export const SWEEP_ORDER = [
   "overdue_invoices",
@@ -11,6 +13,7 @@ export const SWEEP_ORDER = [
   "expired_invites",
   "stripe_reconcile",
   "clerk_reconcile",
+  "analytics_erasure",
   "retention_prune",
 ] as const;
 

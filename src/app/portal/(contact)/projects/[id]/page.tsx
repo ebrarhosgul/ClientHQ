@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { formatBytes } from "@/deliverables/format";
 import { isClerkConfigured } from "@/lib/env";
+import { trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import { getPortalProject, listProjectFiles } from "@/portal/queries";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
@@ -67,6 +68,8 @@ export default async function PortalProjectPage({
   if (project === undefined) {
     notFound();
   }
+
+  trackPortalView(ctx, "/portal/projects/[id]");
 
   const files = await listProjectFiles(ctx, project.id);
 

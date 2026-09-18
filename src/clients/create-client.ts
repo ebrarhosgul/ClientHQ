@@ -37,4 +37,8 @@ export const createClient = withTenantAction({
 
     return { id: row.id };
   },
+  track: {
+    event: "client.created",
+    properties: (_input, created) => ({ client_id: created.id }),
+  },
 });

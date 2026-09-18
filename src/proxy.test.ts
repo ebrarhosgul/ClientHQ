@@ -36,6 +36,8 @@ describe("the public list (AC-4)", () => {
       "/sign-up(.*)",
       "/api/webhooks/(.*)",
       "/api/cron/(.*)",
+      "/privacy",
+      "/ingest/(.*)",
     ]);
   });
 
@@ -46,6 +48,9 @@ describe("the public list (AC-4)", () => {
     "/api/webhooks/stripe",
     "/api/webhooks/clerk",
     "/api/cron/daily",
+    "/privacy",
+    "/ingest/e/",
+    "/ingest/static/array.js",
   ])("lets %s through without a session", (path) => {
     expect(isPublic(request(path))).toBe(true);
   });

@@ -948,6 +948,7 @@ describe.skipIf(url === undefined)(
             kind: "accepted",
             contactId: fixture.contactA1,
             orgId: fixture.orgA,
+            clientId: fixture.clientA1,
           });
 
           const row = await rowOf(tx, fixture.contactA1);
@@ -968,11 +969,13 @@ describe.skipIf(url === undefined)(
             kind: "already_yours",
             contactId: fixture.contactA1,
             orgId: fixture.orgA,
+            clientId: fixture.clientA1,
           });
           expect(await inspectInvitation(identity)).toEqual({
             kind: "already_yours",
             contactId: fixture.contactA1,
             orgId: fixture.orgA,
+            clientId: fixture.clientA1,
           });
           expect((await rowOf(tx, fixture.contactA1))?.acceptedAt).toEqual(
             row?.acceptedAt,

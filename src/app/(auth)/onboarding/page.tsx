@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { afterResponse, analytics } from "@/analytics";
 import { agencyMemberships } from "@/auth/clerk";
 import { isClientContact } from "@/auth/context";
 import { ActivateAgency } from "@/auth/ui/activate-agency";
@@ -98,6 +99,18 @@ export default async function OnboardingPage() {
   if (await isClientContact()) {
     redirect("/portal");
   }
+
+  // The first step of the funnel (spec 0019, AC-11): a signed in person with
+  // no agency has reached the create agency form. Queued for after the
+  // render, and allowed to repeat, because the funnel counts unique persons
+  // per step. Deliberately not fired on a new `users` row, which a contact
+  // accepting an invitation would also produce.
+  afterResponse(() => {
+    analytics().track("onboarding.started", {
+      distinctId: { kind: "user", clerkUserId },
+      orgId: undefined,
+    });
+  });
 
   return (
     <AuthCard

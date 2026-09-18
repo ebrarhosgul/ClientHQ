@@ -35,7 +35,12 @@ import { verifyWebhook, type WebhookEvent } from "@clerk/nextjs/webhooks";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
-import { processedWebhookEvents, subscriptions, users } from "@/db/schema";
+import {
+  organizations,
+  processedWebhookEvents,
+  subscriptions,
+  users,
+} from "@/db/schema";
 import type { Database, Executor } from "@/db/tenant";
 import {
   deleteMembershipRows,
@@ -50,8 +55,14 @@ import {
 import { env } from "@/lib/env";
 import { newId } from "@/lib/id";
 import { scrubUser } from "@/lib/scrub";
+import { afterResponse, analytics } from "@/analytics";
+import { reportException } from "@/observability";
 
 import type { ClerkGateway } from "./clerk";
+import {
+  reportMembershipChange,
+  type MembershipChange,
+} from "./membership-analytics";
 import {
   membershipEventData,
   membershipRoleRead,
@@ -267,6 +278,15 @@ async function applyUserEvent(
     await deleteMembershipRows({ userId: existing.id }, tx);
     await unbindContactsOfUser({ userId: existing.id }, tx);
 
+    // Erased at the provider by the same delivery that scrubbed locally
+    // (spec 0019, AC-20), once the response is out; the nightly
+    // `analytics_erasure` sweep retries anything this misses.
+    afterResponse(() =>
+      analytics()
+        .deletePerson(clerkUserId)
+        .then(() => undefined),
+    );
+
     return { status: 200, outcome: "handled", reason: "applied" } as const;
   });
 }
@@ -384,43 +404,76 @@ async function applyMembershipEvent(
     ? toMembershipRole(membershipRoleRead.parse(membershipPresence.value).role)
     : undefined;
 
-  return db.transaction(async (tx) => {
-    if ((await claim(tx, svixId, eventType)) === "duplicate") {
-      return {
-        status: 200,
-        outcome: "duplicate",
-        reason: "already_processed",
-      } as const;
-    }
-
-    // Always organization, then user, then membership (AC-10, AC-11),
-    // matching `upsertMirror`'s own order so the two writers never disagree.
-    const orgResult = await upsertOrganizationRow(mirrorOrg, tx);
-
-    if (orgResult === "deleted") {
-      throw new WebhookRefusal("org_deleted");
-    }
-
-    let userId: string;
-
-    try {
-      ({ userId } = await ensureUserRow(mirrorUser, tx));
-    } catch (thrown) {
-      if (thrown instanceof MirrorUserDeleted) {
-        throw new WebhookRefusal("user_deleted");
+  const committed = await db.transaction(
+    async (
+      tx,
+    ): Promise<{
+      readonly result: ClerkWebhookResult;
+      readonly change: MembershipChange | undefined;
+    }> => {
+      if ((await claim(tx, svixId, eventType)) === "duplicate") {
+        return {
+          result: {
+            status: 200,
+            outcome: "duplicate",
+            reason: "already_processed",
+          },
+          change: undefined,
+        };
       }
 
-      throw thrown;
-    }
+      // Always organization, then user, then membership (AC-10, AC-11),
+      // matching `upsertMirror`'s own order so the two writers never disagree.
+      const orgResult = await upsertOrganizationRow(mirrorOrg, tx);
 
-    if (role !== undefined) {
-      await upsertMembershipRow(orgResult.orgId, userId, role, tx);
-    } else {
+      if (orgResult === "deleted") {
+        throw new WebhookRefusal("org_deleted");
+      }
+
+      let userId: string;
+
+      try {
+        ({ userId } = await ensureUserRow(mirrorUser, tx));
+      } catch (thrown) {
+        if (thrown instanceof MirrorUserDeleted) {
+          throw new WebhookRefusal("user_deleted");
+        }
+
+        throw thrown;
+      }
+
+      const applied = {
+        status: 200,
+        outcome: "handled",
+        reason: "applied",
+      } as const;
+      const base = { orgId: orgResult.orgId, userId, clerkUserId };
+
+      if (role !== undefined) {
+        const { inserted } = await upsertMembershipRow(
+          orgResult.orgId,
+          userId,
+          role,
+          tx,
+        );
+
+        return {
+          result: applied,
+          change: { ...base, kind: inserted ? "joined" : "role", role },
+        };
+      }
+
       await deleteMembershipRows({ orgId: orgResult.orgId, userId }, tx);
-    }
 
-    return { status: 200, outcome: "handled", reason: "applied" } as const;
-  });
+      return { result: applied, change: { ...base, kind: "removed" } };
+    },
+  );
+
+  if (committed.change !== undefined) {
+    await reportMembershipChange(committed.change);
+  }
+
+  return committed.result;
 }
 
 function applyEvent(
@@ -458,6 +511,32 @@ function applyEvent(
     reference.clerkOrgId,
     reference.clerkUserId,
   );
+}
+
+/**
+ * The local row a Clerk organization maps to, if any, read for the Sentry
+ * tag on a failed delivery (spec 0019, AC-6). A user event names no
+ * organization, and a read that itself fails simply leaves the tag off.
+ */
+async function localOrgIdOf(
+  db: Database,
+  reference: Reference,
+): Promise<string | undefined> {
+  if (reference.kind === "user") {
+    return undefined;
+  }
+
+  try {
+    const [row] = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.clerkOrgId, reference.clerkOrgId))
+      .limit(1);
+
+    return row?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -504,9 +583,11 @@ export async function handleClerkWebhook(
     throw new Error("A verified Clerk event carried no svix-id header.");
   }
 
+  let reference: Reference | undefined;
+
   try {
     // 2. What does it point at?
-    const reference = referenceOf(verified);
+    reference = referenceOf(verified);
 
     const ctx: LogContext = {
       ...baseCtx,
@@ -538,7 +619,19 @@ export async function handleClerkWebhook(
 
     // Everything else might work next time, and Clerk should try again. The
     // whole transaction rolled back, so the redelivery is processed rather
-    // than skipped as a duplicate.
+    // than skipped as a duplicate. Sentry hears about it first, tagged with
+    // the agency when the event's organization maps to a local row (spec
+    // 0019, AC-6).
+    reportException(thrown, {
+      tags: {
+        org_id:
+          reference === undefined
+            ? undefined
+            : await localOrgIdOf(db, reference),
+      },
+      fingerprint: ["clerk_webhook", verified.type],
+    });
+
     return answer(
       {
         status: 500,

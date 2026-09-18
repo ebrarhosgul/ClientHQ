@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -17,6 +18,41 @@ const nextConfig: NextConfig = {
     "/invoices/[id]/pdf": ["./src/invoices/pdf/fonts/**"],
     "/portal/invoices/[id]/pdf": ["./src/invoices/pdf/fonts/**"],
   },
+  // PostHog traffic goes through this app's own domain (spec 0019, AC-16):
+  // the browser client posts to `/ingest`, and these two rewrites forward it
+  // to the EU cloud. PostHog's own paths end in a slash, so the trailing
+  // slash redirect has to stay out of the way. No Sentry tunnel is
+  // configured, by choice.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://eu-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://eu.i.posthog.com/:path*",
+      },
+    ];
+  },
 };
 
-export default nextConfig;
+/**
+ * Source map upload (spec 0019, AC-3). The three variables are read straight
+ * from `process.env`, a named exemption to the `env()` rule: `env()` parses
+ * the whole schema, and a build must not need database credentials to
+ * compile. Without `SENTRY_AUTH_TOKEN` the plugin skips the upload and the
+ * build completes; with it, every JavaScript file and map is uploaded and the
+ * maps are deleted from the deployed output afterwards (the plugin's default).
+ * Turbopack, so none of the webpack only tree shaking options apply.
+ */
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  // Only the CI and Vercel build logs need the plugin's own output.
+  silent: !process.env.CI,
+});

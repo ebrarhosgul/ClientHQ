@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { ErrorState } from "@/ui/patterns/error-state";
+import { useReportedError } from "@/ui/patterns/use-reported-error";
 import { Button } from "@/ui/primitives/button";
 
 /**
@@ -14,14 +15,18 @@ import { Button } from "@/ui/primitives/button";
  * system. The real detail goes to the server log and, later, to Sentry.
  */
 export default function RouteError({
+  error,
   reset,
 }: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
+  const reference = useReportedError(error);
+
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <ErrorState
+        reference={reference}
         className="w-full max-w-md"
         action={
           <div className="flex flex-wrap items-center justify-center gap-2">

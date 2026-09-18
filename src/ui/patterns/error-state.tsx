@@ -15,10 +15,17 @@ import { cn } from "@/ui/lib/cn";
  *    no exit is a dead end.
  * 3. `role="alert"`, so someone who was reading elsewhere on the page when the
  *    boundary caught is told rather than left waiting.
+ *
+ * The one thing it may show beyond the sentence is a reference (spec 0019,
+ * AC-7): the Sentry event id, as plain text a person can quote back. It is
+ * not a digest, it names nothing about the system, and it is absent whenever
+ * error tracking is off.
  */
 export type ErrorStateProps = {
   readonly heading?: string;
   readonly description?: string;
+  /** The error tracking event id, shown as `Reference: <id>` when present. */
+  readonly reference?: string;
   readonly action?: ReactNode;
   readonly className?: string;
 };
@@ -30,6 +37,7 @@ export const DEFAULT_ERROR_DESCRIPTION =
 export function ErrorState({
   heading = DEFAULT_ERROR_HEADING,
   description = DEFAULT_ERROR_DESCRIPTION,
+  reference,
   action,
   className,
 }: ErrorStateProps) {
@@ -49,6 +57,11 @@ export function ErrorState({
         <p className="max-w-prose text-sm text-muted-foreground">
           {description}
         </p>
+        {reference ? (
+          <p className="text-xs text-muted-foreground">
+            Reference: <span className="font-mono">{reference}</span>
+          </p>
+        ) : undefined}
       </div>
 
       {action ? <div className="mt-1">{action}</div> : undefined}

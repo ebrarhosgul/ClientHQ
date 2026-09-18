@@ -28,17 +28,25 @@ async function mirrorMembershipId(
   return rows.find((row) => row.user.clerkUserId === clerkUserId)?.id;
 }
 
-/** Set the mirror's role for this Clerk user, when a row exists. */
+/**
+ * Set the mirror's role for this Clerk user, when a row exists. Hands back
+ * the local user id so the caller can update the person's analytics
+ * properties (spec 0019, AC-13).
+ */
 export async function updateMirrorRole(
   db: StaffAccessor,
   clerkUserId: string,
   role: MembershipRole,
-): Promise<void> {
+): Promise<{ readonly userId: string } | undefined> {
   const id = await mirrorMembershipId(db, clerkUserId);
 
-  if (id !== undefined) {
-    await db.update(memberships, id, { role });
+  if (id === undefined) {
+    return undefined;
   }
+
+  const row = await db.update(memberships, id, { role });
+
+  return row === undefined ? undefined : { userId: row.userId };
 }
 
 /** Delete the mirror's membership row for this Clerk user, when one exists. */

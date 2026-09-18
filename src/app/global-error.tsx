@@ -1,5 +1,8 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useState } from "react";
+
 import "./globals.css";
 
 /**
@@ -16,14 +19,26 @@ import "./globals.css";
  *
  * It also deliberately does not import `ErrorState`: if the failure was in a
  * shared module, importing more of the same tree is how a fallback fails too.
- * The markup below is the shared error state written out by hand, on purpose.
+ * The markup below is the shared error state written out by hand, on purpose,
+ * and the Sentry report is written out by hand for the same reason rather
+ * than through `useReportedError` (spec 0019, AC-7).
  */
 export default function GlobalError({
+  error,
   reset,
 }: {
   readonly error: Error;
   readonly reset: () => void;
 }) {
+  // Once, on mount, and never allowed to break the fallback it reports for.
+  const [reference] = useState((): string | undefined => {
+    try {
+      return Sentry.isEnabled() ? Sentry.captureException(error) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
   return (
     <html lang="en">
       <body
@@ -44,6 +59,11 @@ export default function GlobalError({
               The application could not start. Nothing you did caused it, and
               nothing has been lost.
             </p>
+            {reference ? (
+              <p className="text-xs text-muted-foreground">
+                Reference: <span className="font-mono">{reference}</span>
+              </p>
+            ) : undefined}
             <button
               type="button"
               onClick={reset}
