@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   createAgencyRows: vi.fn(),
   suggestedSlug: vi.fn(),
   deletedOrganizationClerkIds: vi.fn(),
+  consume: vi.fn(),
 }));
 
 vi.mock("@/db/tenant/session", () => ({
@@ -38,6 +39,7 @@ vi.mock("@/db/tenant", async () => {
     createAgencyRows: mocks.createAgencyRows,
     suggestedSlug: mocks.suggestedSlug,
     deletedOrganizationClerkIds: mocks.deletedOrganizationClerkIds,
+    consume: mocks.consume,
   };
 });
 
@@ -68,6 +70,7 @@ beforeEach(() => {
     orgId: "local-org",
     userId: "local-user",
   });
+  mocks.consume.mockResolvedValue({ allowed: true });
 });
 
 describe("createAgency", () => {
@@ -231,6 +234,54 @@ describe("createAgency", () => {
       ok: true,
       data: { clerkOrgId: "org_new", alreadyExisted: false },
     });
+  });
+
+  it("consumes the create_agency allowance for this person, right before Clerk creates the organization (spec 0018, AC-6)", async () => {
+    await createAgency({ name: "Northwind Studio" });
+
+    expect(mocks.consume).toHaveBeenCalledWith(
+      { kind: "user", id: "user_1" },
+      { action: "create_agency", limit: 3, windowSeconds: 86400 },
+      expect.any(Date),
+    );
+    expect(mocks.consume.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createClerkOrganization.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("refuses before Clerk creates anything once the ceiling is reached (spec 0018, AC-6)", async () => {
+    mocks.consume.mockResolvedValue({
+      allowed: false,
+      message:
+        "You have reached the allowance of 3 new agencies a day. Try again in about 4 hours.",
+    });
+
+    const result = await createAgency({ name: "Northwind Studio" });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "rate_limited",
+        message:
+          "You have reached the allowance of 3 new agencies a day. Try again in about 4 hours.",
+      },
+    });
+    expect(mocks.createClerkOrganization).not.toHaveBeenCalled();
+    expect(mocks.createAgencyRows).not.toHaveBeenCalled();
+  });
+
+  it("a double submit that resolves to an existing agency consumes no allowance (spec 0018, AC-6)", async () => {
+    mocks.agencyMemberships.mockResolvedValue([
+      {
+        clerkOrgId: "org_existing",
+        name: "Northwind",
+        clerkOrgRole: "org:admin",
+      },
+    ]);
+
+    await createAgency({ name: "Northwind" });
+
+    expect(mocks.consume).not.toHaveBeenCalled();
   });
 
   it("fails as unauthenticated when the Clerk user is gone", async () => {

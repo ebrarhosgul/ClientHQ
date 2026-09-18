@@ -19,6 +19,7 @@
 import { flattenError, z } from "zod";
 
 import {
+  consume,
   createAgencyRows,
   deletedOrganizationClerkIds,
   failure,
@@ -29,6 +30,7 @@ import {
   type Result,
 } from "@/db/tenant";
 import { sessionClaims } from "@/db/tenant/session";
+import { CREATE_AGENCY } from "@/rate-limit/policies";
 
 import { agencyMemberships, clerkUser, createClerkOrganization } from "./clerk";
 
@@ -123,6 +125,20 @@ export async function createAgency(
       return { kind: "gone" as const };
     }
 
+    // Immediately before the one call that actually creates something (AC-6):
+    // a double submit that resolved to an existing agency above never reaches
+    // here, so it costs nothing, and no Clerk organization is ever created
+    // past the ceiling.
+    const verdict = await consume(
+      { kind: "user", id: clerkUserId },
+      CREATE_AGENCY,
+      new Date(),
+    );
+
+    if (!verdict.allowed) {
+      return { kind: "rate_limited" as const, message: verdict.message };
+    }
+
     const created = await createClerkOrganization({
       name,
       slug: await suggestedSlug(name),
@@ -138,6 +154,10 @@ export async function createAgency(
 
   if (prepared.data.kind === "gone") {
     return failure({ code: "unauthenticated", message: "" });
+  }
+
+  if (prepared.data.kind === "rate_limited") {
+    return failure({ code: "rate_limited", message: prepared.data.message });
   }
 
   if (prepared.data.kind === "existing") {
