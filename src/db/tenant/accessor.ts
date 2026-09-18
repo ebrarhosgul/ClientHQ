@@ -16,7 +16,7 @@
  * returns is a row of `table` and nothing else. They are the only two
  * conversions in the layer, and the accessor's public surface has none.
  */
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, count as countRows, eq, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 
 import { newId } from "@/lib/id";
@@ -99,6 +99,17 @@ export type TenantReader<TScope extends TenantTable> = {
     table: T,
     id: string,
   ): Promise<T["$inferSelect"] | undefined>;
+
+  /**
+   * How many rows of `table` this tenant holds, under the same predicate as
+   * every read. Added by spec 0019 for the two counts analytics stamps on an
+   * event (`is_first` on an issued invoice, `team_size` on the agency) so
+   * both can run inside the transaction that made them true.
+   */
+  count<T extends TScope & TenantTable>(
+    table: T,
+    opts?: Pick<FindOptions<T, NoRelations>, "where">,
+  ): Promise<number>;
 };
 
 /** The default `with`: no relations. */
@@ -259,6 +270,22 @@ function buildAccessor(
     return findFirst(table, { where: eq(table.id, id) });
   }
 
+  async function count<T extends TenantTable>(
+    table: T,
+    opts?: Pick<FindOptions<T, NoRelations>, "where">,
+  ): Promise<number> {
+    const key = relationalKey(table);
+    const executable: PgTable = table;
+    const [row] = await (
+      await run()
+    )
+      .select({ value: countRows() })
+      .from(executable)
+      .where(scope(table, key, opts?.where));
+
+    return row?.value ?? 0;
+  }
+
   async function insert<T extends TenantTable>(
     table: T,
     values: InsertValues<T>,
@@ -331,7 +358,15 @@ function buildAccessor(
     return true;
   }
 
-  return { findMany, findFirst, findById, insert, update, delete: remove };
+  return {
+    findMany,
+    findFirst,
+    findById,
+    count,
+    insert,
+    update,
+    delete: remove,
+  };
 }
 
 /**

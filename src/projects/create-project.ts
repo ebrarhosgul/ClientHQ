@@ -42,4 +42,11 @@ export const createProject = withTenantAction({
 
     return { id: row.id };
   },
+  track: {
+    event: "project.created",
+    properties: (input, created) => ({
+      project_id: created.id,
+      client_id: input.clientId,
+    }),
+  },
 });

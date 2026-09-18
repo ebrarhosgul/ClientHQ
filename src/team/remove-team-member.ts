@@ -6,6 +6,7 @@
  * confirms, only the `memberships` mirror row is deleted; the shared `users`
  * row is never touched (see `./mirror.ts`).
  */
+import { identifyAgency } from "@/analytics/agency-group";
 import { organizationMembers, removeOrganizationMember } from "@/auth/clerk";
 import { tenantActionError, withTenantAction } from "@/db/tenant";
 
@@ -92,6 +93,9 @@ export const removeTeamMember = withTenantAction({
     }
 
     logTeamEvent({ ...detail, outcome: "ok" });
+
+    // The agency's `team_size` follows the mirror (spec 0019, AC-13).
+    await identifyAgency(ctx.orgId);
 
     return { self };
   },

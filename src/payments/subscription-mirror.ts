@@ -43,6 +43,39 @@ export async function resolveOrgId(
 export type SubscriptionMirrorOutcome = "applied" | "customer_id_conflict";
 
 /**
+ * What a write meant for the funnel (spec 0019, AC-11): `started` on any move
+ * into `active` from no row or from any other status, `changed` on every
+ * other change of status, `none` when the status is what it already was. A
+ * webhook retry and the nightly reconcile both go through this under the
+ * same row lock, so a real transition is seen exactly once.
+ */
+export type SubscriptionTransition = "started" | "changed" | "none";
+
+export function subscriptionTransition(
+  previous: string | undefined,
+  next: string,
+): SubscriptionTransition {
+  if (previous === next) {
+    return "none";
+  }
+
+  return next === "active" ? "started" : "changed";
+}
+
+export type SubscriptionMirrorResult = {
+  readonly outcome: SubscriptionMirrorOutcome;
+  readonly transition: SubscriptionTransition;
+  /** The database clock at a `started` transition; undefined otherwise. */
+  readonly subscribedAt: Date | undefined;
+};
+
+const NO_WRITE: SubscriptionMirrorResult = {
+  outcome: "customer_id_conflict",
+  transition: "none",
+  subscribedAt: undefined,
+};
+
+/**
  * Lock the agency's row, refuse a customer id change, then upsert the
  * mirrored fields, all inside the caller's open transaction.
  *
@@ -63,9 +96,14 @@ export async function applySubscriptionState(
   tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
   orgId: string,
   subscription: RetrievedSubscription,
-): Promise<SubscriptionMirrorOutcome> {
+): Promise<SubscriptionMirrorResult> {
+  // The status comes along with the customer id (spec 0019, AC-11): the
+  // transition below is decided against the row as it was under this lock.
   const [existing] = await tx
-    .select({ stripeCustomerId: subscriptions.stripeCustomerId })
+    .select({
+      stripeCustomerId: subscriptions.stripeCustomerId,
+      status: subscriptions.status,
+    })
     .from(subscriptions)
     .where(eq(subscriptions.orgId, orgId))
     .for("update")
@@ -75,8 +113,13 @@ export async function applySubscriptionState(
     existing !== undefined &&
     existing.stripeCustomerId !== subscription.customer
   ) {
-    return "customer_id_conflict";
+    return NO_WRITE;
   }
+
+  const transition = subscriptionTransition(
+    existing?.status,
+    subscription.status,
+  );
 
   const item = primaryItem(subscription);
   const pastDue = subscription.status === "past_due";
@@ -90,7 +133,7 @@ export async function applySubscriptionState(
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
   } as const;
 
-  await tx
+  const [written] = await tx
     .insert(subscriptions)
     .values({
       id: newId(),
@@ -109,7 +152,14 @@ export async function applySubscriptionState(
         // the same one `past_due_since` just used.
         updatedAt: sql`now()`,
       },
-    });
+    })
+    // The same database clock again, so `subscribed_at` on the funnel event
+    // is the transaction's `now()` and never a serverless instance's own.
+    .returning({ updatedAt: subscriptions.updatedAt });
 
-  return "applied";
+  return {
+    outcome: "applied",
+    transition,
+    subscribedAt: transition === "started" ? written?.updatedAt : undefined,
+  };
 }

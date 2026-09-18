@@ -1097,6 +1097,10 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
             }
           />
           <ErrorState action={<Button variant="outline">Try again</Button>} />
+          <ErrorState
+            reference="7c1f0d2e9a4b4c8d"
+            action={<Button variant="outline">Try again</Button>}
+          />
         </div>
         <EmptyState
           heading="No invoices yet"

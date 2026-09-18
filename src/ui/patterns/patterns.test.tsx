@@ -135,6 +135,16 @@ describe("ErrorState", () => {
 
     expect(screen.getByText("Page not found")).toBeInTheDocument();
   });
+
+  it("shows the tracking reference as plain text inside the alert, and nothing without one (spec 0019, AC-7)", () => {
+    const { rerender } = render(<ErrorState reference="ab12cd34" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Reference: ab12cd34");
+
+    rerender(<ErrorState />);
+
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Reference");
+  });
 });
 
 describe("error messages", () => {
@@ -664,6 +674,7 @@ describe.each(THEMES)("in the %s theme", (theme) => {
         />
         <EmptyState heading="No clients yet" description="Nothing here." />
         <ErrorState />
+        <ErrorState reference="ab12cd34ef56" />
         <AddressFields
           legend="Billing address"
           names={ADDRESS_NAMES}

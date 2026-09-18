@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { ErrorState } from "@/ui/patterns/error-state";
+import { useReportedError } from "@/ui/patterns/use-reported-error";
 import { Button } from "@/ui/primitives/button";
 
 /**
@@ -19,13 +20,17 @@ import { Button } from "@/ui/primitives/button";
  * that something inside the agency area could not be loaded.
  */
 export default function AgencyError({
+  error,
   reset,
 }: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
+  const reference = useReportedError(error);
+
   return (
     <ErrorState
+      reference={reference}
       className="my-auto"
       description="This page could not be loaded. Nothing you did caused it, nothing has been lost, and your subscription is not affected."
       action={

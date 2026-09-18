@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { isClerkConfigured } from "@/lib/env";
 import { OverdueBadge } from "@/projects/ui/overdue-badge";
 import { OVERVIEW_PROJECTS_EMPTY } from "@/portal/copy";
+import { trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import {
   listPortalProjects,
@@ -78,12 +79,19 @@ export default async function PortalProjectsPage({
 }: PageProps<"/portal/projects">) {
   const { page: rawPage } = await searchParams;
 
-  const { rows, page, pageCount, total } = isClerkConfigured()
-    ? await listPortalProjects(
-        (await portalContext()).ctx,
-        parsePageParam(firstParam(rawPage)),
-      )
-    : NO_RESULTS;
+  const portal = isClerkConfigured() ? await portalContext() : undefined;
+
+  if (portal !== undefined) {
+    trackPortalView(portal.ctx, "/portal/projects");
+  }
+
+  const { rows, page, pageCount, total } =
+    portal !== undefined
+      ? await listPortalProjects(
+          portal.ctx,
+          parsePageParam(firstParam(rawPage)),
+        )
+      : NO_RESULTS;
 
   return (
     <div className="flex flex-col gap-6">

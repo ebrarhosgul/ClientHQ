@@ -362,12 +362,12 @@ Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `
 Knowing what happens in production: errors and traces across server and browser, plus product analytics for which signups actually activate and which convert to a subscription.
 **Done when:** server and browser errors arrive with useful context and source maps, the conversion events you care about are recorded, and neither collector leaks personal data or blows through a free tier quota.
 - [x] Design it (spec): `/architect product analytics & error tracking`
-- [ ] Build it: `/develop product analytics & error tracking`
-  - [ ] The thread: Sentry in all three runtimes with source maps and the `enabled` predicate, the analytics client and catalogue, the `track` slot on `withTenantAction`, `agency.created` and `subscription.started` proven on a preview deploy · AC-1, AC-2, AC-3, AC-9, AC-10, AC-11, AC-21, AC-22, AC-23
-  - [ ] Sentry privacy and signals: the scrub, `org_id` and `user.id` tags, sampling and masked replay on error, the four promoted log signals, the error boundaries with a reference id · AC-4, AC-5, AC-6, AC-7
-  - [ ] The full catalogue: every server event on its action, webhook, route or page, person and group properties, portal events anonymous · AC-11, AC-12, AC-13
-  - [ ] Browser and consent: page views through the `/ingest` proxy, the cookieless start, the consent cookie and banner, `/privacy` · AC-14, AC-15, AC-16, AC-17, AC-18, AC-19
-  - [ ] Erasure and the verify walk: `deletePerson` from the scrub path, the `analytics_erasure` sweep, the alert rule and `verify.md` · AC-8, AC-20
+- [x] Build it: `/develop product analytics & error tracking` · code in `src/observability/`, `src/analytics/`, the three Sentry config files, `src/instrumentation.ts`, `src/app/privacy/`, `src/cron/analytics-erasure.ts` and the `track` slot in `src/db/tenant/action.ts`
+  - [x] The thread: Sentry in all three runtimes with source maps and the `enabled` predicate, the analytics client and catalogue, the `track` slot on `withTenantAction`, `agency.created` and `subscription.started` proven on a preview deploy · AC-1, AC-2, AC-3, AC-9, AC-10, AC-11, AC-21, AC-22, AC-23
+  - [x] Sentry privacy and signals: the scrub, `org_id` and `user.id` tags, sampling and masked replay on error, the four promoted log signals, the error boundaries with a reference id · AC-4, AC-5, AC-6, AC-7
+  - [x] The full catalogue: every server event on its action, webhook, route or page, person and group properties, portal events anonymous · AC-11, AC-12, AC-13
+  - [x] Browser and consent: page views through the `/ingest` proxy, the cookieless start, the consent cookie and banner, `/privacy` · AC-14, AC-15, AC-16, AC-17, AC-18, AC-19
+  - [x] Erasure and the verify walk: `deletePerson` from the scrub path, the `analytics_erasure` sweep, the alert rule and `verify.md` · AC-8, AC-20
 - [ ] Verify it: `/check verify product analytics & error tracking`
 - [ ] Test it: `/test product analytics & error tracking`
 - [ ] Review it (fresh model): `/check review product analytics & error tracking`

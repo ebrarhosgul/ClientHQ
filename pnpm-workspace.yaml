@@ -3,3 +3,9 @@ allowBuilds:
   unrs-resolver: false
   # drizzle-kit bundles esbuild; its postinstall fetches the platform binary.
   esbuild: true
+  # @sentry/nextjs uploads source maps through the sentry-cli binary, which its
+  # postinstall downloads (spec 0019, AC-3). Without it a build with the auth
+  # token set would fail the upload step.
+  "@sentry/cli": true
+  # core-js's postinstall only prints a funding notice.
+  core-js: false

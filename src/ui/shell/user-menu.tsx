@@ -4,6 +4,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { LogOut } from "lucide-react";
 import Link from "next/link";
 
+import { CookieSettingsMenuItem } from "@/analytics/ui/cookie-settings";
 import { cn } from "@/ui/lib/cn";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/primitives/avatar";
 import { Button } from "@/ui/primitives/button";
@@ -83,6 +84,11 @@ function ClerkUserMenu({ className }: { readonly className?: string }) {
         <DropdownMenuItem asChild>
           <Link href="/settings">Settings</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/privacy">Privacy</Link>
+        </DropdownMenuItem>
+        <CookieSettingsMenuItem />
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void signOut({ redirectUrl: "/" })}>
           <LogOut aria-hidden />
           Sign out

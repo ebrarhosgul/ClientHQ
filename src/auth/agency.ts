@@ -18,6 +18,8 @@
  */
 import { flattenError, z } from "zod";
 
+import { analytics } from "@/analytics";
+import { identifyAgency, identifyPerson } from "@/analytics/agency-group";
 import {
   consume,
   createAgencyRows,
@@ -173,9 +175,10 @@ export async function createAgency(
   }
 
   const { clerkOrgId } = created.data;
+  let rows: Awaited<ReturnType<typeof createAgencyRows>>;
 
   try {
-    await createAgencyRows({ clerkOrgId, name }, user.data);
+    rows = await createAgencyRows({ clerkOrgId, name }, user.data);
   } catch (error) {
     // The Clerk organization exists and the local rows do not. Nothing partial
     // was committed, the person is told to try again, and their next agency
@@ -188,6 +191,17 @@ export async function createAgency(
 
     return failure({ code, message: RETRY_MESSAGE });
   }
+
+  // The second step of the funnel, after the rows committed (spec 0019,
+  // AC-11, AC-13): the event, then the person (the creator is always the
+  // admin) and the agency group with its one member. Nothing here can fail
+  // the action: the analytics client never throws.
+  analytics().track("agency.created", {
+    distinctId: { kind: "user", clerkUserId },
+    orgId: rows.orgId,
+  });
+  await identifyPerson({ clerkUserId, userId: rows.userId, role: "admin" });
+  await identifyAgency(rows.orgId);
 
   return ok({ clerkOrgId, alreadyExisted: false });
 }

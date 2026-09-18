@@ -11,6 +11,7 @@ import {
   OVERVIEW_INVOICES_EMPTY,
   OVERVIEW_PROJECTS_EMPTY,
 } from "@/portal/copy";
+import { trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import { overviewData, type OverviewData } from "@/portal/queries";
 import { OverviewSection } from "@/portal/ui/overview-section";
@@ -41,9 +42,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * shared yet would see (spec 0004, AC-22).
  */
 export default async function PortalOverviewPage() {
-  const { projects, files, invoices } = isClerkConfigured()
-    ? await overviewData((await portalContext()).ctx)
-    : NO_OVERVIEW;
+  const portal = isClerkConfigured() ? await portalContext() : undefined;
+
+  if (portal !== undefined) {
+    trackPortalView(portal.ctx, "/portal");
+  }
+
+  const { projects, files, invoices } =
+    portal !== undefined ? await overviewData(portal.ctx) : NO_OVERVIEW;
 
   return (
     <div className="flex flex-col gap-8">

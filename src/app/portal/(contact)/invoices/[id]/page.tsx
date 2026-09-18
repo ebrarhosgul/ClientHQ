@@ -7,6 +7,7 @@ import { InvoiceDocument } from "@/invoices/ui/invoice-document";
 import { PastDueBadge } from "@/invoices/ui/past-due-badge";
 import { todayUtc } from "@/lib/dates";
 import { isClerkConfigured } from "@/lib/env";
+import { trackPortalInvoiceView, trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import { portalId } from "@/portal/schema";
 import { InvoiceStatusChip } from "@/ui/patterns/status-chip";
@@ -61,6 +62,9 @@ export default async function PortalInvoicePage({
   if (invoice === undefined) {
     notFound();
   }
+
+  trackPortalView(ctx, "/portal/invoices/[id]");
+  trackPortalInvoiceView(ctx, parsed.data);
 
   const today = todayUtc();
   const pastDue = isPastDue(invoice.status, invoice.dueDate, today);

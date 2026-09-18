@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatBytes } from "@/deliverables/format";
 import { isClerkConfigured } from "@/lib/env";
 import { OVERVIEW_FILES_EMPTY } from "@/portal/copy";
+import { trackPortalView } from "@/portal/analytics";
 import { portalContext } from "@/portal/context";
 import {
   groupFilesByProject,
@@ -50,12 +51,16 @@ export default async function PortalFilesPage({
 }: PageProps<"/portal/files">) {
   const { page: rawPage } = await searchParams;
 
-  const { rows, page, pageCount } = isClerkConfigured()
-    ? await listPortalFiles(
-        (await portalContext()).ctx,
-        parsePageParam(firstParam(rawPage)),
-      )
-    : NO_RESULTS;
+  const portal = isClerkConfigured() ? await portalContext() : undefined;
+
+  if (portal !== undefined) {
+    trackPortalView(portal.ctx, "/portal/files");
+  }
+
+  const { rows, page, pageCount } =
+    portal !== undefined
+      ? await listPortalFiles(portal.ctx, parsePageParam(firstParam(rawPage)))
+      : NO_RESULTS;
   const groups = groupFilesByProject(rows);
 
   return (

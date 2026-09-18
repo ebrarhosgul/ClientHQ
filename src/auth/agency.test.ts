@@ -43,6 +43,17 @@ vi.mock("@/db/tenant", async () => {
   };
 });
 
+vi.mock("@/analytics", () => ({
+  analytics: () => ({
+    track: vi.fn(),
+  }),
+}));
+
+vi.mock("@/analytics/agency-group", () => ({
+  identifyPerson: vi.fn(),
+  identifyAgency: vi.fn(),
+}));
+
 vi.mock("./clerk", () => ({
   agencyMemberships: mocks.agencyMemberships,
   clerkUser: mocks.clerkUser,

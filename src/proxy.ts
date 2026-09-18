@@ -24,6 +24,11 @@ import { isClerkConfigured } from "@/lib/env";
  * session: each verifies its own signature or secret instead. They do not
  * exist yet (features 8, 17 and 18), and are listed now so those features do
  * not have to widen this list while shipping something else.
+ *
+ * Spec 0019 adds two more: `/privacy`, the notice anyone may read before
+ * they have an account, and `/ingest`, the rewrite the browser's analytics
+ * client posts through, which is exactly as open as PostHog's own endpoint
+ * and carries no session (AC-16, AC-19).
  */
 export const PUBLIC_ROUTES = [
   "/",
@@ -31,6 +36,8 @@ export const PUBLIC_ROUTES = [
   "/sign-up(.*)",
   "/api/webhooks/(.*)",
   "/api/cron/(.*)",
+  "/privacy",
+  "/ingest/(.*)",
 ] as const;
 
 const isPublicRoute = createRouteMatcher([...PUBLIC_ROUTES]);

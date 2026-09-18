@@ -16,6 +16,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { analytics } from "@/analytics";
 import { clerkUser, clerkVerifiedEmails } from "@/auth/clerk";
 import {
   acceptInvitation as bindInvitation,
@@ -86,6 +87,16 @@ export async function acceptInvitation(input: unknown): Promise<Result<never>> {
 
   if (outcome.kind === "refused") {
     return failure(FORBIDDEN);
+  }
+
+  // A client event, never a person (spec 0019, AC-12): the contact is
+  // identified only as `client:<client_id>`, and only on a real acceptance.
+  if (outcome.kind === "accepted") {
+    analytics().track("contact.accepted", {
+      distinctId: { kind: "client", clientId: outcome.clientId },
+      orgId: outcome.orgId,
+      properties: { client_id: outcome.clientId },
+    });
   }
 
   const jar = await cookies();

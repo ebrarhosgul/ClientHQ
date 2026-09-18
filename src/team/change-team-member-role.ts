@@ -9,6 +9,7 @@
  * the mirror row follows, and a mirror failure after a Clerk success is
  * logged at error level and still returns `ok`, because the change is real.
  */
+import { identifyPerson } from "@/analytics/agency-group";
 import { organizationMembers, setOrganizationMemberRole } from "@/auth/clerk";
 import type { MembershipRole } from "@/db/schema";
 import { tenantActionError, withTenantAction } from "@/db/tenant";
@@ -96,14 +97,25 @@ export const changeTeamMemberRole = withTenantAction({
       throwUnavailable(written.failure, "write");
     }
 
+    let mirrored: { readonly userId: string } | undefined;
+
     try {
-      await updateMirrorRole(db, target.clerkUserId, input.role);
+      mirrored = await updateMirrorRole(db, target.clerkUserId, input.role);
     } catch {
       logTeamEvent({ ...detail, outcome: "mirror_failed" }, "error");
       return { role: input.role, self };
     }
 
     logTeamEvent({ ...detail, outcome: "ok" });
+
+    // The person's role property follows the mirror (spec 0019, AC-13).
+    if (mirrored !== undefined) {
+      await identifyPerson({
+        clerkUserId: target.clerkUserId,
+        userId: mirrored.userId,
+        role: input.role,
+      });
+    }
 
     return { role: input.role, self };
   },

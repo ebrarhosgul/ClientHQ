@@ -170,6 +170,44 @@ const serverEnvSchema = z.object({
   CRON_SECRET: z
     .string()
     .min(16, "CRON_SECRET is required and must be at least 16 characters"),
+
+  /**
+   * Feature 20, product analytics and error tracking (spec 0019, AC-21,
+   * AC-23). Every one of these is optional in every environment, production
+   * included, and there is deliberately no refinement demanding them: an
+   * unset provider means observability is off and the product runs exactly
+   * as before, never a boot failure. `isSentryConfigured()` and
+   * `isAnalyticsConfigured()` in `src/observability/` are the two questions
+   * the rest of the code asks.
+   *
+   * The Sentry DSN and the PostHog key are `NEXT_PUBLIC_` because the browser
+   * needs them too; both identify a project, never a person. `SENTRY_ORG`,
+   * `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` are read by `withSentryConfig`
+   * in `next.config.ts` at build time, straight from `process.env` (a named
+   * exemption: a build must not need database credentials to compile), and
+   * are declared here so the schema stays the one list of everything the app
+   * reads. The `POSTHOG_PERSONAL_API_KEY` and `POSTHOG_PROJECT_ID` pair
+   * exists only for person deletion (AC-20).
+   */
+  NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional(),
+  SENTRY_ORG: z.string().min(1).optional(),
+  SENTRY_PROJECT: z.string().min(1).optional(),
+  SENTRY_AUTH_TOKEN: z.string().min(1).optional(),
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.url().default("https://eu.i.posthog.com"),
+  POSTHOG_PERSONAL_API_KEY: z.string().min(1).optional(),
+  POSTHOG_PROJECT_ID: z.string().min(1).optional(),
+
+  /**
+   * Supplied by Vercel when "automatically expose system environment
+   * variables" is on, and absent everywhere else. `VERCEL_ENV` decides
+   * whether the SDKs send at all (production and preview only, AC-2) and the
+   * commit SHA becomes the Sentry release, so a stack trace maps to the exact
+   * build that produced it.
+   */
+  VERCEL_ENV: z.string().min(1).optional(),
+  NEXT_PUBLIC_VERCEL_ENV: z.string().min(1).optional(),
+  VERCEL_GIT_COMMIT_SHA: z.string().min(1).optional(),
 });
 
 /**

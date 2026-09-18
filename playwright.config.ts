@@ -143,6 +143,13 @@ export default defineConfig({
         R2_ACCESS_KEY_ID: "",
         R2_SECRET_ACCESS_KEY: "",
         R2_BUCKET: "",
+        // No observability provider either (spec 0019, AC-22): the suite
+        // asserts nothing leaves for `/ingest` or `sentry.io`, and a
+        // developer's own keys must not make that assertion red locally.
+        NEXT_PUBLIC_SENTRY_DSN: "",
+        NEXT_PUBLIC_POSTHOG_KEY: "",
+        NEXT_PUBLIC_VERCEL_ENV: "",
+        VERCEL_ENV: "",
       },
     },
     ...(hasPortalContactCredentials
@@ -159,6 +166,11 @@ export default defineConfig({
               // Its own build directory: `next dev` refuses a second instance
               // sharing the default server's `.next` (see `next.config.ts`).
               NEXT_DIST_DIR: ".next-portal-contact",
+              // Still no observability provider (spec 0019, AC-22).
+              NEXT_PUBLIC_SENTRY_DSN: "",
+              NEXT_PUBLIC_POSTHOG_KEY: "",
+              NEXT_PUBLIC_VERCEL_ENV: "",
+              VERCEL_ENV: "",
             },
           },
         ]

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { ErrorState } from "@/ui/patterns/error-state";
+import { useReportedError } from "@/ui/patterns/use-reported-error";
 import { Button } from "@/ui/primitives/button";
 
 /**
@@ -17,13 +18,17 @@ import { Button } from "@/ui/primitives/button";
  * gap rather than a silent one.
  */
 export default function PortalError({
+  error,
   reset,
 }: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
+  const reference = useReportedError(error);
+
   return (
     <ErrorState
+      reference={reference}
       className="my-auto"
       description="This page could not be loaded. Nothing you did caused it, and nothing has been lost."
       action={

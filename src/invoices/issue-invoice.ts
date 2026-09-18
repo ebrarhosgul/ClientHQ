@@ -22,6 +22,8 @@
  * the other refused with `conflict`, because the invoice row's lock makes
  * the second compare and set see `sent`.
  */
+import { isNotNull } from "drizzle-orm";
+
 import { clients, invoiceEvents, invoices } from "@/db/schema";
 import {
   tenantActionError,
@@ -41,6 +43,8 @@ export type IssuedInvoice = {
   readonly number: number;
   readonly status: "sent";
   readonly notification: NotificationOutcome;
+  /** The agency's first ever issued invoice (spec 0019, AC-11). */
+  readonly isFirst: boolean;
 };
 
 export const issueInvoice = withTenantAction({
@@ -112,8 +116,15 @@ export const issueInvoice = withTenantAction({
         actorUserId: ctx.userId,
       });
 
+      // Inside the same transaction, so the count includes this invoice and
+      // nothing issued after it: exactly one means this was the first.
+      const issuedCount = await scope.db.count(invoices, {
+        where: isNotNull(invoices.issueDate),
+      });
+
       return {
         id: row.id,
+        isFirst: issuedCount === 1,
         clientId: row.clientId,
         number,
         totalCents: row.totalCents,
@@ -133,6 +144,16 @@ export const issueInvoice = withTenantAction({
       number: issued.number,
       status: "sent",
       notification,
+      isFirst: issued.isFirst,
     };
+  },
+  // The third step of the funnel (spec 0019, AC-11): fired after the whole
+  // handler, so after the commit, with `is_first` counted inside it.
+  track: {
+    event: "invoice.issued",
+    properties: (_input, issued) => ({
+      invoice_id: issued.id,
+      is_first: issued.isFirst,
+    }),
   },
 });

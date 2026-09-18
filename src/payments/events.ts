@@ -61,6 +61,12 @@ export const retrievedSubscription = z.object({
    * resolve to the same agency (spec 0017, AC-7).
    */
   created: stripeTimestamp,
+  /**
+   * When the trial ends, or null outside one. Never stored: it is passed in
+   * memory to the agency's analytics group properties by the webhook and the
+   * nightly reconcile (spec 0019, AC-13), and read from Stripe every time.
+   */
+  trial_end: stripeTimestamp.nullish(),
   metadata: z.record(z.string(), z.string()).nullish(),
   items: z.object({
     data: z

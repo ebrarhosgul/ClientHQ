@@ -14,6 +14,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { flattenError, type ZodType } from "zod";
 
+import { analytics, type EventName, type EventProperties } from "@/analytics";
 import type { RateLimitPolicy } from "@/rate-limit/policies";
 
 import { tenantDb, type StaffAccessor } from "./accessor";
@@ -80,7 +81,37 @@ export type ActionConfig<TSchema extends ZodType, TData> = {
    * a refused call has no side effect at all.
    */
   readonly rateLimit?: RateLimitPolicy;
+  /**
+   * The product event this action reports (spec 0019, AC-10). Fired only
+   * after the handler resolved and, with `transaction: true`, after the
+   * commit: never on a parse failure, a role or subscription refusal, a rate
+   * limit refusal, or a thrown handler. The person and the agency come from
+   * the tenant context, never from the action, so a wrong `org_id` on an
+   * event is not something an input can cause. The flush is scheduled with
+   * `after()`, so the response never waits on the provider.
+   */
+  readonly track?: ActionTrack<TSchema["_output"], TData>;
 };
+
+/**
+ * One event from the catalogue, with an optional function that derives its
+ * extra properties from the parsed input and the handler's result.
+ *
+ * `NoInfer` keeps these callbacks from taking part in inferring the
+ * handler's result type, so a `track` written above its `handler` in the
+ * config still sees the real result rather than `unknown`.
+ */
+export type ActionTrack<TInput, TData> = {
+  readonly [E in EventName]: {
+    readonly event: E;
+    readonly properties?: (
+      input: NoInfer<TInput>,
+      result: NoInfer<TData>,
+    ) => EventProperties<E>;
+    /** Fire only when this holds; a success it does not describe is silent. */
+    readonly when?: (input: NoInfer<TInput>, result: NoInfer<TData>) => boolean;
+  };
+}[EventName];
 
 /** A PostgreSQL error, as the postgres-js driver surfaces it. */
 type DriverError = { readonly code: string; readonly constraint_name?: string };
@@ -161,6 +192,29 @@ function toActionError(
   }
 
   return undefined;
+}
+
+/**
+ * Report the action's event, after success only. The client never throws,
+ * so this is the one call in the wrapper with no `try` of its own.
+ */
+function fireTrack<TInput, TData>(
+  track: ActionTrack<TInput, TData> | undefined,
+  ctx: StaffContext,
+  input: TInput,
+  result: TData,
+): void {
+  if (track === undefined || track.when?.(input, result) === false) {
+    return;
+  }
+
+  analytics().track(track.event, {
+    distinctId: { kind: "user", clerkUserId: ctx.clerkUserId },
+    orgId: ctx.orgId,
+    // The properties function is typed per event above; the client parses
+    // the result against that event's schema before anything is sent.
+    properties: track.properties?.(input, result),
+  } as Parameters<ReturnType<typeof analytics>["track"]>[1]);
 }
 
 /**
@@ -247,6 +301,7 @@ export function withTenantAction<TSchema extends ZodType, TData>(
 
       // After a successful handler, and only then.
       revalidate(config.revalidate);
+      fireTrack(config.track, ctx, parsed.data, data);
 
       return ok(data);
     } catch (thrown) {

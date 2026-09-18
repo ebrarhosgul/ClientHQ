@@ -12,6 +12,7 @@ import { cronRuns } from "@/db/schema";
 import type { Database } from "@/db/tenant";
 import { todayUtc } from "@/lib/dates";
 import { newId } from "@/lib/id";
+import { reportSignal } from "@/observability";
 
 import { logCronRun, logCronSweep } from "./log";
 import type { Sweep, SweepName, SweepOutcome, SweepReport } from "./sweep";
@@ -93,6 +94,17 @@ export async function runDailySweeps({
       reason: result.reason,
       error: result.error,
     });
+
+    // A failed sweep is promoted beside its log line (spec 0019, AC-6), one
+    // issue per sweep name. No `org_id`: a sweep spans every agency.
+    if (result.outcome === "failed") {
+      reportSignal(`cron.sweep_failed: ${result.name}`, {
+        level: "error",
+        tags: { sweep: result.name },
+        extra: { runId, error: result.error, durationMs: result.durationMs },
+        fingerprint: ["cron.sweep_failed", result.name],
+      });
+    }
 
     results.push(result);
   }

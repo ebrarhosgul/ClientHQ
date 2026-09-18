@@ -41,6 +41,7 @@ import { generateToken, hashToken } from "./token";
 
 export type SentInvitation = {
   readonly id: string;
+  readonly clientId: string;
   readonly expiresAt: Date;
 };
 
@@ -176,6 +177,10 @@ export const sendInvitation = withTenantAction({
       contactId: contact.id,
     });
 
-    return { id: contact.id, expiresAt };
+    return { id: contact.id, clientId: contact.clientId, expiresAt };
+  },
+  track: {
+    event: "contact.invited",
+    properties: (_input, sent) => ({ client_id: sent.clientId }),
   },
 });

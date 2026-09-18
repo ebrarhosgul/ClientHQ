@@ -39,4 +39,10 @@ export const setDeliverableVisibility = withTenantAction({
 
     return { visibleToClient: updated.visibleToClient };
   },
+  // Only a flip to visible is a share (spec 0019, AC-12); hiding is silent.
+  track: {
+    event: "deliverable.shared",
+    when: (_input, result) => result.visibleToClient,
+    properties: (input) => ({ deliverable_id: input.deliverableId }),
+  },
 });

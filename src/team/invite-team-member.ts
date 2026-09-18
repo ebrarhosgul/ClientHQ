@@ -104,4 +104,8 @@ export const inviteTeamMember = withTenantAction({
 
     return { invitationId: sent.data.invitationId };
   },
+  track: {
+    event: "team_member.invited",
+    properties: (input) => ({ role: input.role }),
+  },
 });

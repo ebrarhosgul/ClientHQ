@@ -7,9 +7,13 @@
  * organization whenever they are known, and never any row contents. A
  * `no_session` refusal has neither identifier, which is why both are optional.
  *
- * Deliberately `console` and nothing else. Vercel collects stdout, and error
- * tracking is feature 20's decision, not this layer's.
+ * `console` for every line. Vercel collects stdout. Two of the four events
+ * are also promoted to Sentry with the same fields (spec 0019, AC-6):
+ * `access.invariant`, because it is a webhook bug, and `tenant.escape_hatch`,
+ * because spec 0003 wants those call sites counted. A refusal and a system
+ * access grant stay log lines only.
  */
+import { reportSignal } from "@/observability";
 
 export type TenantLogLine = {
   readonly event:
@@ -71,6 +75,12 @@ export function logGateInvariant(details: GateInvariantDetails): void {
     ...details,
     at: new Date().toISOString(),
   });
+  reportSignal("access.invariant", {
+    level: "error",
+    tags: { org_id: details.orgId },
+    extra: { operation: "accessVerdict", reason: details.reason },
+    fingerprint: ["access.invariant", "accessVerdict"],
+  });
 }
 
 /**
@@ -82,5 +92,15 @@ export function logEscapeHatch(details: RefusalDetails): void {
     event: "tenant.escape_hatch",
     ...details,
     at: new Date().toISOString(),
+  });
+  reportSignal("tenant.escape_hatch", {
+    level: "error",
+    tags: { org_id: details.orgId },
+    extra: {
+      operation: details.operation,
+      reason: details.reason,
+      userId: details.userId,
+    },
+    fingerprint: ["tenant.escape_hatch", details.operation],
   });
 }

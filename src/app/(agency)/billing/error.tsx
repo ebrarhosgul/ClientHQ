@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { ErrorState } from "@/ui/patterns/error-state";
+import { useReportedError } from "@/ui/patterns/use-reported-error";
 import { Button } from "@/ui/primitives/button";
 
 /**
@@ -17,13 +18,17 @@ import { Button } from "@/ui/primitives/button";
  * actually wants to know, which is that its money is not involved.
  */
 export default function BillingError({
+  error,
   reset,
 }: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
+  const reference = useReportedError(error);
+
   return (
     <ErrorState
+      reference={reference}
       className="my-auto"
       heading="Your billing details could not be loaded"
       description="Nothing has changed about your subscription, and nothing has been charged. This is a problem reading the page, not a problem with your account."
