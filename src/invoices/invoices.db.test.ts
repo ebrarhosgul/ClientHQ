@@ -26,6 +26,7 @@ import {
   invoices,
   memberships,
   organizations,
+  rateLimitWindows,
   subscriptions,
   users,
   type InvoiceStatus,
@@ -37,6 +38,8 @@ import { failure, ok, type Result } from "@/db/tenant/errors";
 import { newId } from "@/lib/id";
 import { loadEnvFiles } from "@/lib/load-env-files";
 import { todayUtc } from "@/lib/dates";
+import { INVOICE_EMAIL } from "@/rate-limit/policies";
+import { windowStart } from "@/rate-limit/window";
 
 const state = vi.hoisted(() => ({
   tx: undefined as unknown,
@@ -927,6 +930,80 @@ describe.skipIf(!url)("invoices against real PostgreSQL", () => {
         expect(onVoid.ok).toBe(false);
       });
     });
+  });
+
+  describe("rate limiting (spec 0018, AC-1, AC-2, AC-11, AC-12)", () => {
+    it("refuses issuing once the shared allowance is spent, with no side effect (AC-1, AC-2)", async () => {
+      await inRollback(async (tx, fixture) => {
+        const id = await draftWithLines(fixture, 1);
+
+        await tx.insert(rateLimitWindows).values({
+          subject: `org:${fixture.orgA}`,
+          action: "invoice_email",
+          windowStart: windowStart(new Date(), INVOICE_EMAIL.windowSeconds),
+          count: INVOICE_EMAIL.limit,
+          updatedAt: new Date(),
+        });
+
+        const result = await issueInvoice({ id });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe("rate_limited");
+          expect(result.error.message).toMatch(
+            /reached its allowance of 50 invoice emails a day/,
+          );
+        }
+        expect(await eventsOf(tx, id)).toHaveLength(0);
+        expect(state.sent).toHaveLength(0);
+        expect((await getInvoice(staffOf(fixture, "A"), id))?.status).toBe(
+          "draft",
+        );
+      });
+    });
+
+    it(
+      "resendInvoiceNotification draws on the same allowance issueInvoice does, " +
+        "equally for an admin and a member, and the ceiling wins over the cooldown (AC-1, AC-11, AC-12)",
+      async () => {
+        await inRollback(async (tx, fixture) => {
+          const id = await draftWithLines(fixture, 1);
+
+          // Consumes one unit of the shared allowance.
+          expect((await issueInvoice({ id })).ok).toBe(true);
+
+          // Push the same window to its ceiling, as a member of the same
+          // agency: the allowance is the agency's, not the person's (AC-11).
+          await tx
+            .update(rateLimitWindows)
+            .set({ count: INVOICE_EMAIL.limit })
+            .where(
+              and(
+                eq(rateLimitWindows.subject, `org:${fixture.orgA}`),
+                eq(rateLimitWindows.action, "invoice_email"),
+              ),
+            );
+          state.claims = { ...state.claims, clerkOrgRole: "org:member" };
+
+          // Still inside the five minute cooldown too: if the cooldown ran
+          // first this would be `conflict`, not `rate_limited`.
+          const result = await resendInvoiceNotification({ id });
+
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error.code).toBe("rate_limited");
+          }
+
+          // Exactly one notification, from the issue above; the refused
+          // resend sent nothing.
+          expect(
+            (await eventsOf(tx, id)).filter(
+              (event) => event.kind === "notified",
+            ),
+          ).toHaveLength(1);
+        });
+      },
+    );
   });
 
   describe("contactsToNotify (AC-6)", () => {
