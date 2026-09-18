@@ -21,6 +21,8 @@
  * Skipped when `DIRECT_URL` is not set, so `pnpm test` still runs without a
  * database.
  */
+import { randomUUID } from "node:crypto";
+
 import { drizzle } from "drizzle-orm/postgres-js";
 import { and, eq, inArray } from "drizzle-orm";
 import postgres from "postgres";
@@ -55,17 +57,21 @@ const db: Database = drizzle(sql, { schema });
 const createdOrgs: string[] = [];
 const createdEvents: string[] = [];
 
+function tag(): string {
+  return randomUUID().replace(/-/g, "").slice(0, 12);
+}
+
 async function makeOrganization(
   patch: { readonly deletedAt?: Date } = {},
 ): Promise<string> {
   const id = newId();
-  const tag = id.slice(0, 8);
+  const orgTag = tag();
 
   await db.insert(organizations).values({
     id,
-    clerkOrgId: `org_${tag}`,
-    name: `Agency ${tag}`,
-    slug: `agency-${tag}`,
+    clerkOrgId: `org_${orgTag}`,
+    name: `Agency ${orgTag}`,
+    slug: `agency-${orgTag}`,
     deletedAt: patch.deletedAt,
   });
 
