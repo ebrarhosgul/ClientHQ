@@ -354,7 +354,7 @@ Putting a ceiling on the actions a signed in user could otherwise abuse: request
   - [x] Retention, types and verification: the seven day prune in `retention_prune`, the type level test for the slot, and the manual walk in `verify.md` · AC-10, AC-13
 - [x] Verify it: `/check verify rate limiting`
 - [x] Test it: `/test rate limiting`
-- [ ] Review it (fresh model): `/check review rate limiting`
+- [x] Review it (fresh model): `/check review rate limiting`
 - [ ] Document it: `/document rate limiting`
 Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `## Build plan` · code in `src/rate-limit/`, `src/db/schema/rate-limit.ts`, `src/db/tenant/rate-limit.ts`, `src/db/tenant/action.ts`, `src/deliverables/request-upload.ts`, `src/invoices/issue-invoice.ts`, `src/invoices/resend-invoice-notification.ts`, `src/auth/agency.ts`, `src/cron/retention-sweep.ts`
 

@@ -14,6 +14,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { errorMessage } from "@/ui/patterns/error-messages";
 import { Button } from "@/ui/primitives/button";
 import { Progress } from "@/ui/primitives/progress";
 
@@ -218,7 +219,7 @@ export function UploadDeliverable({
       );
 
       if (result.error.code !== "validation") {
-        setMessage(result.error.message);
+        setMessage(errorMessage(result.error));
       }
 
       setPhase("idle");

@@ -95,9 +95,13 @@ export async function createAgency(
 
   const { name } = parsed.data;
 
-  // Everything Clerk is asked for, in one place, so any Clerk failure becomes
-  // one honest "try again" rather than an error page (AC-11).
-  const prepared = await withClerk(async () => {
+  // Everything Clerk is asked for to find or gate the caller, in one place,
+  // so any Clerk failure becomes one honest "try again" rather than an error
+  // page (AC-11). `consume` deliberately runs after this block rather than
+  // inside it (below): it is documented never to throw, but folding it into
+  // this catch would mislabel a store failure as a Clerk outage if that
+  // contract ever changed.
+  const resolved = await withClerk(async () => {
     // The double submit guard (AC-9). A retried or double clicked submit finds
     // the membership its first attempt created and activates that agency
     // instead of minting a second one. Read from Clerk, never from the local
@@ -125,46 +129,50 @@ export async function createAgency(
       return { kind: "gone" as const };
     }
 
-    // Immediately before the one call that actually creates something (AC-6):
-    // a double submit that resolved to an existing agency above never reaches
-    // here, so it costs nothing, and no Clerk organization is ever created
-    // past the ceiling.
-    const verdict = await consume(
-      { kind: "user", id: clerkUserId },
-      CREATE_AGENCY,
-      new Date(),
-    );
-
-    if (!verdict.allowed) {
-      return { kind: "rate_limited" as const, message: verdict.message };
-    }
-
-    const created = await createClerkOrganization({
-      name,
-      slug: await suggestedSlug(name),
-      createdBy: clerkUserId,
-    });
-
-    return { kind: "created" as const, clerkOrgId: created.clerkOrgId, user };
+    return { kind: "ready" as const, user };
   });
 
-  if (!prepared.ok) {
-    return failure(prepared.error);
+  if (!resolved.ok) {
+    return failure(resolved.error);
   }
 
-  if (prepared.data.kind === "gone") {
+  if (resolved.data.kind === "gone") {
     return failure({ code: "unauthenticated", message: "" });
   }
 
-  if (prepared.data.kind === "rate_limited") {
-    return failure({ code: "rate_limited", message: prepared.data.message });
+  if (resolved.data.kind === "existing") {
+    return ok({ clerkOrgId: resolved.data.clerkOrgId, alreadyExisted: true });
   }
 
-  if (prepared.data.kind === "existing") {
-    return ok({ clerkOrgId: prepared.data.clerkOrgId, alreadyExisted: true });
+  const { user } = resolved.data;
+
+  // Immediately before the one call that actually creates something (AC-6):
+  // a double submit that resolved to an existing agency above never reaches
+  // here, so it costs nothing, and no Clerk organization is ever created
+  // past the ceiling.
+  const verdict = await consume(
+    { kind: "user", id: clerkUserId },
+    CREATE_AGENCY,
+    new Date(),
+  );
+
+  if (!verdict.allowed) {
+    return failure({ code: "rate_limited", message: verdict.message });
   }
 
-  const { clerkOrgId, user } = prepared.data;
+  const created = await withClerk(async () =>
+    createClerkOrganization({
+      name,
+      slug: await suggestedSlug(name),
+      createdBy: clerkUserId,
+    }),
+  );
+
+  if (!created.ok) {
+    return failure(created.error);
+  }
+
+  const { clerkOrgId } = created.data;
 
   try {
     await createAgencyRows({ clerkOrgId, name }, user.data);

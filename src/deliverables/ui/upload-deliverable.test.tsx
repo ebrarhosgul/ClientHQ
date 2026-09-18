@@ -1,5 +1,5 @@
 /**
- * covers: spec 0011 AC-1, AC-2, AC-5, AC-6, AC-7, AC-8
+ * covers: spec 0011 AC-1, AC-2, AC-5, AC-6, AC-7, AC-8; spec 0018 AC-14
  *
  * The upload flow never really talks to R2 in a test; a fake
  * `XMLHttpRequest` stands in so each phase (picking, the signed PUT with
@@ -207,6 +207,25 @@ describe("UploadDeliverable", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This project is archived, so no files can be added.",
+    );
+    expect(FakeXHR.instances).toHaveLength(0);
+  });
+
+  it("falls back to the rate limit sentence when a refusal carries no message (spec 0018, AC-14)", async () => {
+    const user = userEvent.setup();
+    mocks.requestUpload.mockResolvedValue({
+      ok: false,
+      error: { code: "rate_limited", message: "" },
+    });
+
+    render(<UploadDeliverable projectId="p1" />);
+    await user.upload(
+      screen.getByLabelText("Choose a file to upload"),
+      pickedFile(),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That is a lot of requests. Wait a moment and try again.",
     );
     expect(FakeXHR.instances).toHaveLength(0);
   });

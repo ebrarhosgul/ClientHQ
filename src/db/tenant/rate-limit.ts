@@ -37,6 +37,14 @@ function subjectText(subject: RateLimitSubject): string {
  * attempt counts whether it is then allowed, refused, or allowed but fails
  * later in the caller.
  */
+/** Distinguishes the upsert's own broken invariant from a driver or network failure in `rate_limit.skipped` (AC-7). */
+class UpsertReturnedNoRow extends Error {
+  constructor() {
+    super("the rate limit upsert returned no row");
+    this.name = "UpsertReturnedNoRow";
+  }
+}
+
 export async function consume(
   subject: RateLimitSubject,
   policy: RateLimitPolicy,
@@ -44,8 +52,6 @@ export async function consume(
 ): Promise<RateLimitVerdict> {
   const subjectKey = subjectText(subject);
   const start = windowStart(now, policy.windowSeconds);
-
-  let count: number;
 
   try {
     const db = await pooledDb();
@@ -73,10 +79,31 @@ export async function consume(
       .returning({ count: rateLimitWindows.count });
 
     if (row === undefined) {
-      throw new Error("the rate limit upsert returned no row");
+      throw new UpsertReturnedNoRow();
     }
 
-    count = row.count;
+    const { count } = row;
+
+    if (count <= policy.limit) {
+      return { allowed: true };
+    }
+
+    const retryAfter = retryAfterSeconds(start, policy.windowSeconds, now);
+
+    const verdict: RateLimitVerdict = {
+      allowed: false,
+      subject: subjectKey,
+      action: policy.action,
+      count,
+      limit: policy.limit,
+      windowStart: start,
+      retryAfterSeconds: retryAfter,
+      message: refusalMessage(policy, retryAfter),
+    };
+
+    logRefused(verdict);
+
+    return verdict;
   } catch (error) {
     logSkipped({
       subject: subjectKey,
@@ -86,25 +113,4 @@ export async function consume(
 
     return { allowed: true };
   }
-
-  if (count <= policy.limit) {
-    return { allowed: true };
-  }
-
-  const retryAfter = retryAfterSeconds(start, policy.windowSeconds, now);
-
-  const verdict: RateLimitVerdict = {
-    allowed: false,
-    subject: subjectKey,
-    action: policy.action,
-    count,
-    limit: policy.limit,
-    windowStart: start,
-    retryAfterSeconds: retryAfter,
-    message: refusalMessage(policy, retryAfter),
-  };
-
-  logRefused(verdict);
-
-  return verdict;
 }

@@ -10,8 +10,8 @@
  *   - every one of the fourteen tables exists
  *   - every tenant scoped table has `org_id uuid not null` and at least one
  *     index whose leading column is `org_id` (AC-2)
- *   - every unique constraint, CHECK constraint and plain index the spec names
- *     exists (AC-8)
+ *   - every primary key, unique constraint, CHECK constraint and plain index
+ *     the spec names exists (AC-8, AC-9)
  *   - every foreign key's ON DELETE action matches the spec, read from
  *     `pg_constraint.confdeltype` (AC-6, AC-8). The RESTRICT and CASCADE
  *     choices are the exact mechanism AC-6 rests on, and a wrong one would
@@ -63,9 +63,9 @@ const TABLES: readonly string[] = [
 ];
 
 /**
- * Everything except the tenant root (`organizations`) and the three tables
- * with no tenant to hold: `users`, `processed_webhook_events` (spec 0002) and
- * `cron_runs` (spec 0017).
+ * Everything except the tenant root (`organizations`) and the four tables
+ * with no tenant to hold: `users`, `processed_webhook_events` (spec 0002),
+ * `cron_runs` (spec 0017) and `rate_limit_windows` (spec 0018).
  */
 const TENANT_SCOPED: readonly string[] = [
   "memberships",
@@ -78,6 +78,17 @@ const TENANT_SCOPED: readonly string[] = [
   "invoice_line_items",
   "invoice_events",
 ];
+
+/**
+ * Composite primary keys worth asserting by name, beyond the implicit
+ * surrogate `id uuid primary key` every other table carries. `onConflictDoUpdate`
+ * targets this one directly (AC-9): if the constraint were ever missing, every
+ * `consume()` upsert throws, the door's `catch` swallows it, and the limiter
+ * fails open with nothing but a `rate_limit.skipped` warn line to notice.
+ */
+const PRIMARY_KEYS: Readonly<Record<string, readonly string[]>> = {
+  rate_limit_windows: ["subject", "action", "window_start"],
+};
 
 const UNIQUE_CONSTRAINTS: Readonly<
   Record<string, readonly (readonly string[])[]>
@@ -482,6 +493,20 @@ function checkTenantColumns(catalogue: Catalogue): readonly Finding[] {
   });
 }
 
+function checkPrimaryKeys(catalogue: Catalogue): readonly Finding[] {
+  return Object.entries(PRIMARY_KEYS).map(([table, columns]) => ({
+    label: `primary key ${table}(${columns.join(", ")})`,
+    problem: catalogue.constraints.some(
+      (constraint) =>
+        constraint.table === table &&
+        constraint.kind === "p" &&
+        sameColumns(constraint.columns, columns),
+    )
+      ? undefined
+      : "missing",
+  }));
+}
+
 function checkUniques(catalogue: Catalogue): readonly Finding[] {
   return Object.entries(UNIQUE_CONSTRAINTS).flatMap(([table, sets]) =>
     sets.map((columns) => ({
@@ -595,6 +620,7 @@ async function main(): Promise<number> {
     const findings: readonly Finding[] = [
       ...checkTables(catalogue),
       ...checkTenantColumns(catalogue),
+      ...checkPrimaryKeys(catalogue),
       ...checkUniques(catalogue),
       ...checkChecks(catalogue),
       ...checkIndexes(catalogue),

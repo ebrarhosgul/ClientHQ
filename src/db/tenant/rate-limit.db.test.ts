@@ -5,12 +5,17 @@
  *
  * `consume` against real PostgreSQL. The upsert is the mechanism worth a
  * database rather than a mock: 60 attempts against a fresh window, arriving
- * from separate connections the way separate serverless invocations would,
- * all succeed and leave `count = 60`; the 61st, whichever lands last, is
- * refused. Rows are tracked by their primary key and deleted in `afterEach`,
- * the same pattern `retention-sweep.db.test.ts` uses, because the
- * concurrency case specifically needs real separate statements rather than
- * one rolled back transaction.
+ * over this file's own five connection pool the way separate serverless
+ * invocations would (genuinely overlapping statements on separate backend
+ * connections, not sixty queued behind one), all succeed and leave
+ * `count = 60`; the 61st, whichever lands last, is refused. `pooledDb()` is
+ * redirected at that pool for this whole file, because the app's own handle
+ * (`src/db/client.ts`) is capped at `max: 1` and would serialise every
+ * attempt onto a single connection, hiding exactly the race this test
+ * exists to catch. Rows are tracked by their primary key and deleted in
+ * `afterEach`, the same pattern `retention-sweep.db.test.ts` uses, because
+ * the concurrency case specifically needs real separate statements rather
+ * than one rolled back transaction.
  */
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -32,6 +37,25 @@ vi.setConfig({ testTimeout: 30_000 });
 const url = process.env.DIRECT_URL;
 const sql = postgres(url ?? "", { prepare: false, max: 5 });
 const db = drizzle(sql, { schema });
+
+/**
+ * `consume` reaches PostgreSQL through `pooledDb()`. Redirecting it at this
+ * file's own multi connection pool, instead of the app's `max: 1` handle, is
+ * what makes the concurrency test below exercise real concurrency. `state`
+ * is a mutable box rather than a direct reference because `vi.mock` factories
+ * are hoisted above every other statement in the file, so they cannot close
+ * over `db` at the point they are declared; the same pattern other database
+ * suites use (see `deliverables.db.test.ts`).
+ */
+const executorState = vi.hoisted(() => ({
+  db: undefined as unknown,
+}));
+
+vi.mock("@/db/tenant/executor", () => ({
+  pooledDb: async () => executorState.db,
+}));
+
+executorState.db = db;
 
 function tag(): string {
   return Math.random().toString(36).slice(2, 12);

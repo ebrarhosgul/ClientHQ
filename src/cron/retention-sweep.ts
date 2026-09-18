@@ -41,17 +41,21 @@ async function run({ db, now }: SweepInput): Promise<SweepReport> {
     .where(lt(cronRuns.startedAt, cutoff))
     .returning({ id: cronRuns.id });
 
+  // No `.returning()`: up to 24 hourly upload rows plus two daily rows per
+  // agency per day, plus a row per person creating an agency, means a week's
+  // worth can run to hundreds of thousands of rows at scale. `count` is the
+  // driver's own affected row count, so nothing is pulled back over the wire
+  // just to be measured.
   const rateLimitWindowsPruned = await db
     .delete(rateLimitWindows)
-    .where(lt(rateLimitWindows.windowStart, rateLimitCutoff))
-    .returning({ subject: rateLimitWindows.subject });
+    .where(lt(rateLimitWindows.windowStart, rateLimitCutoff));
 
   return {
     outcome: "ok",
     counts: {
       webhook_events_pruned: webhookEventsPruned.length,
       cron_runs_pruned: cronRunsPruned.length,
-      rate_limit_windows_pruned: rateLimitWindowsPruned.length,
+      rate_limit_windows_pruned: rateLimitWindowsPruned.count,
     },
   };
 }

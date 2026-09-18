@@ -24,6 +24,13 @@ export type RateLimitVerdict =
 /**
  * The window's opening instant, aligned to the UTC clock (AC-4): the hourly
  * window resets on the hour, the daily windows at 00:00 UTC.
+ *
+ * The alignment is really against the Unix epoch (`floor(now / windowMs) *
+ * windowMs`), which only reads as "the UTC clock" because 3600 and 86400,
+ * the two `windowSeconds` values the three policies use, both divide the
+ * epoch evenly. A future policy whose `windowSeconds` does not (2700, say)
+ * would floor against the epoch same as ever, but would quietly stop
+ * landing on the clock hour or midnight this comment describes.
  */
 export function windowStart(now: Date, windowSeconds: number): Date {
   const windowMs = windowSeconds * 1000;
@@ -52,6 +59,13 @@ const NOUN_PHRASE: Record<RateLimitPolicy["action"], string> = {
  * `in about N minutes` under an hour, `in about N hours` otherwise, each
  * singular at 1. 3599 seconds reads `in about 1 hour`, never `in about 60
  * minutes` (AC-5).
+ *
+ * `hours` rounds the raw seconds up independently of `minutes`, exactly as
+ * AC-5 specifies, rather than rounding `minutes` up to the nearest 60. That
+ * can overstate the wait by close to an hour just past a boundary (3601
+ * seconds, one second past the hour, reads `in about 2 hours`): accepted,
+ * because it always overstates rather than understates how long the wait
+ * is, and the pinned formula in `window.test.ts` is the one AC-5 names.
  */
 function resetPhrase(retryAfterSecondsValue: number): string {
   const minutes = Math.max(1, Math.ceil(retryAfterSecondsValue / 60));
