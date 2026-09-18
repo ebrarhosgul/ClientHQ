@@ -341,7 +341,7 @@ One guarded scheduled route doing every daily sweep in sequence: marking invoice
 - [ ] Test it: `/test daily cron sweeps`
 - [ ] Review it (fresh model): `/check review daily cron sweeps`
 - [ ] Document it: `/document daily cron sweeps`
-Spec [0017](../specs/0017-daily-cron-sweeps/index.md) · atomic build tasks in its `## Build plan`
+Spec [0017](../specs/0017-daily-cron-sweeps/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0017-daily-cron-sweeps/verify.md)
 
 ### 19. Rate limiting · needs a decision
 Putting a ceiling on the two actions a signed in user could otherwise abuse: sending invitations and requesting signed upload URLs.
