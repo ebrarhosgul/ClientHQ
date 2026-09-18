@@ -6,6 +6,7 @@ import { cronRuns } from "./cron";
 import { memberships, organizations, subscriptions, users } from "./identity";
 import { invoiceEvents, invoiceLineItems, invoices } from "./invoices";
 import { deliverables, projects } from "./projects";
+import { rateLimitWindows } from "./rate-limit";
 import { processedWebhookEvents } from "./webhooks";
 
 /**
@@ -119,3 +120,6 @@ export const selectProcessedWebhookEventSchema = createSelectSchema(
 
 export const insertCronRunSchema = createInsertSchema(cronRuns);
 export const selectCronRunSchema = createSelectSchema(cronRuns);
+
+export const insertRateLimitWindowSchema = createInsertSchema(rateLimitWindows);
+export const selectRateLimitWindowSchema = createSelectSchema(rateLimitWindows);

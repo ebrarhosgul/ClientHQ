@@ -1,12 +1,13 @@
 /**
  * Prove the applied schema is the one spec 0002 describes (plus the `notes`
- * column and `invoice_events` table spec 0012 adds, and the `cron_runs` table
- * spec 0017 adds), by reading the PostgreSQL catalogue rather than by eye.
+ * column and `invoice_events` table spec 0012 adds, the `cron_runs` table spec
+ * 0017 adds, and the `rate_limit_windows` table spec 0018 adds), by reading
+ * the PostgreSQL catalogue rather than by eye.
  *
  * CI runs this right after `pnpm db:migrate` against a throwaway container, and
  * you can run it against any database with `pnpm db:schema:assert`. It asserts:
  *
- *   - every one of the thirteen tables exists
+ *   - every one of the fourteen tables exists
  *   - every tenant scoped table has `org_id uuid not null` and at least one
  *     index whose leading column is `org_id` (AC-2)
  *   - every unique constraint, CHECK constraint and plain index the spec names
@@ -58,6 +59,7 @@ const TABLES: readonly string[] = [
   "invoice_events",
   "processed_webhook_events",
   "cron_runs",
+  "rate_limit_windows",
 ];
 
 /**
@@ -156,6 +158,7 @@ const INDEXES: Readonly<Record<string, readonly (readonly string[])[]>> = {
   invoice_events: [["org_id", "invoice_id", "created_at"]],
   processed_webhook_events: [["processed_at"]],
   cron_runs: [["started_at"]],
+  rate_limit_windows: [["window_start"]],
 };
 
 const FOREIGN_KEYS: readonly ForeignKey[] = [

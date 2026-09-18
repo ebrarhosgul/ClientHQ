@@ -11,6 +11,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { UPLOAD } from "@/rate-limit/policies";
+
 import type { ActionErrorCode } from "./errors";
 
 const state = vi.hoisted(() => ({
@@ -29,6 +31,7 @@ const state = vi.hoisted(() => ({
   /** What the access gate's read returns. Active unless a test says otherwise. */
   subscriptionRow: { status: "active", pastDueSince: null } as unknown,
   subscriptionReads: 0,
+  consume: vi.fn(async () => ({ allowed: true }) as unknown),
 }));
 
 vi.mock("./context", async (importActual) => {
@@ -74,6 +77,11 @@ vi.mock("./executor", () => ({
   }),
 }));
 
+vi.mock("./rate-limit", () => ({
+  consume: (...args: Parameters<typeof state.consume>) =>
+    state.consume(...args),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: (path: string) => {
     state.revalidatedPaths.push(path);
@@ -103,6 +111,7 @@ beforeEach(() => {
   state.transactionsOpened = 0;
   state.subscriptionRow = { status: "active", pastDueSince: null };
   state.subscriptionReads = 0;
+  state.consume = vi.fn(async () => ({ allowed: true }));
 });
 
 describe("input is parsed before anything runs", () => {
@@ -495,5 +504,94 @@ describe("the subscription gate (spec 0008, AC-6)", () => {
 
     await expect(action({ name: "Acme" })).rejects.toBe(outage);
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe("the rate limit slot (spec 0018, AC-2)", () => {
+  it("is never consulted when the action declares no policy", async () => {
+    const action = withTenantAction({
+      name: "x",
+      input,
+      handler: async () => "done",
+    });
+
+    await action({ name: "Acme" });
+
+    expect(state.consume).not.toHaveBeenCalled();
+  });
+
+  it("checks after parsing, on the org from context, with the declared policy", async () => {
+    const handler = vi.fn(async () => "done");
+    const action = withTenantAction({
+      name: "requestUpload",
+      input,
+      rateLimit: UPLOAD,
+      handler,
+    });
+
+    await action({ name: "Acme" });
+
+    expect(state.consume).toHaveBeenCalledWith(
+      { kind: "org", id: "org-1" },
+      UPLOAD,
+      expect.any(Date),
+    );
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns rate_limited and never calls the handler when refused, with no revalidation and no transaction", async () => {
+    state.consume = vi.fn(async () => ({
+      allowed: false,
+      message: "Try again in about 1 hour.",
+    }));
+    const handler = vi.fn(async () => "done");
+    const action = withTenantAction({
+      name: "requestUpload",
+      input,
+      rateLimit: UPLOAD,
+      transaction: true,
+      revalidate: { paths: ["/projects"] },
+      handler,
+    });
+
+    const result = await action({ name: "Acme" });
+
+    expect(result).toStrictEqual({
+      ok: false,
+      error: { code: "rate_limited", message: "Try again in about 1 hour." },
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(state.transactionsOpened).toBe(0);
+    expect(state.revalidatedPaths).toStrictEqual([]);
+  });
+
+  it("does not consult the ceiling for input that fails validation first", async () => {
+    const action = withTenantAction({
+      name: "requestUpload",
+      input,
+      rateLimit: UPLOAD,
+      handler: async () => "done",
+    });
+
+    const result = await action({ name: "" });
+
+    expect(result.ok ? undefined : result.error.code).toBe("validation");
+    expect(state.consume).not.toHaveBeenCalled();
+  });
+
+  it("does not consult the ceiling for a caller the role guard already stopped", async () => {
+    state.ctx = { ...state.ctx, role: "member" };
+    const action = withTenantAction({
+      name: "requestUpload",
+      input,
+      requireRole: "admin",
+      rateLimit: UPLOAD,
+      handler: async () => "done",
+    });
+
+    const result = await action({ name: "Acme" });
+
+    expect(result.ok ? undefined : result.error.code).toBe("forbidden");
+    expect(state.consume).not.toHaveBeenCalled();
   });
 });

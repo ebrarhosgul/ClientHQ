@@ -14,6 +14,7 @@
 import { projects, deliverables } from "@/db/schema";
 import { tenantActionError, withTenantAction } from "@/db/tenant";
 import { newId } from "@/lib/id";
+import { UPLOAD } from "@/rate-limit/policies";
 
 import { requireConfiguredStorage } from "./require-storage";
 import { DELIVERABLE_REVALIDATE } from "./revalidate";
@@ -32,6 +33,7 @@ export const requestUpload = withTenantAction({
   name: "requestUpload",
   input: requestUploadInput,
   revalidate: DELIVERABLE_REVALIDATE,
+  rateLimit: UPLOAD,
   handler: async ({ input, ctx, db }): Promise<RequestedUpload> => {
     // Checked before any row is read (AC-2's fixed order, AC-18).
     const storage = requireConfiguredStorage();
