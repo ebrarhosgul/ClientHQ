@@ -1,6 +1,27 @@
 import { z } from "zod";
 
 /**
+ * An optional provider or credential variable, `undefined` and an explicit
+ * empty string treated the same way.
+ *
+ * `playwright.config.ts` blanks every one of these to `""` rather than
+ * deleting the key, in the webServer envs that must prove a provider is off
+ * (spec 0019, AC-22, AC-23) — deleting it would let a developer's own value
+ * from `.env.local` show back through, since Playwright's `env` is merged
+ * onto the parent process's environment rather than replacing it outright.
+ * A bare `z.string().min(1).optional()` rejects that `""` as invalid, which
+ * is only reachable once something in the request calls `env()`; every
+ * other optional field here shares the same contract, so it gets the same
+ * treatment.
+ */
+function optionalEnv(): z.ZodType<string | undefined> {
+  return z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional(),
+  );
+}
+
+/**
  * Server side environment, validated once at first import.
  *
  * Importing this from client code is a mistake: it would leak secrets into the
@@ -99,8 +120,8 @@ const serverEnvSchema = z.object({
    * because nothing the application runs needs it, and CI deliberately runs the
    * browser suite with no Clerk credentials at all.
    */
-  E2E_CLERK_USER_USERNAME: z.string().min(1).optional(),
-  E2E_CLERK_USER_PASSWORD: z.string().min(1).optional(),
+  E2E_CLERK_USER_USERNAME: optionalEnv(),
+  E2E_CLERK_USER_PASSWORD: optionalEnv(),
 
   /**
    * Feature 15, the client portal (spec 0014). A second dedicated user in the
@@ -110,15 +131,15 @@ const serverEnvSchema = z.object({
    * seeded contact so her accepted row binds to this real account, and the
    * suite skips when any of the three is unset, exactly as the staff one does.
    */
-  E2E_CLERK_CONTACT_USERNAME: z.string().min(1).optional(),
-  E2E_CLERK_CONTACT_PASSWORD: z.string().min(1).optional(),
-  E2E_CLERK_CONTACT_USER_ID: z.string().min(1).optional(),
+  E2E_CLERK_CONTACT_USERNAME: optionalEnv(),
+  E2E_CLERK_CONTACT_PASSWORD: optionalEnv(),
+  E2E_CLERK_CONTACT_USER_ID: optionalEnv(),
 
   /**
    * Development only. A database host besides `localhost` that `pnpm db:seed`
    * may write to. Unset, the seed refuses every remote host.
    */
-  SEED_ALLOW_HOST: z.string().min(1).optional(),
+  SEED_ALLOW_HOST: optionalEnv(),
 
   /**
    * Feature 10, client contacts and portal invitations (spec 0009). The first
@@ -133,7 +154,7 @@ const serverEnvSchema = z.object({
    * `EMAIL_FROM` is the bare sending address on a domain verified in the Resend
    * dashboard. The display name is composed per send, never stored here.
    */
-  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: optionalEnv(),
   EMAIL_FROM: z.email("EMAIL_FROM must be a bare email address"),
 
   /**
@@ -146,18 +167,18 @@ const serverEnvSchema = z.object({
    * `conflict` before touching a row (AC-18). Required in production by the
    * refinement below.
    */
-  R2_ACCOUNT_ID: z.string().min(1).optional(),
-  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  R2_BUCKET: z.string().min(1).optional(),
+  R2_ACCOUNT_ID: optionalEnv(),
+  R2_ACCESS_KEY_ID: optionalEnv(),
+  R2_SECRET_ACCESS_KEY: optionalEnv(),
+  R2_BUCKET: optionalEnv(),
 
   /**
    * `scripts/r2-setup.ts` only, never the app: an Admin Read and Write token
    * for the operator running the bucket setup script. Optional in every
    * environment, including production, because Vercel never carries it.
    */
-  R2_ADMIN_ACCESS_KEY_ID: z.string().min(1).optional(),
-  R2_ADMIN_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_ADMIN_ACCESS_KEY_ID: optionalEnv(),
+  R2_ADMIN_SECRET_ACCESS_KEY: optionalEnv(),
 
   /**
    * Feature 18, daily cron sweeps (spec 0017). The bearer token
@@ -189,14 +210,14 @@ const serverEnvSchema = z.object({
    * reads. The `POSTHOG_PERSONAL_API_KEY` and `POSTHOG_PROJECT_ID` pair
    * exists only for person deletion (AC-20).
    */
-  NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional(),
-  SENTRY_ORG: z.string().min(1).optional(),
-  SENTRY_PROJECT: z.string().min(1).optional(),
-  SENTRY_AUTH_TOKEN: z.string().min(1).optional(),
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_SENTRY_DSN: optionalEnv(),
+  SENTRY_ORG: optionalEnv(),
+  SENTRY_PROJECT: optionalEnv(),
+  SENTRY_AUTH_TOKEN: optionalEnv(),
+  NEXT_PUBLIC_POSTHOG_KEY: optionalEnv(),
   NEXT_PUBLIC_POSTHOG_HOST: z.url().default("https://eu.i.posthog.com"),
-  POSTHOG_PERSONAL_API_KEY: z.string().min(1).optional(),
-  POSTHOG_PROJECT_ID: z.string().min(1).optional(),
+  POSTHOG_PERSONAL_API_KEY: optionalEnv(),
+  POSTHOG_PROJECT_ID: optionalEnv(),
 
   /**
    * Supplied by Vercel when "automatically expose system environment
@@ -205,9 +226,9 @@ const serverEnvSchema = z.object({
    * commit SHA becomes the Sentry release, so a stack trace maps to the exact
    * build that produced it.
    */
-  VERCEL_ENV: z.string().min(1).optional(),
-  NEXT_PUBLIC_VERCEL_ENV: z.string().min(1).optional(),
-  VERCEL_GIT_COMMIT_SHA: z.string().min(1).optional(),
+  VERCEL_ENV: optionalEnv(),
+  NEXT_PUBLIC_VERCEL_ENV: optionalEnv(),
+  VERCEL_GIT_COMMIT_SHA: optionalEnv(),
 });
 
 /**

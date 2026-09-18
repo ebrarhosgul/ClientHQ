@@ -443,6 +443,32 @@ describe("env", () => {
     });
   });
 
+  describe('optional provider variables blanked to "" (spec 0019)', () => {
+    // The bug this guards against: `playwright.config.ts` deliberately sets
+    // these to `""` rather than deleting them, so a developer's own keys
+    // from `.env.local` can never leak into a suite that asserts a provider
+    // is off. A bare `.optional()` rejected that `""` as invalid the moment
+    // anything called `env()` from a server that also had real Clerk
+    // credentials (`e2e/portal-contact.spec.ts`), throwing "Too small"
+    // instead of treating the provider as unconfigured.
+    it.each([
+      "NEXT_PUBLIC_SENTRY_DSN",
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      "VERCEL_ENV",
+      "NEXT_PUBLIC_VERCEL_ENV",
+    ] as const)(
+      "treats %s set to an empty string the same as unset",
+      async (key) => {
+        setProcessEnv({ ...VALID, [key]: "" });
+
+        const env = await freshEnv();
+
+        expect(() => env()).not.toThrow();
+        expect(env()[key]).toBeUndefined();
+      },
+    );
+  });
+
   describe("isR2Configured (spec 0011, AC-18)", () => {
     it("is true when all four R2 variables are set, with no Clerk key or anything else env() requires", async () => {
       setProcessEnv({
