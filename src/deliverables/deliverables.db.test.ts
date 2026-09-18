@@ -32,6 +32,7 @@ import {
   memberships,
   organizations,
   projects,
+  rateLimitWindows,
   subscriptions,
   users,
 } from "@/db/schema";
@@ -42,6 +43,8 @@ import {
 } from "@/storage/fake";
 import { newId } from "@/lib/id";
 import { loadEnvFiles } from "@/lib/load-env-files";
+import { UPLOAD } from "@/rate-limit/policies";
+import { windowStart } from "@/rate-limit/window";
 
 const state = vi.hoisted(() => ({
   tx: undefined as unknown,
@@ -464,6 +467,44 @@ describe.skipIf(url === undefined)(
             ok: false,
             error: { code: "forbidden" },
           });
+        });
+      });
+
+      it("refuses the 61st upload of the hour with the exact sentence and no extra row (spec 0018, AC-1, AC-3, AC-9)", async () => {
+        await inRollback(async (tx, fixture) => {
+          await tx.insert(rateLimitWindows).values({
+            subject: `org:${fixture.orgA}`,
+            action: "upload",
+            windowStart: windowStart(new Date(), UPLOAD.windowSeconds),
+            count: UPLOAD.limit,
+            updatedAt: new Date(),
+          });
+
+          const before = await tx
+            .select()
+            .from(deliverables)
+            .where(eq(deliverables.projectId, fixture.projectA1));
+
+          const result = await requestUpload({
+            projectId: fixture.projectA1,
+            name: "Logo.png",
+            contentType: "image/png",
+            sizeBytes: 2048,
+          });
+
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error.code).toBe("rate_limited");
+            expect(result.error.message).toMatch(
+              /Your agency has reached its upload allowance of 60 an hour\. Try again in about \d+ (minutes?|hours?)\./,
+            );
+          }
+
+          const after = await tx
+            .select()
+            .from(deliverables)
+            .where(eq(deliverables.projectId, fixture.projectA1));
+          expect(after).toHaveLength(before.length);
         });
       });
     });

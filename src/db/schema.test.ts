@@ -37,6 +37,7 @@ import * as cronSchema from "./schema/cron";
 import * as identitySchema from "./schema/identity";
 import * as invoicesSchema from "./schema/invoices";
 import * as projectsSchema from "./schema/projects";
+import * as rateLimitSchema from "./schema/rate-limit";
 import * as webhooksSchema from "./schema/webhooks";
 
 const { MEMBERSHIP_ROLES, organizations, users } = identitySchema;
@@ -53,6 +54,7 @@ const TABLES: readonly PgTable[] = [
   invoicesSchema,
   webhooksSchema,
   cronSchema,
+  rateLimitSchema,
 ]
   .flatMap((module) => Object.values(module))
   .filter((value): value is PgTable => is(value, PgTable));
@@ -100,21 +102,24 @@ const checkLiterals = (
 /**
  * `organizations` is the tenant root, and spec 0002 exempts `users` (one person
  * may serve several agencies) and `processed_webhook_events` (not tenant
- * data); spec 0017 adds `cron_runs` for the same reason as the last one.
+ * data); spec 0017 adds `cron_runs` for the same reason as the last one, and
+ * spec 0018 adds `rate_limit_windows`, whose `create_agency` subject is a
+ * person with no agency yet.
  */
 const NOT_TENANT_SCOPED: readonly string[] = [
   "organizations",
   "users",
   "processed_webhook_events",
   "cron_runs",
+  "rate_limit_windows",
 ];
 
 const TENANT_SCOPED = TABLES.filter(
   (table) => !NOT_TENANT_SCOPED.includes(nameOf(table)),
 );
 
-describe("the schema defines exactly the thirteen tables the specs name", () => {
-  it("has all thirteen (spec 0002's eleven, plus spec 0012's invoice_events and spec 0017's cron_runs), and no fourteenth nobody wrote down", () => {
+describe("the schema defines exactly the fourteen tables the specs name", () => {
+  it("has all fourteen (spec 0002's eleven, plus spec 0012's invoice_events, spec 0017's cron_runs and spec 0018's rate_limit_windows), and no fifteenth nobody wrote down", () => {
     expect(TABLES.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
@@ -127,13 +132,19 @@ describe("the schema defines exactly the thirteen tables the specs name", () => 
       "organizations",
       "processed_webhook_events",
       "projects",
+      "rate_limit_windows",
       "subscriptions",
       "users",
     ]);
   });
 
-  it("gives every table a single `id uuid` primary key, filled by newId()", () => {
+  it("gives every table but rate_limit_windows a single `id uuid` primary key, filled by newId()", () => {
+    // rate_limit_windows carries no id at all: its primary key is the
+    // composite (subject, action, window_start) the atomic upsert conflicts
+    // on (spec 0018, AC-9).
     for (const table of TABLES) {
+      if (nameOf(table) === "rate_limit_windows") continue;
+
       const keys = configOf(table)
         .columns.filter((column) => column.primary)
         .map((column) => `${column.name} ${column.getSQLType()}`);
@@ -141,9 +152,12 @@ describe("the schema defines exactly the thirteen tables the specs name", () => 
     }
   });
 
-  it("gives every table but the webhook ledger, the append only events, and the cron run row created_at and updated_at, both timestamptz not null", () => {
+  it("gives every table but the webhook ledger, the append only events, the cron run row and the rate limit windows created_at and updated_at, both timestamptz not null", () => {
     for (const table of TABLES) {
       if (nameOf(table) === "processed_webhook_events") continue;
+      // rate_limit_windows carries `updated_at` alone, for debugging an
+      // abuse report only; it has no `created_at` (spec 0018, data model).
+      if (nameOf(table) === "rate_limit_windows") continue;
       // Spec 0012: rows are never updated, so there is nothing to stamp.
       if (nameOf(table) === "invoice_events") continue;
       // Spec 0017: a run has started_at/finished_at instead, since a run in
@@ -574,7 +588,7 @@ describe("the tables the spec exempts from tenant scoping have no org_id at all"
 });
 
 describe("the schema barrel re-exports every table, so db.query can reach them", () => {
-  it("exports all thirteen", async () => {
+  it("exports all fourteen", async () => {
     const barrel: Record<string, unknown> = await import("./schema/index");
     const exported = Object.values(barrel).filter((value): value is PgTable =>
       is(value, PgTable),

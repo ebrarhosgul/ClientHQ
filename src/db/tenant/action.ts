@@ -14,6 +14,8 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { flattenError, type ZodType } from "zod";
 
+import type { RateLimitPolicy } from "@/rate-limit/policies";
+
 import { tenantDb, type StaffAccessor } from "./accessor";
 import { tenantContext, type StaffContext } from "./context";
 import {
@@ -28,6 +30,7 @@ import {
 import { pooledDb } from "./executor";
 import { requireAdmin, requireStaff } from "./guards";
 import { logRefusal } from "./log";
+import { consume } from "./rate-limit";
 import { requireFullAccess } from "./subscription";
 
 /** A path to revalidate. The `type` form is required for a dynamic segment. */
@@ -71,11 +74,12 @@ export type ActionConfig<TSchema extends ZodType, TData> = {
    */
   readonly subscription?: "any";
   /**
-   * Reserved for feature 19, the rate limiter. Typed `never` on purpose: the
-   * slot is named so the shape does not change when it lands, and setting it
-   * today is a compile error rather than a silent no-op.
+   * The ceiling this action opts into (spec 0018, AC-1, AC-13). One of the
+   * three exported policies; the type forbids an ad hoc one. Checked on the
+   * pooled executor, after the input parses and before the handler runs, so
+   * a refused call has no side effect at all.
    */
-  readonly rateLimit?: never;
+  readonly rateLimit?: RateLimitPolicy;
 };
 
 /** A PostgreSQL error, as the postgres-js driver surfaces it. */
@@ -163,11 +167,14 @@ function toActionError(
  * Wrap a handler into a Server Action.
  *
  * The order of the checks is the contract: resolution, then the role guard,
- * then the subscription gate, then parsing. An expired session is refused
- * before anything is parsed, so the person who is signed out never learns
- * whether their input was valid; a member with a lapsed subscription gets
- * `forbidden` rather than a hint about billing; and a locked admin gets
- * `subscription_inactive` before their input is looked at (spec 0008, AC-6).
+ * then the subscription gate, then parsing, then the rate limit. An expired
+ * session is refused before anything is parsed, so the person who is signed
+ * out never learns whether their input was valid; a member with a lapsed
+ * subscription gets `forbidden` rather than a hint about billing; a locked
+ * admin gets `subscription_inactive` before their input is looked at (spec
+ * 0008, AC-6); and a caller stopped by any of those never learns a ceiling
+ * exists, because the rate limit check runs last, after parsing (spec 0018,
+ * AC-2).
  */
 export function withTenantAction<TSchema extends ZodType, TData>(
   config: ActionConfig<TSchema, TData>,
@@ -205,6 +212,21 @@ export function withTenantAction<TSchema extends ZodType, TData>(
           message: "Some of that is not right yet.",
           fieldErrors: fieldErrorsOf(parsed.error),
         });
+      }
+
+      // On the pooled executor, before any transaction opens and after the
+      // role and subscription gates: a signed out or locked caller never
+      // learns the ceiling exists (AC-2).
+      if (config.rateLimit !== undefined) {
+        const verdict = await consume(
+          { kind: "org", id: ctx.orgId },
+          config.rateLimit,
+          new Date(),
+        );
+
+        if (!verdict.allowed) {
+          return failure({ code: "rate_limited", message: verdict.message });
+        }
       }
 
       const data = config.transaction

@@ -29,6 +29,7 @@ import {
   withTenantAction,
 } from "@/db/tenant";
 import { todayUtc } from "@/lib/dates";
+import { INVOICE_EMAIL } from "@/rate-limit/policies";
 
 import { linesOf, lockDraft } from "./draft";
 import { notifyInvoiceContacts, type NotificationOutcome } from "./notify";
@@ -47,6 +48,7 @@ export const issueInvoice = withTenantAction({
   input: issueInvoiceInput,
   revalidate: INVOICE_REVALIDATE,
   transaction: false,
+  rateLimit: INVOICE_EMAIL,
   handler: async ({ input, ctx, db }): Promise<IssuedInvoice> => {
     const issued = await tenantTransaction(ctx, async (scope) => {
       const draft = await lockDraft(scope.db, input.id);

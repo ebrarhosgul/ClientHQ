@@ -1,5 +1,5 @@
 /**
- * covers: spec 0012 AC-10, AC-11, AC-12, AC-13, AC-17
+ * covers: spec 0012 AC-10, AC-11, AC-12, AC-13, AC-17; spec 0018 AC-14
  *
  * axe over every invoice surface in every state and both themes, plus the
  * few behaviours the pure modules cannot see: which buttons `InvoiceActions`
@@ -260,6 +260,32 @@ describe("InvoiceActions", () => {
     await screen.findByText("Use 500 characters or fewer.");
 
     expect(reason).toHaveValue("Created by mistake");
+  });
+
+  it("falls back to the rate limit sentence when a refusal carries no message (spec 0018, AC-14)", async () => {
+    const user = userEvent.setup();
+    mocks.action.mockResolvedValue({
+      ok: false,
+      error: { code: "rate_limited", message: "" },
+    });
+
+    render(
+      <InvoiceActions
+        invoiceId="inv"
+        status="draft"
+        issueDate={null}
+        lineCount={2}
+        contactCount={1}
+        today="2026-09-15"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Issue invoice" }));
+    await user.click(screen.getByRole("button", { name: "Issue" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That is a lot of requests. Wait a moment and try again.",
+    );
   });
 });
 

@@ -19,6 +19,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { invoiceEvents, invoices } from "@/db/schema";
 import { tenantActionError, withTenantAction } from "@/db/tenant";
 import { COOLDOWN_MINUTES, cooldownRefuses } from "@/contacts/limits";
+import { INVOICE_EMAIL } from "@/rate-limit/policies";
 
 import { notifyInvoiceContacts, type NotificationOutcome } from "./notify";
 import { INVOICE_REVALIDATE } from "./revalidate";
@@ -35,6 +36,7 @@ export const resendInvoiceNotification = withTenantAction({
   input: resendInvoiceNotificationInput,
   revalidate: INVOICE_REVALIDATE,
   transaction: false,
+  rateLimit: INVOICE_EMAIL,
   handler: async ({ input, ctx, db }): Promise<ResentNotification> => {
     const invoice = await db.findById(invoices, input.id);
 

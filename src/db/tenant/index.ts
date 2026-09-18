@@ -144,6 +144,13 @@ export {
 export { unsafeTenantQuery } from "./unsafe";
 
 /**
+ * Feature 19's door (spec 0018). One atomic upsert per attempt; the wrapper's
+ * `rateLimit` slot and `createAgency` both call it, so every refusal and
+ * every store failure is logged in one place.
+ */
+export { consume, type RateLimitSubject } from "./rate-limit";
+
+/**
  * The handle's *type*, for the webhook and cron routes and the handlers they
  * call: `withSystemAccess` hands one over, and a handler has to be able to name
  * what it was given. A type is not a capability, so the fence around

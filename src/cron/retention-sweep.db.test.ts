@@ -1,13 +1,15 @@
 /**
  * @vitest-environment node
  *
- * covers: spec 0017 AC-9
+ * covers: spec 0017 AC-9; spec 0018 AC-10
  *
- * The retention prune against real PostgreSQL: a 91 day old row in each
- * table is removed, an 89 day old `cron_runs` row and a fresh
+ * The retention prune against real PostgreSQL: a 91 day old row in each of
+ * the first two tables is removed, an 89 day old `cron_runs` row and a fresh
  * `processed_webhook_events` row are left alone, and the current run's own
  * row (inserted moments ago, before this sweep runs) survives because it is
- * nowhere near the cutoff.
+ * nowhere near the cutoff. `rate_limit_windows` answers its question in an
+ * hour or a day, so it gets its own, shorter cutoff: an 8 day old row is
+ * pruned, a 6 day old one stays.
  */
 import { randomUUID } from "node:crypto";
 
@@ -17,7 +19,11 @@ import postgres from "postgres";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import * as schema from "@/db/schema";
-import { cronRuns, processedWebhookEvents } from "@/db/schema";
+import {
+  cronRuns,
+  processedWebhookEvents,
+  rateLimitWindows,
+} from "@/db/schema";
 import type { Database } from "@/db/tenant";
 import { newId } from "@/lib/id";
 import { loadEnvFiles } from "@/lib/load-env-files";
@@ -33,9 +39,12 @@ const db: Database = drizzle(sql, { schema });
 const NOW = new Date("2026-06-15T12:00:00Z");
 const NINETY_ONE_DAYS_AGO = new Date(NOW.getTime() - 91 * 24 * 60 * 60 * 1000);
 const EIGHTY_NINE_DAYS_AGO = new Date(NOW.getTime() - 89 * 24 * 60 * 60 * 1000);
+const EIGHT_DAYS_AGO = new Date(NOW.getTime() - 8 * 24 * 60 * 60 * 1000);
+const SIX_DAYS_AGO = new Date(NOW.getTime() - 6 * 24 * 60 * 60 * 1000);
 
 const createdRuns: string[] = [];
 const createdEvents: string[] = [];
+const createdWindowSubjects: string[] = [];
 
 function tag(): string {
   return randomUUID().replace(/-/g, "").slice(0, 12);
@@ -65,6 +74,21 @@ async function makeWebhookEvent(processedAt: Date): Promise<string> {
   return id;
 }
 
+async function makeRateLimitWindow(start: Date): Promise<string> {
+  const subject = `org:test_${tag()}`;
+
+  await db.insert(rateLimitWindows).values({
+    subject,
+    action: "upload",
+    windowStart: start,
+    count: 1,
+    updatedAt: start,
+  });
+  createdWindowSubjects.push(subject);
+
+  return subject;
+}
+
 async function cronRunExists(id: string): Promise<boolean> {
   const rows = await db.select().from(cronRuns).where(eq(cronRuns.id, id));
   return rows.length > 0;
@@ -75,6 +99,14 @@ async function webhookEventExists(id: string): Promise<boolean> {
     .select()
     .from(processedWebhookEvents)
     .where(eq(processedWebhookEvents.id, id));
+  return rows.length > 0;
+}
+
+async function rateLimitWindowExists(subject: string): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(rateLimitWindows)
+    .where(eq(rateLimitWindows.subject, subject));
   return rows.length > 0;
 }
 
@@ -89,6 +121,12 @@ afterEach(async () => {
       .where(inArray(processedWebhookEvents.id, createdEvents));
     createdEvents.length = 0;
   }
+  if (createdWindowSubjects.length > 0) {
+    await db
+      .delete(rateLimitWindows)
+      .where(inArray(rateLimitWindows.subject, createdWindowSubjects));
+    createdWindowSubjects.length = 0;
+  }
 });
 
 afterAll(async () => {
@@ -96,12 +134,14 @@ afterAll(async () => {
 });
 
 describe.skipIf(!url)("retention_prune against real PostgreSQL", () => {
-  it("prunes rows past 90 days from both tables and keeps the rest", async () => {
+  it("prunes rows past their cutoff from all three tables and keeps the rest", async () => {
     const staleEvent = await makeWebhookEvent(NINETY_ONE_DAYS_AGO);
     const freshEvent = await makeWebhookEvent(NOW);
     const staleRun = await makeCronRun(NINETY_ONE_DAYS_AGO);
     const recentRun = await makeCronRun(EIGHTY_NINE_DAYS_AGO);
     const currentRun = await makeCronRun(NOW);
+    const staleWindow = await makeRateLimitWindow(EIGHT_DAYS_AGO);
+    const recentWindow = await makeRateLimitWindow(SIX_DAYS_AGO);
 
     const report = await retentionPruneSweep.run({
       db,
@@ -113,6 +153,7 @@ describe.skipIf(!url)("retention_prune against real PostgreSQL", () => {
     expect(report.counts).toEqual({
       webhook_events_pruned: 1,
       cron_runs_pruned: 1,
+      rate_limit_windows_pruned: 1,
     });
 
     expect(await webhookEventExists(staleEvent)).toBe(false);
@@ -120,11 +161,14 @@ describe.skipIf(!url)("retention_prune against real PostgreSQL", () => {
     expect(await cronRunExists(staleRun)).toBe(false);
     expect(await cronRunExists(recentRun)).toBe(true);
     expect(await cronRunExists(currentRun)).toBe(true);
+    expect(await rateLimitWindowExists(staleWindow)).toBe(false);
+    expect(await rateLimitWindowExists(recentWindow)).toBe(true);
   });
 
   it("reports zero and changes nothing when no row qualifies", async () => {
     const run = await makeCronRun(EIGHTY_NINE_DAYS_AGO);
     const event = await makeWebhookEvent(NOW);
+    const window = await makeRateLimitWindow(SIX_DAYS_AGO);
 
     const report = await retentionPruneSweep.run({
       db,
@@ -134,9 +178,14 @@ describe.skipIf(!url)("retention_prune against real PostgreSQL", () => {
 
     expect(report).toEqual({
       outcome: "ok",
-      counts: { webhook_events_pruned: 0, cron_runs_pruned: 0 },
+      counts: {
+        webhook_events_pruned: 0,
+        cron_runs_pruned: 0,
+        rate_limit_windows_pruned: 0,
+      },
     });
     expect(await cronRunExists(run)).toBe(true);
     expect(await webhookEventExists(event)).toBe(true);
+    expect(await rateLimitWindowExists(window)).toBe(true);
   });
 });
