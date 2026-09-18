@@ -347,16 +347,16 @@ Spec [0017](../specs/0017-daily-cron-sweeps/index.md) · atomic build tasks in i
 Putting a ceiling on the actions a signed in user could otherwise abuse: requesting signed upload URLs, sending invoice emails, and creating agencies (invitation sends already have theirs from spec 0009).
 **Done when:** each limited action refuses politely past its ceiling with a clear message, limits apply per agency rather than globally, and the limiter failing does not take the whole action down with it.
 - [x] Design it (spec): `/architect rate limiting`
-- [ ] Build it: `/develop rate limiting`
-  - [ ] One thread end to end: the `rate_limit_windows` table and migration, the three policies, the pure window and message module, the door with its atomic upsert, the wrapper slot, and `requestUpload` refusing the 61st upload of the hour with the exact sentence on the project page · AC-1, AC-2, AC-3, AC-4, AC-5, AC-9, AC-13, AC-14
-  - [ ] The log lines and fail open: `rate_limit.refused` and `rate_limit.skipped` from the door, the privacy test, and the 60 parallel consumes test · AC-3, AC-7, AC-8
-  - [ ] The other three actions: the shared invoice email allowance on `issueInvoice` and `resendInvoiceNotification` with the cooldown left as it is, and the per person ceiling in `createAgency` before any Clerk organization is created · AC-1, AC-6, AC-11, AC-12, AC-14
-  - [ ] Retention, types and verification: the seven day prune in `retention_prune`, the type level test for the slot, and the manual walk in `verify.md` · AC-10, AC-13
+- [x] Build it: `/develop rate limiting`
+  - [x] One thread end to end: the `rate_limit_windows` table and migration, the three policies, the pure window and message module, the door with its atomic upsert, the wrapper slot, and `requestUpload` refusing the 61st upload of the hour with the exact sentence on the project page · AC-1, AC-2, AC-3, AC-4, AC-5, AC-9, AC-13, AC-14
+  - [x] The log lines and fail open: `rate_limit.refused` and `rate_limit.skipped` from the door, the privacy test, and the 60 parallel consumes test · AC-3, AC-7, AC-8
+  - [x] The other three actions: the shared invoice email allowance on `issueInvoice` and `resendInvoiceNotification` with the cooldown left as it is, and the per person ceiling in `createAgency` before any Clerk organization is created · AC-1, AC-6, AC-11, AC-12, AC-14
+  - [x] Retention, types and verification: the seven day prune in `retention_prune`, the type level test for the slot, and the manual walk in `verify.md` · AC-10, AC-13
 - [ ] Verify it: `/check verify rate limiting`
 - [ ] Test it: `/test rate limiting`
 - [ ] Review it (fresh model): `/check review rate limiting`
 - [ ] Document it: `/document rate limiting`
-Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `## Build plan`
+Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `## Build plan` · code in `src/rate-limit/`, `src/db/schema/rate-limit.ts`, `src/db/tenant/rate-limit.ts`, `src/db/tenant/action.ts`, `src/deliverables/request-upload.ts`, `src/invoices/issue-invoice.ts`, `src/invoices/resend-invoice-notification.ts`, `src/auth/agency.ts`, `src/cron/retention-sweep.ts`
 
 ### 20. Product analytics & error tracking · needs a decision
 Knowing what happens in production: errors and traces across server and browser, plus product analytics for which signups actually activate and which convert to a subscription.

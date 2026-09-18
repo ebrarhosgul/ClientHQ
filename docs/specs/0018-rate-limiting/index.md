@@ -1,7 +1,7 @@
 # 0018. Rate limiting
 
 **Date**: 2026-09-18
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -146,10 +146,10 @@ Primary key `(subject, action, window_start)`. Index `rate_limit_windows_window_
 
 Tracer Bullet: the first task pushes one refusal all the way from a real `requestUpload` call through the new table and back to the screen, proving the slot, the door, the statement and the message together before the other three actions and the housekeeping are added.
 
-1. **One thread end to end, uploads.** The `rate_limit_windows` schema file, zod entries and migration; `policies.ts` with the three constants; `window.ts` with `windowStart`, `retryAfterSeconds`, `refusalMessage`, the `RateLimitVerdict` type and their unit tests (including the rounding and singular cases); the door in `src/db/tenant/rate-limit.ts` with the upsert setting `updated_at` on both branches; the slot on `withTenantAction` replacing `never` and the check between parse and handler; `requestUpload` declaring `UPLOAD`; the db test that allows 60 and refuses the 61st with the exact sentence and no extra row; the project page showing the sentence in its existing error region. Satisfies **AC-1** (uploads), **AC-2**, **AC-3**, **AC-4**, **AC-5**, **AC-9**, **AC-13**, **AC-14** (uploads).
-2. **The log lines and fail open.** `src/rate-limit/log.ts`, the door calling `logRefused` on every refusal and `logSkipped` from its catch before returning `allowed`, the privacy test over both lines, and the concurrency test with 60 parallel consumes. Satisfies **AC-3**, **AC-7**, **AC-8**.
-3. **Invoice emails and agency creation.** `INVOICE_EMAIL` on `issueInvoice` and `resendInvoiceNotification` with the transaction and cooldown ordering tests; `CREATE_AGENCY` in `createAgency` before `createClerkOrganization` with the Clerk fake test; the invoice and onboarding screens showing the sentence. Satisfies **AC-1**, **AC-6**, **AC-11**, **AC-12**, **AC-14**.
-4. **Retention, types and verification.** The third delete in `retention-sweep.ts` and its test; the type level test for the slot; run the manual walk (seed a row at the ceiling through SQL, then one real call on each of the four actions) and record it in `verify.md`. Satisfies **AC-10**, **AC-13**.
+1. [x] **One thread end to end, uploads.** The `rate_limit_windows` schema file, zod entries and migration; `policies.ts` with the three constants; `window.ts` with `windowStart`, `retryAfterSeconds`, `refusalMessage`, the `RateLimitVerdict` type and their unit tests (including the rounding and singular cases); the door in `src/db/tenant/rate-limit.ts` with the upsert setting `updated_at` on both branches; the slot on `withTenantAction` replacing `never` and the check between parse and handler; `requestUpload` declaring `UPLOAD`; the db test that allows 60 and refuses the 61st with the exact sentence and no extra row; the project page showing the sentence in its existing error region. Satisfies **AC-1** (uploads), **AC-2**, **AC-3**, **AC-4**, **AC-5**, **AC-9**, **AC-13**, **AC-14** (uploads).
+2. [x] **The log lines and fail open.** `src/rate-limit/log.ts`, the door calling `logRefused` on every refusal and `logSkipped` from its catch before returning `allowed`, the privacy test over both lines, and the concurrency test with 60 parallel consumes. Satisfies **AC-3**, **AC-7**, **AC-8**.
+3. [x] **Invoice emails and agency creation.** `INVOICE_EMAIL` on `issueInvoice` and `resendInvoiceNotification` with the transaction and cooldown ordering tests; `CREATE_AGENCY` in `createAgency` before `createClerkOrganization` with the Clerk fake test; the invoice and onboarding screens showing the sentence. Satisfies **AC-1**, **AC-6**, **AC-11**, **AC-12**, **AC-14**.
+4. [x] **Retention, types and verification.** The third delete in `retention-sweep.ts` and its test; the type level test for the slot; run the manual walk (seed a row at the ceiling through SQL, then one real call on each of the four actions) and record it in `verify.md`. Satisfies **AC-10**, **AC-13**.
 
 ## Consequences
 
