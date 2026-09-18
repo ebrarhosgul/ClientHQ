@@ -26,6 +26,8 @@ import {
 } from "@/db/tenant";
 import type { MembershipRole } from "@/db/schema";
 
+import type { ClerkListGateway } from "./reconcile";
+
 /** One Clerk organization this person belongs to, as `/onboarding` needs it. */
 export type AgencyMembership = {
   readonly clerkOrgId: string;
@@ -78,6 +80,62 @@ export async function agencyMemberships(
   }));
 }
 
+/** What `clerkClient()` resolves to, read off its own return type. */
+type Clerk = Awaited<ReturnType<typeof clerkClient>>;
+
+/** The raw shape `organizations.getOrganization` and `getOrganizationList` share. */
+type RawOrganization = Awaited<
+  ReturnType<Clerk["organizations"]["getOrganization"]>
+>;
+
+/** The raw shape `users.getUser` and `getUserList` share. */
+type RawUser = Awaited<ReturnType<Clerk["users"]["getUser"]>>;
+
+/**
+ * The organization columns Clerk owns, off one Clerk organization object.
+ *
+ * Pure and reused by both the single object re read (`clerkOrganization`)
+ * and the nightly reconcile's list gateway (spec 0017, AC-8), so the two can
+ * never map the same object two different ways.
+ */
+export function toMirrorOrganization(
+  organization: RawOrganization,
+): MirrorOrganization {
+  return { clerkOrgId: organization.id, name: organization.name };
+}
+
+/**
+ * The user columns Clerk owns, off one Clerk user object.
+ *
+ * The primary address, falling back to the first one Clerk holds. The column
+ * is not null and lowercase only, so both are enforced right here rather than
+ * left to the constraint to catch. The name goes through the same
+ * `displayName` the member list already uses, with no fallback: an empty
+ * result becomes `undefined` rather than a placeholder string, which is what
+ * `clerkOrganization`'s single object caller has always done.
+ */
+export function toMirrorUser(user: RawUser): MirrorUser {
+  const primary =
+    user.emailAddresses.find(
+      (address) => address.id === user.primaryEmailAddressId,
+    ) ?? user.emailAddresses[0];
+
+  if (primary === undefined) {
+    throw new Error(
+      `Clerk user ${user.id} has no email address, so no valid mirror row can be written.`,
+    );
+  }
+
+  const fullName = displayName(user.firstName, user.lastName, "");
+
+  return {
+    clerkUserId: user.id,
+    email: primary.emailAddress.trim().toLowerCase(),
+    name: fullName === "" ? undefined : fullName,
+    imageUrl: user.imageUrl,
+  };
+}
+
 /** The organization record the mirror needs. `not_found` when Clerk 404s. */
 export async function clerkOrganization(
   clerkOrgId: string,
@@ -89,10 +147,7 @@ export async function clerkOrganization(
       organizationId: clerkOrgId,
     });
 
-    return ok({
-      clerkOrgId: organization.id,
-      name: organization.name,
-    });
+    return ok(toMirrorOrganization(organization));
   } catch (error) {
     if (isNotFound(error)) {
       return failure({
@@ -114,30 +169,7 @@ export async function clerkUser(
   try {
     const user = await clerk.users.getUser(clerkUserId);
 
-    // The primary address, falling back to the first one Clerk holds. The
-    // column is not null and lowercase only, so both are enforced right here
-    // rather than left to the constraint to catch.
-    const primary =
-      user.emailAddresses.find(
-        (address) => address.id === user.primaryEmailAddressId,
-      ) ?? user.emailAddresses[0];
-
-    if (primary === undefined) {
-      throw new Error(
-        `Clerk user ${clerkUserId} has no email address, so no valid mirror row can be written.`,
-      );
-    }
-
-    const fullName = [user.firstName, user.lastName]
-      .filter((part): part is string => part !== null && part.trim() !== "")
-      .join(" ");
-
-    return ok({
-      clerkUserId: user.id,
-      email: primary.emailAddress.trim().toLowerCase(),
-      name: fullName === "" ? undefined : fullName,
-      imageUrl: user.imageUrl,
-    });
+    return ok(toMirrorUser(user));
   } catch (error) {
     if (isNotFound(error)) {
       return failure({
@@ -573,4 +605,112 @@ export async function removeOrganizationMember(input: {
 
     return undefined;
   });
+}
+
+// ---------------------------------------------------------------------------
+// The nightly reconcile's list gateway (spec 0017, AC-8)
+// ---------------------------------------------------------------------------
+
+/** Every item of a Clerk list, one page at a time, to the end. */
+async function* pagedItems<TItem>(
+  page: (offset: number) => Promise<{
+    readonly data: readonly TItem[];
+    readonly totalCount: number;
+  }>,
+): AsyncGenerator<TItem> {
+  let offset = 0;
+
+  for (;;) {
+    const { data, totalCount } = await page(offset);
+
+    yield* data;
+
+    offset += data.length;
+
+    // Stop on a short page too, in case the total moved under us.
+    if (data.length === 0 || offset >= totalCount) {
+      return;
+    }
+  }
+}
+
+/**
+ * Every member of one organization's membership list, mapped to the mirror
+ * fields off `publicUserData`, the same source `organizationMembers` reads.
+ * A member whose Clerk account is gone carries no `publicUserData` and is
+ * skipped, matching that function's own skip.
+ */
+function toMirrorMember(
+  membership: Awaited<
+    ReturnType<Clerk["organizations"]["getOrganizationMembershipList"]>
+  >["data"][number],
+): (MirrorUser & { readonly role: MembershipRole }) | undefined {
+  const person = membership.publicUserData;
+
+  if (!person) {
+    return undefined;
+  }
+
+  const email = person.identifier.trim().toLowerCase();
+  const name = displayName(person.firstName, person.lastName, "");
+
+  return {
+    clerkUserId: person.userId,
+    email,
+    name: name === "" ? undefined : name,
+    imageUrl: person.hasImage ? person.imageUrl : undefined,
+    role: toMembershipRole(membership.role),
+  };
+}
+
+/**
+ * The three Clerk list calls the nightly reconcile makes (spec 0017, AC-8),
+ * each paged at 100 and followed to the end. No object is fetched by id: the
+ * membership list's own `publicUserData` is enough to mirror a member, the
+ * same data `organizationMembers` already reads for `/team`.
+ */
+export function liveClerkListGateway(): ClerkListGateway {
+  return {
+    listOrganizations: async function* listOrganizations() {
+      const clerk = await clerkClient();
+
+      for await (const organization of pagedItems((offset) =>
+        clerk.organizations.getOrganizationList({
+          limit: ORGANIZATION_PAGE_SIZE,
+          offset,
+        }),
+      )) {
+        yield toMirrorOrganization(organization);
+      }
+    },
+
+    listOrganizationMemberships: (clerkOrgId: string) =>
+      (async function* listOrganizationMemberships() {
+        const clerk = await clerkClient();
+
+        for await (const membership of pagedItems((offset) =>
+          clerk.organizations.getOrganizationMembershipList({
+            organizationId: clerkOrgId,
+            limit: ORGANIZATION_PAGE_SIZE,
+            offset,
+          }),
+        )) {
+          const member = toMirrorMember(membership);
+
+          if (member !== undefined) {
+            yield member;
+          }
+        }
+      })(),
+
+    listUsers: async function* listUsers() {
+      const clerk = await clerkClient();
+
+      for await (const user of pagedItems((offset) =>
+        clerk.users.getUserList({ limit: ORGANIZATION_PAGE_SIZE, offset }),
+      )) {
+        yield toMirrorUser(user);
+      }
+    },
+  };
 }

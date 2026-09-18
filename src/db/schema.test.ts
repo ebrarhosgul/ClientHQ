@@ -33,6 +33,7 @@ import { PgDialect, PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import * as clientsSchema from "./schema/clients";
+import * as cronSchema from "./schema/cron";
 import * as identitySchema from "./schema/identity";
 import * as invoicesSchema from "./schema/invoices";
 import * as projectsSchema from "./schema/projects";
@@ -51,6 +52,7 @@ const TABLES: readonly PgTable[] = [
   projectsSchema,
   invoicesSchema,
   webhooksSchema,
+  cronSchema,
 ]
   .flatMap((module) => Object.values(module))
   .filter((value): value is PgTable => is(value, PgTable));
@@ -97,23 +99,26 @@ const checkLiterals = (
 
 /**
  * `organizations` is the tenant root, and spec 0002 exempts `users` (one person
- * may serve several agencies) and `processed_webhook_events` (not tenant data).
+ * may serve several agencies) and `processed_webhook_events` (not tenant
+ * data); spec 0017 adds `cron_runs` for the same reason as the last one.
  */
 const NOT_TENANT_SCOPED: readonly string[] = [
   "organizations",
   "users",
   "processed_webhook_events",
+  "cron_runs",
 ];
 
 const TENANT_SCOPED = TABLES.filter(
   (table) => !NOT_TENANT_SCOPED.includes(nameOf(table)),
 );
 
-describe("the schema defines exactly the twelve tables the specs name", () => {
-  it("has all twelve (spec 0002's eleven plus spec 0012's invoice_events), and no thirteenth nobody wrote down", () => {
+describe("the schema defines exactly the thirteen tables the specs name", () => {
+  it("has all thirteen (spec 0002's eleven, plus spec 0012's invoice_events and spec 0017's cron_runs), and no fourteenth nobody wrote down", () => {
     expect(TABLES.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
+      "cron_runs",
       "deliverables",
       "invoice_events",
       "invoice_line_items",
@@ -136,11 +141,14 @@ describe("the schema defines exactly the twelve tables the specs name", () => {
     }
   });
 
-  it("gives every table but the webhook ledger and the append only events created_at and updated_at, both timestamptz not null", () => {
+  it("gives every table but the webhook ledger, the append only events, and the cron run row created_at and updated_at, both timestamptz not null", () => {
     for (const table of TABLES) {
       if (nameOf(table) === "processed_webhook_events") continue;
       // Spec 0012: rows are never updated, so there is nothing to stamp.
       if (nameOf(table) === "invoice_events") continue;
+      // Spec 0017: a run has started_at/finished_at instead, since a run in
+      // progress is exactly a row that has not finished, not a row updated.
+      if (nameOf(table) === "cron_runs") continue;
 
       for (const name of ["created_at", "updated_at"]) {
         const column = configOf(table).columns.find(
@@ -566,7 +574,7 @@ describe("the tables the spec exempts from tenant scoping have no org_id at all"
 });
 
 describe("the schema barrel re-exports every table, so db.query can reach them", () => {
-  it("exports all eleven", async () => {
+  it("exports all thirteen", async () => {
     const barrel: Record<string, unknown> = await import("./schema/index");
     const exported = Object.values(barrel).filter((value): value is PgTable =>
       is(value, PgTable),

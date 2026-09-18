@@ -28,7 +28,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 15 | Client portal | Slice 7 | in-progress |
 | 16 | Team members & roles | Slice 8 | in-progress |
 | 17 | Clerk webhook sync | Slice 8 | in-progress |
-| 18 | Daily cron sweeps | Slice 9 | planned |
+| 18 | Daily cron sweeps | Slice 9 | in-progress |
 | 19 | Rate limiting | Slice 9 | planned |
 | 20 | Product analytics & error tracking | Slice 9 | planned |
 
@@ -327,10 +327,21 @@ Spec [0015](../specs/0015-clerk-webhook-sync/index.md) · atomic build tasks in 
 
 ## Slice 9: Operations & release readiness
 
-### 18. Daily cron sweeps · needs a decision
+### 18. Daily cron sweeps · in-progress
 One guarded scheduled route doing every daily sweep in sequence: marking invoices overdue, clearing abandoned uploads and their stored objects, and keeping the database from going idle.
 **Done when:** the route refuses an unauthenticated call, marks the right invoices overdue and no others, removes abandoned uploads along with their stored objects, and a failure in one sweep does not silently skip the rest.
-- [ ] Design it (spec): `/architect daily cron sweeps`
+- [x] Design it (spec): `/architect daily cron sweeps`
+- [ ] Build it: `/develop daily cron sweeps`
+  - [ ] The thread: `CRON_SECRET`, the `cron_runs` table, the runner with per sweep isolation and the run record, the overdue invoice sweep, the guarded route and the `vercel.json` schedule, proven by one scheduled run · AC-1, AC-2, AC-3, AC-4, AC-11
+  - [x] Storage and invitations: the abandoned upload sweep (24 hour cutoff, 200 per run, object first, skipped without R2) and the expired invite tidy · AC-5, AC-6
+  - [x] Stripe reconcile: the shared `applySubscriptionState` with its lock and customer guard, the complete listing and newest per agency rules, the list gateway and fake · AC-7
+  - [x] Clerk reconcile: the pure mappers, the list gateway and fake, the three passes with the complete listing rule and the local user set · AC-8
+  - [ ] Retention prune, the overlap and privacy tests, and the `verify.md` walk with one real scheduled run · AC-9, AC-10, AC-12
+- [ ] Verify it: `/check verify daily cron sweeps`
+- [ ] Test it: `/test daily cron sweeps`
+- [ ] Review it (fresh model): `/check review daily cron sweeps`
+- [ ] Document it: `/document daily cron sweeps`
+Spec [0017](../specs/0017-daily-cron-sweeps/index.md) · atomic build tasks in its `## Build plan`
 
 ### 19. Rate limiting · needs a decision
 Putting a ceiling on the two actions a signed in user could otherwise abuse: sending invitations and requesting signed upload URLs.
@@ -354,7 +365,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
 - **Agency settings page**: `/settings` stays a placeholder. Spec 0015 relabels it (the placeholder comment used to say feature 16 replaces it) and leaves agency name and default currency editing to a feature of its own · from spec 0015 · needs a decision
 - **Audit history in the product**: team changes, contact invitations and billing actions are recorded as structured log lines only. Spec 0015 chose not to start an `audit_events` table inside one feature; if a queryable history is wanted it is a cross cutting decision taken once · from spec 0015 · needs a decision
-- **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · needs a decision
+- **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · settled: spec 0017 makes the nightly Stripe reconcile a sweep of feature 18
 - **Gate re check on client side navigation**: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately by the wrapper, so the gap is read only and bounded. Worth measuring once real agencies exist; `template.tsx` in the `(gated)` group is the first thing to try if it matters · from spec 0008 · needs a decision
 - **Preview environment file storage**: R2's CORS rule is per bucket and per origin, so each Vercel preview URL that needs real uploads needs its own bucket run through `pnpm r2:setup`, or previews run with storage unconfigured (which spec 0011 supports with a visible notice). Decide between one shared preview bucket with a wildcard origin rule and per preview buckets if previews ever need real files · from spec 0011 · needs a decision
 - **Audit log**: who did what, deliberately left out of the first schema. Spec 0002 raises a narrower and much cheaper version worth doing first: one append only `invoice_events` table (invoice id, from status, to status, actor, timestamp), best added while feature 13 writes the invoice tables, because history not recorded then cannot be recovered later · from spec 0002 · needs a decision
@@ -367,7 +378,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Contact `last_seen_at`**: a throttled write from the portal so staff can see when a client last visited. Declined in spec 0014 to keep the portal strictly read only; one column and one write when an agency asks · from spec 0014 · needs a decision
 - **Deliverable `shared_at`**: the portal labels a file's date `Added` from `created_at` because flipping visibility records no time. One column set and cleared by `setDeliverableVisibility` would make it an exact `Shared on` · from spec 0014 · needs a decision
 - **Silent client switch on a revoked cookie row**: when the contact cookie names a row that was since removed, the resolver falls back to the person's other row without saying so. Nothing leaks, but a one line notice would stop the surprise · from spec 0014 · needs a decision
-- **Deleted agency clean up and Clerk drift**: spec 0015 soft deletes an agency and scrubs a deleted person, and stops there. Three things fall out of that for feature 18's daily sweep: a nightly Clerk reconcile that lists organizations and memberships and repairs any local row that disagrees (the staleness half of the missed event rule; retries and the `no_mirror_row` repair are the absence half), a decision on the Stripe subscription, rows and R2 objects of a soft deleted agency (the webhook only logs the subscription status), and a retention prune for `processed_webhook_events`, now fed by two sources · from spec 0015 · needs a decision
+- **Deleted agency purge**: spec 0015 soft deletes an agency and stops there, and spec 0017 now reconciles its Stripe subscription state faithfully but deliberately does not cancel it. What remains is the destructive half: cancel the Stripe subscription of a soft deleted agency and, after a grace period, remove its rows and its R2 objects. Its own decision because it destroys data: `/architect deleted agency purge`. Until then storage cost accrues for dead agencies and their subscription bills on · from spec 0015 and spec 0017 · needs a decision
 
 ## Legend
 

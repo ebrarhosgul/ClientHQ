@@ -158,6 +158,18 @@ const serverEnvSchema = z.object({
    */
   R2_ADMIN_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_ADMIN_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+
+  /**
+   * Feature 18, daily cron sweeps (spec 0017). The bearer token
+   * `/api/cron/daily` requires and Vercel Cron sends. Required in every
+   * environment, unlike the providers above: an unset secret would otherwise
+   * open the route rather than fail closed, so there is no unconfigured state
+   * for this one. At least 16 characters so a guessed or truncated value
+   * cannot pass. Generate one with `openssl rand -hex 32`.
+   */
+  CRON_SECRET: z
+    .string()
+    .min(16, "CRON_SECRET is required and must be at least 16 characters"),
 });
 
 /**

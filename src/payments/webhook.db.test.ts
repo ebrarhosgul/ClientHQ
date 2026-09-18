@@ -88,6 +88,9 @@ function retrieved(patch: Record<string, unknown> = {}) {
     customer: "cus_default",
     status: "trialing",
     cancel_at_period_end: false,
+    // Only the nightly reconcile reads this (spec 0017, AC-7); the webhook
+    // never does, so a fixed value is fine for every case in this file.
+    created: 1700000000,
     metadata: {},
     items: {
       data: [

@@ -1,12 +1,12 @@
 /**
  * Prove the applied schema is the one spec 0002 describes (plus the `notes`
- * column and `invoice_events` table spec 0012 adds), by reading the
- * PostgreSQL catalogue rather than by eye.
+ * column and `invoice_events` table spec 0012 adds, and the `cron_runs` table
+ * spec 0017 adds), by reading the PostgreSQL catalogue rather than by eye.
  *
  * CI runs this right after `pnpm db:migrate` against a throwaway container, and
  * you can run it against any database with `pnpm db:schema:assert`. It asserts:
  *
- *   - every one of the twelve tables exists
+ *   - every one of the thirteen tables exists
  *   - every tenant scoped table has `org_id uuid not null` and at least one
  *     index whose leading column is `org_id` (AC-2)
  *   - every unique constraint, CHECK constraint and plain index the spec names
@@ -57,11 +57,13 @@ const TABLES: readonly string[] = [
   "invoice_line_items",
   "invoice_events",
   "processed_webhook_events",
+  "cron_runs",
 ];
 
 /**
- * Everything except the tenant root (`organizations`) and the two tables spec
- * 0002 exempts (`users`, `processed_webhook_events`).
+ * Everything except the tenant root (`organizations`) and the three tables
+ * with no tenant to hold: `users`, `processed_webhook_events` (spec 0002) and
+ * `cron_runs` (spec 0017).
  */
 const TENANT_SCOPED: readonly string[] = [
   "memberships",
@@ -121,6 +123,7 @@ const CHECK_CONSTRAINTS: Readonly<Record<string, readonly string[]>> = {
     "invoice_events_statuses_by_kind_check",
   ],
   processed_webhook_events: ["processed_webhook_events_source_check"],
+  cron_runs: ["cron_runs_outcome_check"],
 };
 
 /** Plain (non unique) indexes, by column list in order. */
@@ -152,6 +155,7 @@ const INDEXES: Readonly<Record<string, readonly (readonly string[])[]>> = {
   invoice_line_items: [["org_id", "invoice_id"]],
   invoice_events: [["org_id", "invoice_id", "created_at"]],
   processed_webhook_events: [["processed_at"]],
+  cron_runs: [["started_at"]],
 };
 
 const FOREIGN_KEYS: readonly ForeignKey[] = [

@@ -21,6 +21,7 @@ import {
 } from "./events";
 
 const PERIOD_END = 1790000000;
+const CREATED = 1700000000;
 
 function subscriptionPayload(patch: Record<string, unknown> = {}) {
   return {
@@ -28,6 +29,7 @@ function subscriptionPayload(patch: Record<string, unknown> = {}) {
     customer: "cus_123",
     status: "trialing",
     cancel_at_period_end: false,
+    created: CREATED,
     metadata: { org_id: "00000000-0000-7000-8000-000000000001" },
     items: {
       data: [
@@ -90,6 +92,12 @@ describe("the retrieved subscription", () => {
     );
 
     expect(parsed.status).toBe("something_new");
+  });
+
+  it("reads created as a real date, for the reconcile's newest per agency rule (spec 0017)", () => {
+    const parsed = retrievedSubscription.parse(subscriptionPayload());
+
+    expect(parsed.created).toEqual(new Date(CREATED * 1000));
   });
 });
 

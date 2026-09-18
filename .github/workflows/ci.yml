@@ -120,6 +120,7 @@ jobs:
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
       CLERK_WEBHOOK_SIGNING_SECRET: whsec_Y2ktcGxhY2Vob2xkZXItc2VjcmV0LXZhbHVl
       EMAIL_FROM: ci@example.com
+      CRON_SECRET: ci-placeholder-cron-secret-value
 
     steps:
       - name: Check out the repository
@@ -202,6 +203,65 @@ jobs:
       - name: Prove the invoice_events CHECKs refuse a malformed row
         if: ${{ !cancelled() }}
         run: pnpm vitest run src/db/invoice-events.db.test.ts
+
+      # The cron run row, per sweep isolation and the report shape (spec 0017)
+      # are claims about a real transaction and a real row, not about
+      # TypeScript's idea of the runner.
+      - name: Prove the cron runner writes and updates the run row
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/cron/runner.db.test.ts
+
+      # The overdue sweep's compare and set, its one transaction with the
+      # event, and its idempotence on a second run (spec 0017, AC-4, AC-12).
+      - name: Prove the overdue invoice sweep moves the right invoices once
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/invoices/overdue-sweep.db.test.ts
+
+      # Object before row, the failed row left in place, and the 200 row cap
+      # with the fake object store (spec 0017, AC-5).
+      - name: Prove the abandoned upload sweep removes object then row
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/deliverables/abandoned-sweep.db.test.ts
+
+      # The 30 day cutoff, in one statement, against a real row (spec 0017,
+      # AC-6).
+      - name: Prove the expired invite sweep clears only what is past the cutoff
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/contacts/expired-invites-sweep.db.test.ts
+
+      # The complete listing rule, the newest per agency rule, and the shared
+      # applySubscriptionState lock and customer id guard, against real SQL
+      # with Stripe faked (spec 0017, AC-7).
+      - name: Prove the Stripe reconcile resolves, picks the newest, and applies once
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/payments/reconcile.db.test.ts
+
+      # The three pass order (organizations, memberships, users), the soft
+      # delete and scrub rules, and per object error isolation, against real
+      # SQL with Clerk faked (spec 0017, AC-8).
+      - name: Prove the Clerk reconcile soft deletes, scrubs, and isolates errors
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/auth/reconcile.db.test.ts
+
+      # The 90 day cutoff on both tables, in one run, leaving the current
+      # run's own fresh row alone (spec 0017, AC-9).
+      - name: Prove the retention prune removes only what is past 90 days
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/cron/retention-sweep.db.test.ts
+
+      # Two runner calls at once against the real overdue and abandoned
+      # upload sweeps: no lock is taken, and idempotence by construction is
+      # what keeps both runs safe (spec 0017, AC-12).
+      - name: Prove two overlapping runs never duplicate a write
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/cron/overlap.db.test.ts
+
+      # A run that soft deletes an organization and scrubs a user reads real
+      # personal data to do it; this greps its report and every log line for
+      # none of it leaking back out (spec 0017, AC-10).
+      - name: Prove a run's report and logs carry no personal data
+        if: ${{ !cancelled() }}
+        run: pnpm vitest run src/cron/privacy.db.test.ts
 
   # The browser half of the accessibility proof. The two jobs above run no
   # browser, so without this the Playwright side of spec 0004's AC-19 would

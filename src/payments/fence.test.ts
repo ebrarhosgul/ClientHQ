@@ -36,8 +36,7 @@ const ROOT = path.resolve(
 
 /**
  * The files allowed to reach the second door, in the order spec 0003 lists
- * them: two provider webhooks, the daily cron, and the door's own test. Only
- * the first of the four exists today; the rest are later features.
+ * them: two provider webhooks, the daily cron, and the door's own test.
  */
 const ALLOWED = [
   "src/app/api/webhooks/stripe/route.ts",
@@ -78,6 +77,7 @@ describe("the second door stays shut", () => {
     ).filter((file): file is string => file !== undefined);
 
     expect(importers.sort()).toEqual([
+      "src/app/api/cron/daily/route.ts",
       "src/app/api/webhooks/clerk/route.ts",
       "src/app/api/webhooks/stripe/route.ts",
       "src/db/tenant/system.test.ts",
