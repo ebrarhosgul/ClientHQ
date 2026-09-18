@@ -74,6 +74,18 @@ describe("AnalyticsProvider", () => {
       advanced_disable_feature_flags: true,
       persistence: "memory",
     });
+    // posthog-js attaches these on its own, outside the catalogue; document.referrer
+    // can carry a full URL with a live token, so they must never be sent.
+    expect(state.posthog.init.mock.calls[0]?.[1]).toMatchObject({
+      property_denylist: [
+        "$referrer",
+        "$referring_domain",
+        "$initial_referrer",
+        "$initial_referring_domain",
+        "$initial_current_url",
+        "$initial_pathname",
+      ],
+    });
     expect(state.posthog.capture).toHaveBeenCalledWith("$pageview", {
       $current_url: `${window.location.origin}/dashboard`,
     });

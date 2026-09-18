@@ -16,6 +16,23 @@ import type { PostHog } from "posthog-js";
 
 import type { ConsentState } from "./consent-state";
 
+/**
+ * Properties `posthog-js` attaches to every event on its own, outside the
+ * catalogue's `NoPlainString` rule (AC-9): `document.referrer` and the
+ * campaign params it derives can carry a full URL, query string and all, so
+ * a link into a token bearing page (`/portal/accept?token=…`) would leak
+ * that token to the very first event captured after it. Denylisted rather
+ * than reduced, because nothing downstream in this product reads them.
+ */
+const DENYLISTED_PROPERTIES = [
+  "$referrer",
+  "$referring_domain",
+  "$initial_referrer",
+  "$initial_referring_domain",
+  "$initial_current_url",
+  "$initial_pathname",
+] as const;
+
 export type BrowserAnalyticsConfig = {
   readonly key: string;
   readonly consent: ConsentState;
@@ -65,6 +82,7 @@ async function load(
       capture_dead_clicks: false,
       capture_exceptions: false,
       rageclick: false,
+      property_denylist: [...DENYLISTED_PROPERTIES],
     });
 
     instance = posthog;

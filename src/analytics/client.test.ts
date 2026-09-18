@@ -24,7 +24,12 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function lines(): { event: string; name?: string; errorName?: string }[] {
+function lines(): {
+  event: string;
+  name?: string;
+  clerkUserId?: string;
+  errorName?: string;
+}[] {
   return warn.mock.calls.map(([line]) => JSON.parse(String(line)));
 }
 
@@ -137,16 +142,22 @@ describe("a provider failure never reaches the caller (AC-21)", () => {
 
     const events = lines();
 
-    expect(events.every((line) => line.event === "analytics.failed")).toBe(
-      true,
-    );
+    expect(events.map((line) => line.event)).toEqual([
+      "analytics.failed",
+      "analytics.failed",
+      "analytics.failed",
+      "analytics.erasure_failed",
+      "analytics.failed",
+    ]);
     expect(events.map((line) => line.name)).toEqual([
       "agency.created",
       "identify",
       "groupIdentify",
-      "deletePerson",
+      undefined,
       "flush",
     ]);
+    // deletePerson's failure carries the person it belongs to, by name (AC-20).
+    expect(events[3]?.clerkUserId).toBe("u");
     // The error's name, never its message and never the properties.
     expect(JSON.stringify(events)).not.toContain("provider down");
   });

@@ -370,7 +370,7 @@ Knowing what happens in production: errors and traces across server and browser,
   - [x] Erasure and the verify walk: `deletePerson` from the scrub path, the `analytics_erasure` sweep, the alert rule and `verify.md` · AC-8, AC-20
 - [x] Verify it: `/check verify product analytics & error tracking` · commands all green, PostHog and Sentry proven end to end on the live deploy; the rest of the manual walk accepted with gaps, tracked in `verify.md`
 - [ ] Test it: `/test product analytics & error tracking`
-- [ ] Review it (fresh model): `/check review product analytics & error tracking`
+- [x] Review it (fresh model): `/check review product analytics & error tracking`
 - [ ] Document it: `/document product analytics & error tracking`
 Spec [0019](../specs/0019-product-analytics-and-error-tracking/index.md) · atomic build tasks in its `## Build plan`
 

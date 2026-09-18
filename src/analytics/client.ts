@@ -14,7 +14,11 @@
  * away instead.
  */
 import { observabilityEnv } from "@/lib/observability-env";
-import { isAnalyticsConfigured, logAnalyticsFailed } from "@/observability";
+import {
+  isAnalyticsConfigured,
+  logAnalyticsFailed,
+  logErasureFailed,
+} from "@/observability";
 
 import { afterResponse } from "./after-response";
 import {
@@ -165,7 +169,7 @@ export function createAnalytics({
 
         return true;
       } catch (thrown) {
-        logAnalyticsFailed("deletePerson", thrown);
+        logErasureFailed(clerkUserId, thrown);
 
         return false;
       }

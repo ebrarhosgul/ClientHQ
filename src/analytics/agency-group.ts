@@ -4,6 +4,12 @@
  * changes what they say: agency creation, a subscription transition, a
  * membership insert or removal, a role change.
  *
+ * Every caller awaits these after its own write already committed (key
+ * invariant 4, AC-21), so a database blip on this read must never surface as
+ * the action's failure: `identifyAgency` and `identifyPerson` swallow their
+ * own read and log `analytics.failed` rather than throw, the same promise
+ * the analytics client keeps for the provider call underneath.
+ *
  * Deliberately not re exported from `src/analytics/index.ts`: this file
  * reaches into the tenant layer, and the tenant layer's action wrapper
  * imports the barrel, so exporting it there would close a cycle.
@@ -13,6 +19,7 @@ import {
   personCreatedAt,
   type Executor,
 } from "@/db/tenant";
+import { logAnalyticsFailed } from "@/observability";
 
 import { analytics } from "./client";
 import type { AgencyProperties, PersonProperties } from "./events";
@@ -58,20 +65,24 @@ export async function agencyGroupProperties(
   };
 }
 
-/** Read and send the agency's group properties in one go. */
+/** Read and send the agency's group properties in one go. Never throws (AC-21). */
 export async function identifyAgency(
   orgId: string,
   overrides: AgencyGroupOverrides = {},
   executor?: Executor,
 ): Promise<void> {
-  const properties = await agencyGroupProperties(orgId, overrides, executor);
+  try {
+    const properties = await agencyGroupProperties(orgId, overrides, executor);
 
-  if (properties !== undefined) {
-    analytics().groupIdentify(orgId, properties);
+    if (properties !== undefined) {
+      analytics().groupIdentify(orgId, properties);
+    }
+  } catch (thrown) {
+    logAnalyticsFailed("groupIdentify", thrown);
   }
 }
 
-/** Read and send a person's properties: their role and when they joined. */
+/** Read and send a person's properties: their role and when they joined. Never throws (AC-21). */
 export async function identifyPerson(
   person: {
     readonly clerkUserId: string;
@@ -84,12 +95,16 @@ export async function identifyPerson(
     return;
   }
 
-  const createdAt = await personCreatedAt(person.userId, executor);
+  try {
+    const createdAt = await personCreatedAt(person.userId, executor);
 
-  if (createdAt !== undefined) {
-    analytics().identify(person.clerkUserId, {
-      role: person.role,
-      created_at: createdAt.toISOString(),
-    });
+    if (createdAt !== undefined) {
+      analytics().identify(person.clerkUserId, {
+        role: person.role,
+        created_at: createdAt.toISOString(),
+      });
+    }
+  } catch (thrown) {
+    logAnalyticsFailed("identify", thrown);
   }
 }

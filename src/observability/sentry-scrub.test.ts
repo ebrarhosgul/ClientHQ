@@ -17,7 +17,7 @@ describe("scrubEvent (spec 0019, AC-4)", () => {
       ip_address: "203.0.113.9",
     },
     request: {
-      url: "https://app.example.com/invoices/1",
+      url: "https://app.example.com/invoices/1?ref=abc",
       method: "POST",
       headers: { authorization: "Bearer secret", cookie: "sid=1" },
       cookies: { sid: "1" },
@@ -28,15 +28,53 @@ describe("scrubEvent (spec 0019, AC-4)", () => {
       { category: "console", message: "sent to person@example.com" },
       { category: "console", message: "cache warm" },
       { category: "fetch", message: "GET /api" },
+      {
+        category: "fetch",
+        data: { method: "GET", url: "https://app.example.com/api?key=xyz" },
+      },
+      {
+        category: "navigation",
+        data: {
+          from: "/portal/accept?token=raw-invite-token",
+          to: "/onboarding",
+        },
+      },
     ],
   };
 
-  it("removes headers, cookies, body and query string but keeps url and method", () => {
+  it("removes headers, cookies, body and query string, and reduces url to origin plus pathname", () => {
     const scrubbed = scrubEvent(event);
 
     expect(scrubbed.request).toEqual({
       url: "https://app.example.com/invoices/1",
       method: "POST",
+    });
+  });
+
+  it("reduces a request url that carries a live invite token", () => {
+    const withToken: ErrorEvent = {
+      ...event,
+      request: {
+        ...event.request,
+        url: "https://app.example.com/portal/accept?token=raw-invite-token",
+      },
+    };
+
+    expect(scrubEvent(withToken).request?.url).toBe(
+      "https://app.example.com/portal/accept",
+    );
+  });
+
+  it("reduces url-shaped fields in breadcrumb data instead of leaving them untouched", () => {
+    const scrubbed = scrubEvent(event);
+
+    expect(scrubbed.breadcrumbs).toContainEqual({
+      category: "fetch",
+      data: { method: "GET", url: "https://app.example.com/api" },
+    });
+    expect(scrubbed.breadcrumbs).toContainEqual({
+      category: "navigation",
+      data: { from: "/portal/accept", to: "/onboarding" },
     });
   });
 
@@ -48,6 +86,14 @@ describe("scrubEvent (spec 0019, AC-4)", () => {
     expect(scrubEvent(event).breadcrumbs).toEqual([
       { category: "console", message: "cache warm" },
       { category: "fetch", message: "GET /api" },
+      {
+        category: "fetch",
+        data: { method: "GET", url: "https://app.example.com/api" },
+      },
+      {
+        category: "navigation",
+        data: { from: "/portal/accept", to: "/onboarding" },
+      },
     ]);
   });
 

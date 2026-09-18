@@ -16,6 +16,7 @@ import { flattenError, type ZodType } from "zod";
 
 import { analytics, type EventName, type EventProperties } from "@/analytics";
 import type { RateLimitPolicy } from "@/rate-limit/policies";
+import { logAnalyticsFailed } from "@/observability";
 
 import { tenantDb, type StaffAccessor } from "./accessor";
 import { tenantContext, type StaffContext } from "./context";
@@ -195,8 +196,11 @@ function toActionError(
 }
 
 /**
- * Report the action's event, after success only. The client never throws,
- * so this is the one call in the wrapper with no `try` of its own.
+ * Report the action's event, after success only. The client itself never
+ * throws, but `when` and `properties` are caller supplied derivations that
+ * can, and by the time this runs the handler's write, transaction included,
+ * has already committed (AC-21) — so a throw here is caught and logged
+ * rather than allowed to fail an action that in fact succeeded.
  */
 function fireTrack<TInput, TData>(
   track: ActionTrack<TInput, TData> | undefined,
@@ -204,17 +208,25 @@ function fireTrack<TInput, TData>(
   input: TInput,
   result: TData,
 ): void {
-  if (track === undefined || track.when?.(input, result) === false) {
+  if (track === undefined) {
     return;
   }
 
-  analytics().track(track.event, {
-    distinctId: { kind: "user", clerkUserId: ctx.clerkUserId },
-    orgId: ctx.orgId,
-    // The properties function is typed per event above; the client parses
-    // the result against that event's schema before anything is sent.
-    properties: track.properties?.(input, result),
-  } as Parameters<ReturnType<typeof analytics>["track"]>[1]);
+  try {
+    if (track.when?.(input, result) === false) {
+      return;
+    }
+
+    analytics().track(track.event, {
+      distinctId: { kind: "user", clerkUserId: ctx.clerkUserId },
+      orgId: ctx.orgId,
+      // The properties function is typed per event above; the client parses
+      // the result against that event's schema before anything is sent.
+      properties: track.properties?.(input, result),
+    } as Parameters<ReturnType<typeof analytics>["track"]>[1]);
+  } catch (thrown) {
+    logAnalyticsFailed(track.event, thrown);
+  }
 }
 
 /**
