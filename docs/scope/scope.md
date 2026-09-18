@@ -29,7 +29,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 16 | Team members & roles | Slice 8 | in-progress |
 | 17 | Clerk webhook sync | Slice 8 | in-progress |
 | 18 | Daily cron sweeps | Slice 9 | in-progress |
-| 19 | Rate limiting | Slice 9 | planned |
+| 19 | Rate limiting | Slice 9 | in-progress |
 | 20 | Product analytics & error tracking | Slice 9 | planned |
 
 ## Foundations
@@ -343,10 +343,20 @@ One guarded scheduled route doing every daily sweep in sequence: marking invoice
 - [ ] Document it: `/document daily cron sweeps`
 Spec [0017](../specs/0017-daily-cron-sweeps/index.md) · atomic build tasks in its `## Build plan` · verify steps in its [verify.md](../specs/0017-daily-cron-sweeps/verify.md)
 
-### 19. Rate limiting · needs a decision
-Putting a ceiling on the two actions a signed in user could otherwise abuse: sending invitations and requesting signed upload URLs.
+### 19. Rate limiting · in-progress
+Putting a ceiling on the actions a signed in user could otherwise abuse: requesting signed upload URLs, sending invoice emails, and creating agencies (invitation sends already have theirs from spec 0009).
 **Done when:** each limited action refuses politely past its ceiling with a clear message, limits apply per agency rather than globally, and the limiter failing does not take the whole action down with it.
-- [ ] Design it (spec): `/architect rate limiting`
+- [x] Design it (spec): `/architect rate limiting`
+- [ ] Build it: `/develop rate limiting`
+  - [ ] One thread end to end: the `rate_limit_windows` table and migration, the three policies, the pure window and message module, the door with its atomic upsert, the wrapper slot, and `requestUpload` refusing the 61st upload of the hour with the exact sentence on the project page · AC-1, AC-2, AC-3, AC-4, AC-5, AC-9, AC-13, AC-14
+  - [ ] The log lines and fail open: `rate_limit.refused` and `rate_limit.skipped` from the door, the privacy test, and the 60 parallel consumes test · AC-3, AC-7, AC-8
+  - [ ] The other three actions: the shared invoice email allowance on `issueInvoice` and `resendInvoiceNotification` with the cooldown left as it is, and the per person ceiling in `createAgency` before any Clerk organization is created · AC-1, AC-6, AC-11, AC-12, AC-14
+  - [ ] Retention, types and verification: the seven day prune in `retention_prune`, the type level test for the slot, and the manual walk in `verify.md` · AC-10, AC-13
+- [ ] Verify it: `/check verify rate limiting`
+- [ ] Test it: `/test rate limiting`
+- [ ] Review it (fresh model): `/check review rate limiting`
+- [ ] Document it: `/document rate limiting`
+Spec [0018](../specs/0018-rate-limiting/index.md) · atomic build tasks in its `## Build plan`
 
 ### 20. Product analytics & error tracking · needs a decision
 Knowing what happens in production: errors and traces across server and browser, plus product analytics for which signups actually activate and which convert to a subscription.
@@ -362,7 +372,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Postgres row level security**: a second line of defence that fails closed instead of open. Spec 0001 calls this the single biggest security upgrade available to the design. Spec 0002 left it unblocked (`org_id` is not null on every tenant table) and spec 0003 has now settled the shape it needs: one choke point in the data access layer, so switching it on is a dedicated application database role, a policy migration across the eight tenant tables, and a change to that one function. Spec 0003 names the trigger for doing it: the first moment two real agencies share the database · from spec 0003 · needs a decision
 - **Colour token lint rule**: a `clienthq/no-literal-colour` ESLint rule in the shape of the existing `clienthq/no-raw-db-import`, catching both a raw hex value and an opacity modifier on a colour token. Spec 0004 makes "every colour comes from a token" a load bearing invariant and then enforces it by review, which is the weaker half of what the project already does for the database handle. The opacity case is the one the contrast test cannot see · from spec 0004 · needs a decision
 - **Agency branding in the portal**: no logo upload, no per agency colour, no white labelling. Spec 0004 gives the client portal ClientHQ's own chrome, so a client sees your product rather than their agency's. If real agencies ask for their logo on the portal their clients see, that is a new decision and it reaches into the tokens · from spec 0004 · needs a decision
-- **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · needs a decision
+- **Agency creation is not rate limited**: any signed in account can create unlimited agencies, because spec 0005 deliberately allows a person to belong to several. Feature 19's ceilings cover invitation sends and upload URL signing only, so this action belongs on that list when it is built · from spec 0005 · settled: spec 0018 gives agency creation a per person ceiling
 - **Agency settings page**: `/settings` stays a placeholder. Spec 0015 relabels it (the placeholder comment used to say feature 16 replaces it) and leaves agency name and default currency editing to a feature of its own · from spec 0015 · needs a decision
 - **Audit history in the product**: team changes, contact invitations and billing actions are recorded as structured log lines only. Spec 0015 chose not to start an `audit_events` table inside one feature; if a queryable history is wanted it is a cross cutting decision taken once · from spec 0015 · needs a decision
 - **Subscription drift detection**: nothing currently notices when the Stripe webhook stops working. A misconfigured endpoint, or one Stripe disables after repeated failures, freezes the local subscription mirror silently, and feature 9 then turns that stale row into a lockout for an agency that is paying. The fix is a nightly reconcile that lists active Stripe subscriptions and repairs any local row that disagrees, so feature 18 is its natural home rather than a feature of its own. Worth settling when feature 18 is designed, and worth not forgetting before feature 9 reaches production · from spec 0007 · settled: spec 0017 makes the nightly Stripe reconcile a sweep of feature 18
