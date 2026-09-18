@@ -352,7 +352,7 @@ Putting a ceiling on the actions a signed in user could otherwise abuse: request
   - [x] The log lines and fail open: `rate_limit.refused` and `rate_limit.skipped` from the door, the privacy test, and the 60 parallel consumes test · AC-3, AC-7, AC-8
   - [x] The other three actions: the shared invoice email allowance on `issueInvoice` and `resendInvoiceNotification` with the cooldown left as it is, and the per person ceiling in `createAgency` before any Clerk organization is created · AC-1, AC-6, AC-11, AC-12, AC-14
   - [x] Retention, types and verification: the seven day prune in `retention_prune`, the type level test for the slot, and the manual walk in `verify.md` · AC-10, AC-13
-- [ ] Verify it: `/check verify rate limiting`
+- [x] Verify it: `/check verify rate limiting`
 - [ ] Test it: `/test rate limiting`
 - [ ] Review it (fresh model): `/check review rate limiting`
 - [ ] Document it: `/document rate limiting`
