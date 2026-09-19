@@ -19,7 +19,7 @@ Settled in [spec 0001](docs/specs/0001-stack-and-foundational-architecture/index
 - **Language / Runtime**: TypeScript 5 on Node 22 LTS
 - **Framework**: Next.js 16 App Router (React 19), Server Components for reads, Server Actions for writes
 - **Key dependencies**: Drizzle ORM over PostgreSQL on Supabase, Zod, Tailwind CSS v4 with shadcn/ui
-- **Providers**: Clerk (auth and agency organizations), Stripe (subscription), Cloudflare R2 (files), Resend (email), Upstash Redis (rate limits), Sentry (errors), Vercel (hosting)
+- **Providers**: Clerk (auth and agency organizations), Stripe (subscription), Cloudflare R2 (files), Resend (email), a Postgres counter table (rate limits, spec 0018), Sentry (errors), PostHog (product analytics), Vercel (hosting)
 - **Package manager**: pnpm 11 (`corepack pnpm` if pnpm is not on your path)
 
 ## Build approach
@@ -80,6 +80,7 @@ Code style is functional and immutable. No classes where a plain function works.
 - Every UI surface meets WCAG 2.2 AA, including its empty and error states.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`).
 - **The load bearing rule**: nothing outside the tenant scoping data access layer may import the raw database handle from `src/db/client.ts`. See [src/db/AGENTS.md](src/db/AGENTS.md).
+- **Provider SDK boundaries**: only `src/storage/` (and `scripts/r2-setup.ts`) may import `@aws-sdk/*`, and only `src/invoices/pdf/` may import `@react-pdf/*`. ESLint fails the build otherwise; go through `@/storage` and `@/invoices/pdf/render`.
 
 ## Layout
 
@@ -123,6 +124,15 @@ MCP servers: Sentry (`getsentry/sentry-mcp`, recommended, connect by OAuth at ht
 
 ## Context files
 
+- [src/ui/AGENTS.md](src/ui/AGENTS.md): the design tokens, the component set and the accessibility machinery; read `design.md` first
 - [src/db/AGENTS.md](src/db/AGENTS.md): the database handle, the tenant scoping rule, and the Supabase pooler constraints
+- [src/auth/AGENTS.md](src/auth/AGENTS.md): Clerk to local mirror sync, agency creation and the Clerk webhook
+- [src/payments/AGENTS.md](src/payments/AGENTS.md): the Stripe subscription mirror, the webhook order and the reconcile
+- [src/cron/AGENTS.md](src/cron/AGENTS.md): the one daily route, the sweep order and the runner's isolation rules
+- [src/analytics/AGENTS.md](src/analytics/AGENTS.md): PostHog events, consent and the property rules, beside Sentry in `src/observability/`
+- [src/invoices/AGENTS.md](src/invoices/AGENTS.md): the invoice lifecycle, gapless numbering, the issue email and the PDF
+- [src/contacts/AGENTS.md](src/contacts/AGENTS.md): client contacts and the single use portal invitation token
+- [src/storage/AGENTS.md](src/storage/AGENTS.md): the four operation R2 port, its fake and the R2 quirks
+- [src/rate-limit/AGENTS.md](src/rate-limit/AGENTS.md): the three named ceilings and how they fail open
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
