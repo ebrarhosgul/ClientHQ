@@ -1,6 +1,35 @@
 # ClientHQ
 
+> ### 🚀 Live Demo
+>
+> [![Live Demo](https://img.shields.io/badge/Live_Demo-Open_the_app-2ea44f?style=for-the-badge)](https://REPLACE_WITH_DEMO_URL)
+>
+> **Try it as an agency.** Sign in with the evaluation account below to see the agency dashboard, then open a client's portal invitation to see what their clients see.
+>
+> | | |
+> |---|---|
+> | **URL** | `https://REPLACE_WITH_DEMO_URL` |
+> | **Email** | `demo.agency@example.com` |
+> | **Password** | `REPLACE_WITH_DEMO_PASSWORD` |
+>
+> _Placeholders. No hosted demo is published yet. Before you replace these, use a dedicated throwaway agency on a Stripe test mode subscription with seeded sample data, and never real customer data or a password you use anywhere else. The account is public once it is written here._
+
 A multi tenant portal where agencies run their clients, projects, deliverables and invoices in one place, and each of their clients gets a read only window onto their own work.
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./docs/assets/dashboard-preview.png" alt="Agency dashboard preview: clients, projects and invoices at a glance" width="100%" />
+      <br />
+      <sub><b>Agency dashboard</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="./docs/assets/portal-preview.png" alt="Client portal preview: a client's own projects, shared files and invoices" width="100%" />
+      <br />
+      <sub><b>Client portal</b></sub>
+    </td>
+  </tr>
+</table>
 
 ## Contents
 
@@ -26,13 +55,13 @@ ClientHQ puts that in one product with two audiences:
 
 Agencies pay ClientHQ a monthly subscription through Stripe, with a trial. That is the only money the platform touches.
 
-In scope: sign in and agency organizations, client records, contacts and portal invitations, projects, deliverable upload and download, invoice authoring and lifecycle, invoice PDF, the client portal, team members and roles, provider webhook sync, daily maintenance sweeps.
+In scope: sign in and agency organizations, client records, contacts and portal invitations, projects, deliverable upload and download, invoice authoring and lifecycle, invoice PDF, the client portal, team members and roles, provider webhook sync, daily maintenance sweeps, rate limits on costly actions, and error tracking with privacy respecting product analytics.
 
-Out of scope, on purpose: paying an invoice through the platform, agency branding in the portal, a public marketing site, and analytics. See [section 8](#8-explicit-trade-offs-and-roadmap) and the [scope](docs/scope/scope.md) for the full list.
+Out of scope, on purpose: paying an invoice through the platform, agency branding in the portal, and a public marketing site. See [section 8](#8-explicit-trade-offs-and-roadmap) and the [roadmap](docs/scope/scope.md) for the full list.
 
 ### Non negotiable invariants
 
-These three rules shape every design decision below. If a change would weaken one, it needs its own spec first.
+These three rules shape every design decision below. If a change would weaken one, it needs its own written design first.
 
 **Zero money transfer.** No client money moves through the platform. Stripe is used for exactly one thing, the agency's own subscription. An invoice is a record the agency sends to its client, and marking it paid is a status change made by staff, not a payment. There is no Stripe Connect, no card form for clients, and nothing to hold in escrow.
 
@@ -49,7 +78,20 @@ One honest limit: the application layer fails closed, but the database layer doe
 
 ### Where the build stands
 
-Features 1, 2 and 5 (stack, tooling, design system) are done. Features 3, 4 and 6 to 19 are built or in progress, each still moving through its verify, test and review steps. Rate limiting (feature 19) has an approved design in [spec 0018](docs/specs/0018-rate-limiting/index.md) and is not built yet. Product analytics and error tracking (feature 20) still needs a decision. The live status is the table at the top of [docs/scope/scope.md](docs/scope/scope.md).
+Every feature on the roadmap now has code on `main`. Features 1, 2 and 5 (stack, tooling, design system) are marked done. The rest are still marked in progress in [docs/scope/scope.md](docs/scope/scope.md), which is the live source of truth, because each has a closing step open: an independent review, a verification pass, or written documentation.
+
+Feature 20 (product analytics, Sentry error tracking and privacy consent) is the one whose earlier status was wrong in this document, so here is exactly where it stands, checked against the code, the tests and the verification record on `main`:
+
+| Aspect | Status |
+|---|---|
+| **Implemented** | Sentry error tracking in all three runtimes (server, browser, edge proxy). PostHog product analytics on PostHog's EU cloud, with business events fired from the server. A consent cookie and banner, a public `/privacy` page, and erasure of a person's analytics data when they are deleted. See [section 4](#error-tracking-product-analytics-and-consent) for how it works |
+| **Automated tests** | Unit suites for the Sentry logic (`src/observability/`), the analytics client, event catalogue, consent and provider (`src/analytics/`), the action wrapper's event slot, the erasure sweep and the error state component. Database tests for the analytics reads and the privacy of cron output. A browser spec, [e2e/analytics-consent.spec.ts](e2e/analytics-consent.spec.ts), proves what does and does not leave the browser. No test ever contacts a provider |
+| **Formal verification** | Written record in [the verification file](docs/specs/0019-product-analytics-and-error-tracking/verify.md). All automated commands passed on 2026-09-18, including a production build without a Sentry token that emits no source maps. The PostHog and Sentry pipelines were proven end to end on a live deployment. The rest of the manual walk was accepted with gaps, listed in the next row |
+| **Not yet proven** | Live confirmation of the other four Sentry throw types, source map stack traces, scrubbing on a live event, the trace sampler, masked replay, the three engineered alert scenarios, the full PostHog event walk, erasure on a real Clerk deletion, and the screen reader pass on `/privacy` and the banner. The one Sentry alert rule (email on each new production issue) is not created yet |
+| **Independent review** | Done. It found one blocker: invitation tokens in portal URLs would have reached Sentry. That is fixed (query strings and hashes are stripped from request and breadcrumb URLs) along with three lesser findings, in a follow up commit |
+| **Roadmap row** | Still "in progress": the dedicated test pass and the written documentation are unticked, even though test files exist |
+
+Rate limiting (feature 19) is also built, verified and reviewed: see the [action wrapper](#tenant-scoped-data-access-layer) below. Only its documentation step is open.
 
 ## 2. System architecture and boundaries
 
@@ -63,6 +105,7 @@ One Next.js App Router application serves both audiences. Route groups (the fold
 | Agency, subscription gated | `src/app/(agency)/(gated)/` | everything above except `/billing` and `/settings` | Also needs a paid up subscription |
 | Client contact | `src/app/portal/` | `/portal`, `/portal/projects`, `/portal/invoices`, `/portal/files` | A signed in user with an accepted contact row |
 | Signed in, no destination yet | `src/app/(auth)/` | `/sign-in`, `/sign-up`, `/onboarding` | Everyone; `/onboarding` routes a person to their agency, an agency picker, the portal, or a create an agency form |
+| Public | `src/app/privacy/`, `src/app/page.tsx` | `/privacy`, `/` | Everyone, with no session |
 | Machines | `src/app/api/` | `/api/webhooks/stripe`, `/api/webhooks/clerk`, `/api/cron/daily`, `/api/health/db` | Callers that prove themselves with a signature or a secret instead of a session |
 
 Three details worth knowing:
@@ -78,7 +121,7 @@ Every request is resolved to a tenant context once, from a verified session, bef
 ```mermaid
 flowchart TD
     R[Request] --> P{Proxy: public route?}
-    P -- yes --> PUB[Sign in, sign up, webhooks, cron]
+    P -- yes --> PUB[Sign in, sign up, privacy, webhooks, cron]
     P -- no --> S{Session?}
     S -- no --> SI[Redirect to sign in]
     S -- yes --> A{Agency path?}
@@ -109,13 +152,15 @@ Where the pieces live:
 
 ## 3. Key architectural decisions and engineering trade offs
 
-Each decision below has a spec with the options considered. This section is the short version.
+Each decision below is written to stand on its own: the problem, the decision, and what it costs. Every one also has a full design document with the options that were rejected, linked as a deep dive at the end. You do not need to open them to follow the reasoning.
 
 ### Tenant scoped data access layer
 
-The problem: with application enforced tenancy, one query that forgets its `org_id` predicate leaks one agency's data to another, and nothing in the database notices. So the design makes forgetting impossible instead of unlikely.
+**The problem.** This product stores many agencies' data in the same tables, separated only by an `org_id` column. If application code enforces that separation, one query that forgets its `org_id` predicate quietly hands one agency's rows to another, and nothing in the database notices. Discipline alone does not scale past a few developers or a few months.
 
-The layer lives in `src/db/tenant/` and exposes a small surface:
+**The decision.** Make forgetting impossible instead of unlikely. All reads and writes go through a single layer in `src/db/tenant/` that applies the tenant filter for you. The raw database handle is unreachable from anywhere else, enforced by a lint rule that fails the build.
+
+The layer exposes a small surface:
 
 | Name | Role |
 |---|---|
@@ -125,26 +170,29 @@ The layer lives in `src/db/tenant/` and exposes a small surface:
 | `unsafeTenantQuery()` | A conspicuous, logged exit for a query the accessor cannot express. Still scoped, with the predicate written by hand |
 | `withSystemAccess()` | The unscoped door, for callers with no tenant to resolve. Fenced to three files |
 
-`withTenantAction()` wraps every write in the same steps:
+`withTenantAction()` wraps every write in the same steps, so no action can skip one:
 
 1. Parse the input with Zod. It is the only parse at this boundary.
 2. Resolve the tenant context and check the role (`org:admin` or `org:member`).
 3. Check the subscription gate, so a write in the grace window or after a lockout is refused with `subscription_inactive`.
-4. Run the handler with a scoped accessor it cannot widen, optionally inside one transaction that rolls back every write if it throws.
-5. Return a `Result` with a closed set of error codes, and revalidate declared paths and tags only after success.
+4. If the action declares a rate limit policy, consume one unit of its allowance. Three named ceilings exist: 60 upload requests an hour and 50 invoice emails a day per agency, and 3 agency creations a day per person. A refusal returns a plain sentence saying the allowance and roughly when to retry. The limiter is a small Postgres counter table updated by one atomic statement, and if it fails, the action proceeds and the failure is logged, so a counter hiccup never takes invoicing down.
+5. Run the handler with a scoped accessor it cannot widen, optionally inside one transaction that rolls back every write if it throws.
+6. Return a `Result` with a closed set of error codes. Only after success, revalidate declared paths and tags and fire any declared analytics event, after the transaction has committed.
 
-Trade offs and how they are contained:
+**The trade off.**
 
 - Coverage is derived from the schema. A table is tenant scoped exactly when it has an `org_id` column, so a new table is protected without anyone remembering to protect it, and a table without one cannot be passed to the accessor at all (a compile error).
-- Two ESLint rules make bypassing the layer a build failure: `clienthq/no-raw-db-import` (only `src/db/tenant/**` plus three exact paths may import the raw handle) and `clienthq/no-system-access-import` (only the two webhook routes and the cron route may use the unscoped door). A test fails if the exemption lists drift from spec 0003.
+- Two custom ESLint rules make bypassing the layer a build failure: one blocks importing the raw handle (only `src/db/tenant/**` plus three exact paths may), and one blocks the unscoped door outside the two webhook routes and the cron route. A test fails if either allowed list changes without the documented design changing, so widening one is a pull request conversation, not a quiet edit.
 - Staff permissions read the Clerk session claim, not the local `memberships.role` column, which is a display mirror that can be briefly stale.
-- Reads are plain statements today. The single choke point exists so that turning on row level security later changes one function and a migration rather than every call site.
+- The cost that remains: enforcement is still in the application, so a careless query behind the escape hatch reopens the hole. The layer has one choke point precisely so that PostgreSQL row level security can be added later by changing one function and one migration. See [section 8](#8-explicit-trade-offs-and-roadmap).
 
-Spec: [0003](docs/specs/0003-tenant-scoping-data-access-layer/index.md). Area guide: [src/db/AGENTS.md](src/db/AGENTS.md).
+Deep dive: [tenant layer design](docs/specs/0003-tenant-scoping-data-access-layer/index.md), [rate limiting design](docs/specs/0018-rate-limiting/index.md), and the area guide [src/db/AGENTS.md](src/db/AGENTS.md).
 
 ### Direct to storage deliverables pipeline
 
-Deliverable files go straight from the browser to Cloudflare R2, so file bytes never pass through a serverless function. The application only signs short lived URLs and records what happened.
+**The problem.** Agencies upload files of up to 100 MB. Streaming those bytes through a serverless function costs memory and execution time, hits request size limits, and makes the application a bottleneck for something object storage does natively. But letting the browser talk to storage directly means the server no longer sees the bytes, so it cannot trust what arrives.
+
+**The decision.** Files go straight from the browser to Cloudflare R2. The application only signs short lived URLs and records what happened, and it verifies the stored object afterwards instead of trusting the browser's claims.
 
 ```mermaid
 sequenceDiagram
@@ -167,24 +215,24 @@ sequenceDiagram
     S-->>B: Redirect to presigned GET URL, valid 2 minutes
 ```
 
-Why it is built this way:
+How each risk is handled:
 
-- **A narrow storage port.** [src/storage/port.ts](src/storage/port.ts) has four operations: sign a PUT, sign a GET, read back what exists, delete. Nothing else in the project talks to R2 (an ESLint restriction keeps the AWS SDK out of other files), so an in memory fake in `src/storage/fake.ts` is a complete stand in for every test.
+- **A narrow storage port.** [src/storage/port.ts](src/storage/port.ts) has four operations: sign a PUT, sign a GET, read back what exists, delete. Nothing else in the project talks to R2 (a lint restriction keeps the AWS SDK out of other files), so an in memory fake is a complete stand in for every test.
 - **Trust the object, not the browser.** The server checks the content type allowlist and size cap before signing, then re reads the stored object with `HEAD` on confirm. A row only becomes `ready` if what landed passes the same rules.
-- **Keys carry the tenant.** Object keys are `org/{orgId}/project/{projectId}/{id}`, and the row's id is minted by the accessor, so the key is set in a second step after the insert.
+- **Keys carry the tenant.** Object keys are `org/{orgId}/project/{projectId}/{id}`. The row's id is minted by the accessor, so the key is set in a second step after the insert.
 - **Files are private until shared.** `visible_to_client` defaults to false. Downloads redirect to a 2 minute signed URL after the same context and gate checks as any page.
 - **No orphans.** A daily sweep removes abandoned `pending` rows, deleting the object first and the row second.
 - **Storage is optional outside production.** Without R2 credentials the Deliverables section shows a "storage not configured" notice instead of an upload control.
 
-Trade off: R2's CORS rule is per bucket and per origin, so each preview deployment that needs real uploads needs its own bucket. `pnpm r2:setup` configures a bucket. This is tracked as a deferred decision in the scope.
+**The trade off.** The server never sees the bytes, so it cannot scan or transform them, and the size and type rules are only as good as the metadata R2 reports on `HEAD`. The design also creates a window where an object exists in R2 with no confirmed row, which is why the abandoned upload sweep exists. Finally, R2's CORS rule is per bucket and per origin, so each preview deployment that needs real uploads needs its own bucket, configured with `pnpm r2:setup`, or has to run with storage unconfigured.
 
-Spec: [0011](docs/specs/0011-deliverable-upload-download/index.md).
+Deep dive: [deliverables design](docs/specs/0011-deliverable-upload-download/index.md) and [src/storage/AGENTS.md](src/storage/AGENTS.md).
 
 ### Idempotent webhook processing ledger
 
-Stripe and Clerk both deliver events at least once, out of order, and sometimes twice at the same moment. The local database mirrors subscription and identity state, so the handlers have to be safe under all of that.
+**The problem.** The local database mirrors subscription state from Stripe and identity state from Clerk. Both providers deliver events at least once, out of order, and sometimes twice at the same instant. A naive handler double applies events, lets an old event overwrite a newer state, or marks an event handled while its effect was lost, and the mirror silently drifts from the truth. In this product a stale subscription row becomes a lockout for an agency that is paying.
 
-The ledger is the `processed_webhook_events` table: a unique constraint on `(source, event_id)`, no payload (events carry personal data, and both providers keep the originals), pruned after 90 days by the daily cron.
+**The decision.** Every event is recorded in a ledger table, `processed_webhook_events`, inside the same transaction as its effect. The table has a unique constraint on `(source, event_id)` and no payload (events carry personal data, and both providers keep the originals). It is pruned after 90 days by the daily cron.
 
 The Stripe handler follows a fixed six step order ([src/payments/webhook.ts](src/payments/webhook.ts)):
 
@@ -193,19 +241,21 @@ The Stripe handler follows a fixed six step order ([src/payments/webhook.ts](src
 3. Re read the subscription from Stripe, outside any transaction. The event says something changed; it is never the source of what it changed to, which is what makes an out of order delivery harmless.
 4. Insert the ledger row with `ON CONFLICT DO NOTHING`. If nothing was inserted, the event was already handled: answer 200 and apply nothing.
 5. Lock the agency's subscription row `FOR UPDATE`, then apply the retrieved state. This stops two concurrent deliveries from committing in the wrong order.
-6. Commit the ledger row and the state change together, or not at all.
+6. Commit the ledger row and the state change together, or not at all. Only after the commit does the product analytics funnel hear about a subscription starting, so a rolled back event never counts.
 
-Failure policy: almost nothing answers 500. Stripe disables an endpoint that keeps failing, which would silently freeze the subscription mirror. So 500 means only "this might work on retry". An event that can never succeed (naming no agency, or an agency that does not exist) is logged and answered 200. The one exception is a payload that does not parse, which means this code is wrong about Stripe's shapes and deserves the retries and the loud failure.
-
-The Clerk webhook follows the same shape for eight organization, membership and user events, with soft deletes and personal data scrubbing. Both handlers are two of the only three callers allowed to use `withSystemAccess`.
+The Clerk webhook follows the same shape for eight organization, membership and user events, with soft deletes and personal data scrubbing. Both handlers are two of the only three callers allowed to use the unscoped system access door.
 
 A daily backstop catches what a broken webhook would miss: reconcile sweeps list Stripe subscriptions and Clerk objects and repair any local drift through the same shared apply function.
 
-Specs: [0007](docs/specs/0007-subscription-checkout-and-stripe-webhook/index.md), [0015](docs/specs/0015-clerk-webhook-sync/index.md), [0017](docs/specs/0017-daily-cron-sweeps/index.md).
+**The trade off.** Correctness is bought with an extra network round trip to Stripe per event and a row lock per agency, and the handler has an unusual failure policy. Stripe disables an endpoint that keeps failing, which would silently freeze the mirror, so almost nothing answers 500. A 500 means only "this might work on retry". An event that can never succeed (naming no agency, or an agency that does not exist) is logged and answered 200. The one exception is a payload that does not parse, which means this code is wrong about Stripe's shapes and deserves the retries and the loud failure. Exceptions are reported to Sentry before the handler rethrows, so the provider still retries and the operator still hears about it.
+
+Deep dive: [Stripe webhook design](docs/specs/0007-subscription-checkout-and-stripe-webhook/index.md), [Clerk webhook design](docs/specs/0015-clerk-webhook-sync/index.md), [daily sweeps design](docs/specs/0017-daily-cron-sweeps/index.md), [src/payments/AGENTS.md](src/payments/AGENTS.md).
 
 ### Dynamic read time subscription gating
 
-The agency's access level is never stored and never cached. It is computed on every read from two columns of the subscription row and the clock, by a pure function ([src/access/level.ts](src/access/level.ts)).
+**The problem.** An agency's right to use the product depends on its subscription, and that changes with the clock: a failed payment starts a grace period, and the period ends on its own. Storing a "locked" flag means a scheduled job has to flip it, the job can fail or run late, and the flag can disagree with what Stripe says.
+
+**The decision.** The access level is never stored and never cached. It is computed on every read from two columns of the subscription row and the current time, by a pure function ([src/access/level.ts](src/access/level.ts)).
 
 | Level | Subscription state | Agency experience |
 |---|---|---|
@@ -214,22 +264,22 @@ The agency's access level is never stored and never cached. It is computed on ev
 | `locked` | `past_due` beyond 7 days, `unpaid`, `canceled`, `incomplete_expired`, `paused`, or any status this build does not know | Sent to `/billing` |
 | `unsubscribed` | No subscription row, or a Checkout that never finished | Sent to `/billing` |
 
-Why read time instead of a job or a stored flag:
+Why this shape holds up:
 
-- A grace window expires with no scheduled job and no write. At exactly the boundary the window has closed, and the tests stand on that boundary.
+- A grace window expires with no job and no write. At exactly the boundary the window has closed, and the tests stand on that boundary.
 - `cancel_at_period_end` is deliberately not an input. An agency that has cancelled keeps full access until Stripe actually ends the subscription and the webhook records it.
 - The status switch is exhaustive. Adding a status to the enum fails the typecheck until it is given a level.
 - A `past_due` row with no start date, which the webhook should never produce, is treated as `locked` and reported rather than becoming a grace window with no end.
 - Enforcement is in two places. The `(gated)` layout redirects pages, and `withTenantAction()` refuses writes, so a stale page on screen cannot write past the gate.
 - The portal reads the same verdict. Clients see everything in `full` and `grace`, and a "portal unavailable" page when the agency is `locked` or `unsubscribed`.
 
-Trade off: a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately, so the gap is read only and bounded.
+**The trade off.** Computing on every read means every gated request depends on a fresh subscription row, and the rule is a product decision baked into a constant (7 days), not a setting. Also, a Next.js layout does not re render on a client side navigation, so an agency whose grace window lapses mid session keeps reading until its next full page load. Writes are refused immediately, so the gap is read only and bounded.
 
-Specs: [0007](docs/specs/0007-subscription-checkout-and-stripe-webhook/index.md), [0008](docs/specs/0008-subscription-access-gate/index.md).
+Deep dive: [checkout and webhook design](docs/specs/0007-subscription-checkout-and-stripe-webhook/index.md) and [access gate design](docs/specs/0008-subscription-access-gate/index.md).
 
 ## 4. Technology stack and technical rationale
 
-The stack was settled once, in [spec 0001](docs/specs/0001-stack-and-foundational-architecture/index.md), and is the source of truth.
+The stack was settled once, in [the foundational design](docs/specs/0001-stack-and-foundational-architecture/index.md), and the summary below is enough to work from.
 
 ### Core framework and language
 
@@ -260,7 +310,7 @@ Database rules worth knowing:
 
 **Clerk** provides sign in, sessions and agency organizations. Its roles map to `org:admin` and `org:member`. The application keeps local mirror rows for organizations, users and memberships, synced by the Clerk webhook and repaired on demand if a row is missing, so a person is never stranded between sign up and the webhook arriving.
 
-Client contacts are not Clerk organization members. They are invited by email (through Resend, with React Email templates), accept an invitation, and are then resolved from their accepted `client_contacts` row.
+Client contacts are not Clerk organization members. They are invited by email (through Resend, with React Email templates), accept a single use invitation, and are then resolved from their accepted `client_contacts` row.
 
 ### Payments and storage
 
@@ -269,18 +319,38 @@ Client contacts are not Clerk organization members. They are invited by email (t
 
 ### Document generation
 
-Invoice PDFs are rendered on the server with **`@react-pdf/renderer`**, from the same presentation module the invoice screen uses, so the page and the PDF cannot show different numbers. The agency's own name comes from the database, fonts are bundled, and the same handler serves staff and contacts under their own access rules.
+Invoice PDFs are rendered on the server with **`@react-pdf/renderer`**, from the same presentation module the invoice screen uses, so the page and the PDF cannot show different numbers. The agency's own name comes from the database, fonts are bundled, and the same handler serves staff and contacts under their own access rules. Only `src/invoices/pdf/` may import the renderer.
 
-Known limits: A4 only, dates in UTC, money in the `en-US` locale, and no tagged (screen reader navigable) PDF structure. All are tracked in the scope.
+Known limits: A4 only, dates in UTC, money in the `en-US` locale, and no tagged (screen reader navigable) PDF structure. All are tracked on the roadmap.
+
+### Error tracking, product analytics and consent
+
+This is feature 20, implemented as described here. Its status against tests and verification is in [section 1](#where-the-build-stands).
+
+**Problem.** The operator needs production errors with readable stack traces and the agency they hit, and needs to know where signups drop out of the funnel. But the product holds an agency's client relationships, and its users may be in the EU, so an analytics tool that swallows names, emails or invoice amounts would be a liability.
+
+**Decision.** Two providers, one rule: only ids, roles, dates, counts and fixed labels ever leave the application. Never an email, a name, a money amount or a file name.
+
+- **Sentry** (`@sentry/nextjs`) reports errors from the Node server, the browser and the edge proxy. It sends only from Vercel production and preview, never from development, tests or CI. Source maps upload when the build has a Sentry token and are removed from the deployed output. A scrub step strips headers, cookies, request bodies, query strings and hashes, and every user field except the id. Events are tagged with the agency's `org_id`. Traces are sampled at 10 percent and never for cron or webhook traffic. Session replay is fully masked and recorded only when an error occurs. Error screens show a `Reference` id that matches the Sentry event.
+- **PostHog** (EU cloud) counts the funnel. Events such as `agency.created`, `invoice.issued` and `subscription.started` fire from the **server**, after the database transaction commits, through an `after()` callback so a response never waits on the provider. The catalogue is typed: a property may only be an id, a declared label, a boolean, a count or a date, so a free text string is a compile error, and a test fails on any property key that looks like an email, name, amount or title.
+- **The browser** only counts page views. Autocapture and session recording are off, and PostHog runs with no cookie and only in memory until the visitor accepts. Its traffic goes through this app's own `/ingest` path.
+- **Client contacts are never profiled.** No banner, no script, no cookie and no person record under `/portal`. Portal events carry only agency and client ids.
+- **Consent** is one first party cookie, `clienthq_consent`, set by a public Server Action. The banner shows Accept and Decline with equal weight, is not a dialog and never traps focus, and comes back from "Cookie settings" on `/privacy` or in the user menu. `/privacy` states in plain words what is collected and what never is.
+- **Erasure.** When a person is deleted in Clerk and scrubbed locally, their PostHog person and events are deleted too. A seventh daily sweep retries any deletion whose background call did not complete.
+- **Observability never takes the product down.** Every provider call is wrapped so it cannot throw into an action or a page. With no keys set, every call is a no op, and all provider variables are optional.
+
+**Trade off.** Server side events fire after commit on a best effort basis, so an event can be lost if the function freezes first, which is why the retry sweep exists only for erasure and not for the funnel. Cookieless page views cannot join a signed out visitor across visits. There is no in product analytics view: dashboards are the providers' own, and the application never reads back from them. Masked replay and error tracking rest on legitimate interest rather than consent, and the privacy page says so.
+
+Deep dive: [observability design](docs/specs/0019-product-analytics-and-error-tracking/index.md) and [src/analytics/AGENTS.md](src/analytics/AGENTS.md).
 
 ### Other providers
 
 | Provider | Role | State |
 |---|---|---|
 | Resend | Invitation and invoice emails. Without a key in development, emails print to the server console | In use |
-| Vercel | Hosting and the daily cron trigger | In use |
-| Upstash Redis | Planned for rate limits | [Spec 0018](docs/specs/0018-rate-limiting/index.md) proposes a Postgres counter table instead and retires it |
-| Sentry | Errors and traces | Feature 20, needs a decision |
+| Vercel | Hosting and the daily cron trigger (03:00 UTC) | In use |
+| PostgreSQL counter table | Rate limits. It replaced the Upstash Redis originally planned, so there is no extra provider | In use |
+| Sentry, PostHog | See the previous subsection | In use |
 
 ## 5. Quality assurance, testing and compliance
 
@@ -290,29 +360,32 @@ Vitest runs everything under `src/`, `scripts/` and `tools/` (over 200 test file
 
 | Layer | What it covers | Examples |
 |---|---|---|
-| Pure modules | Money, permission and tenancy logic, with the clock as a parameter | `level.test.ts` stands at the grace boundary; `money.test.ts` checks rounding edges; `status.test.ts` covers the invoice lifecycle; `idempotency.test.ts` covers the checkout key |
-| Components | Rendered in jsdom with Testing Library, with axe run on the result | `grace-banner.test.tsx`, the primitives and patterns under `src/ui/` |
+| Pure modules | Money, permission and tenancy logic, with the clock as a parameter | `level.test.ts` stands at the grace boundary; `money.test.ts` checks rounding edges; `status.test.ts` covers the invoice lifecycle; `window.test.ts` covers rate limit windows; `sentry-scrub.test.ts` covers what is removed from an error event |
+| Components | Rendered in jsdom with Testing Library, with axe run on the result | `grace-banner.test.tsx`, `cookie-banner.test.tsx`, the primitives and patterns under `src/ui/` |
 | Database integration | Claims about PostgreSQL rather than TypeScript, in `*.db.test.ts` files | See the next subsection |
-| Browser | Real pages in a real browser | See the Playwright subsection |
+| Browser | Real pages in a real browser | See the browser subsection |
 
-Failures are returned as values (a `Result` shape), and the tests assert on those values rather than on thrown errors.
+Failures are returned as values (a `Result` shape), and the tests assert on those values rather than on thrown errors. Providers are always replaced with fakes: a fake object store, a recording analytics sink, stubbed Stripe and Clerk gateways. `NODE_ENV=test` makes the analytics client a no op regardless of keys.
+
+Each feature also has **acceptance criteria validation**: its design lists numbered acceptance criteria (`AC-1`, `AC-2`, and so on), and each test file opens with a `covers:` header naming the criteria it proves, so any criterion can be traced to a test.
 
 ### Multi tenant database boundary tests
 
-The claims that matter most are about SQL, so they are proven against a real PostgreSQL rather than mocks. In CI, a second job starts a throwaway `postgres:17` container (matching the Supabase project's version), applies every migration from empty, applies them again expecting nothing to happen, asserts the live schema against spec 0002, and then runs the `*.db.test.ts` suites against it:
+The claims that matter most are about SQL, so they are proven against a real PostgreSQL rather than mocks. In CI, a second job starts a throwaway `postgres:17` container (matching the Supabase project's version), applies every migration from empty, applies them again expecting nothing to happen, asserts the live schema against the design, and then runs these **automated boundary tests** against it:
 
 - **Tenancy**: seeds two organizations with overlapping data and asks every accessor method for something it must not reach, including the contact narrowing. It runs inside a transaction that is rolled back, so it can be pointed at a development database safely.
 - **Money**: the TypeScript rounding and the `CHECK` constraints agree at the rounding boundaries.
 - **Webhooks**: Stripe and Clerk survive replay, reordering, concurrent delivery and rollback. The providers are faked; the transaction is not.
 - **Invoices**: two simultaneous issues get consecutive numbers and only one succeeds, and one agency cannot see another's invoices, lines or events.
 - **Transactions**: a throw inside a tenant transaction rolls back every write, including the invoice counter.
-- **Cron**: every sweep, run isolation, overlap safety, retention cutoffs, and a check that reports and logs carry no personal data.
+- **Rate limits**: sixty parallel calls against a fresh window all succeed and the next one is refused.
+- **Cron and privacy**: every sweep, run isolation, overlap safety, retention cutoffs, and a check that run reports and logs carry no personal data.
 
 Locally, these files skip themselves when `DIRECT_URL` is not set, so `pnpm test` works without a database. Point `DIRECT_URL` at a disposable PostgreSQL 17 or a development Supabase project to run them.
 
 ### End to end scenarios and journey tests
 
-Playwright specs in `e2e/` run against the real application on port 3100: scaffold and shell, sign in, clients, contacts, projects, deliverables, billing, invoice PDF, and the client portal. The client portal journey needs a second, real signed in session, so it runs its own dev server on port 3101 and only when the `E2E_CLERK_CONTACT_*` variables are present. See [e2e/CLERK.md](e2e/CLERK.md) for how the browser suite gets past sign in with Clerk testing tokens.
+Playwright specs in `e2e/` run against the real application on port 3100: scaffold and shell, sign in, clients, contacts, projects, deliverables, billing, invoice PDF, and analytics consent. The consent spec asserts that no request leaves for `/ingest`, `sentry.io` or `posthog.com` from public, agency or portal pages when no provider is configured, and that Accept, Decline and Cookie settings behave as designed. The client portal journey needs a second, real signed in session, so it runs its own dev server on port 3101 and only when the `E2E_CLERK_CONTACT_*` variables are present. See [e2e/CLERK.md](e2e/CLERK.md) for how the browser suite gets past sign in with Clerk testing tokens.
 
 ### Accessibility
 
@@ -322,40 +395,44 @@ Every UI surface, including empty and error states, must meet WCAG 2.2 AA. It is
 - **In the painted app**: [e2e/axe.ts](e2e/axe.ts) runs the same rules with `@axe-core/playwright` in both light and dark themes, which is where contrast as actually painted and target size as actually laid out can be seen.
 - **Tokens**: a contrast test enforces the colour token pairs in both themes, and dedicated specs cover zoom and reduced motion.
 
-Automated tools do not replace a person with a keyboard and a screen reader, so a manual pass is part of `/check verify`. The `/design` route shows every component in every state in both themes.
+Automated tools do not replace a person with a keyboard and a screen reader, so a manual pass is part of formal verification.
+
+**Formal verification** here means a written, criterion by criterion verification record kept beside each feature's design, not a mathematical proof. It lists the commands to run and a manual walk against the real application, and marks each step as done or open. The `/design` route shows every component in every state in both themes, which supports that walk. Where a walk was accepted with gaps, the gaps are named in the record. Feature 20's are summarized in [section 1](#where-the-build-stands).
 
 ### Static guardrails
 
 - `clienthq/no-raw-db-import` blocks importing `src/db/client.ts` outside the data access layer.
 - `clienthq/no-system-access-import` blocks the unscoped door outside the two webhook routes and the cron route.
-- `tenant-isolation-config.test.mts` fails if either exemption list stops matching spec 0003, so widening one is a pull request conversation, not a quiet edit.
-- A `no-restricted-imports` rule keeps the AWS SDK inside the storage port.
+- `tenant-isolation-config.test.mts` fails if either allowed list stops matching the documented design.
+- Restricted import rules keep the AWS SDK inside the storage port and the PDF renderer inside `src/invoices/pdf/`. The PostHog and Sentry SDK boundaries are documented conventions checked in code review.
 - Every commit runs `.githooks/pre-commit` (format and lint on staged files, typecheck of the whole project). CI runs format, lint, typecheck, unit tests and a migration drift check on every push and pull request. `.github/workflows/migrate.yml` migrates the deployed database on merge to `main` and only then triggers the deploy, so a failed migration stops the release.
 
 ## 6. Engineering workflow and standards
 
+This is the one section that names the internal workflow commands. Everywhere else the README uses plain engineering terms.
+
 ### Tracer bullet approach
 
-The build proves the whole pipe before building any part of it fully. Slice 1 is a walking skeleton: real auth, real database, real tenancy, real UI, really deployed, and narrow rather than fake. It ends with the first tenant scoped write and read (client records). Later slices widen the pipe one feature at a time: subscription, contacts, projects, deliverables, invoices, portal, team, maintenance.
+The build proves the whole pipe before building any part of it fully. Slice 1 is a walking skeleton: real auth, real database, real tenancy, real UI, really deployed, and narrow rather than fake. It ends with the first tenant scoped write and read (client records). Later slices widen the pipe one feature at a time: subscription, contacts, projects, deliverables, invoices, portal, team, maintenance, then rate limits and observability.
 
 ### Spec driven development lifecycle
 
-Each feature moves through the same skills, and each step leaves an artifact behind.
+Each feature moves through the same slash commands, and each step leaves an artifact behind.
 
-| Step | Skill | Leaves behind |
+| Step | Command | Leaves behind |
 |---|---|---|
 | Plan the roadmap | `/scope` | [docs/scope/scope.md](docs/scope/scope.md), the living feature list with status |
-| Decide and design | `/architect` | `docs/specs/NNNN-title/index.md` with acceptance criteria (`AC-1`, `AC-2`, and so on) and `rationale.md` with the options considered |
-| Build | `/develop` | Code in small vertical threads, each mapped to acceptance criteria in the spec's build plan |
-| Prove behaviour | `/check verify` | `verify.md` beside the spec, from driving the real app against every acceptance criterion |
+| Decide and design | `/architect` | `docs/specs/NNNN-title/index.md` with numbered acceptance criteria and `rationale.md` with the options considered |
+| Build | `/develop` | Code in small vertical threads, each mapped to acceptance criteria in the design's build plan |
+| Prove behaviour | `/check verify` | `verify.md` beside the design: the formal verification record, from driving the real app against every acceptance criterion |
 | Write tests | `/test` | `*.test.ts` files beside the source |
 | Independent review | `/check review` | A file in `docs/reviews/`, written by a model that did not write the code |
-| Write it up | `/document` | PR text, changelog entries, release notes |
-| Keep context current | `/sync` | Updated `AGENTS.md` files and scope reconciliation |
+| Write it up | `/document` | PR text, changelog entries, release notes, and this README |
+| Keep context current | `/sync` | Updated `AGENTS.md` files and roadmap reconciliation |
 
-`/audit` bootstraps the `AGENTS.md` files every later step reads, and `/debug` finds root causes without adding features. Test files carry a `covers: spec NNNN AC-N` header so a criterion can be traced to its proof.
+`/audit` bootstraps the `AGENTS.md` files every later step reads, and `/debug` finds root causes without adding features. Each major area also has its own short guide, such as `src/db/AGENTS.md`, `src/payments/AGENTS.md`, `src/analytics/AGENTS.md` and `src/rate-limit/AGENTS.md`, linked from the root [AGENTS.md](AGENTS.md).
 
-Conventions: functional and immutable code, pure functions by default with side effects pushed to the edges, named exports, every environment variable declared in the Zod schema in `src/lib/env.ts` and read through `env()`, `snake_case` in SQL and `camelCase` in TypeScript, and Conventional Commits. The full list is in [AGENTS.md](AGENTS.md).
+Conventions: functional and immutable code, pure functions by default with side effects pushed to the edges, named exports, every environment variable declared in the Zod schema in `src/lib/env.ts` and read through `env()`, `snake_case` in SQL and `camelCase` in TypeScript, and Conventional Commits.
 
 ## 7. Local setup and environment provisioning
 
@@ -364,18 +441,18 @@ Conventions: functional and immutable code, pure functions by default with side 
 | You need | Notes |
 |---|---|
 | Node 22 or newer | The `engines` field enforces it |
-| pnpm 11 | Use `corepack pnpm` if `pnpm` is not on your path, or run `corepack enable pnpm` once |
+| pnpm 11 | If `pnpm` is not on your path, run `corepack enable pnpm` once so the plain `pnpm` command works |
 | A PostgreSQL 17 database | A Supabase project matches production. You need both the pooler and the direct connection strings |
 | A Clerk application | A development instance, with organizations enabled |
 | A Stripe account in test mode | A product with a monthly recurring Price and a 14 day trial set on it. The [Stripe CLI](https://docs.stripe.com/stripe-cli) for local webhooks |
-| Optional: Cloudflare R2 and Resend | Without them, uploads show a notice and emails print to the console |
+| Optional: Cloudflare R2, Resend, Sentry, PostHog | Without them, uploads show a notice, emails print to the console, and observability calls do nothing |
 
 Stripe dashboard prerequisites (Billing Portal setup and the six webhook events) are listed in the comments of [.env.example](.env.example). The Clerk webhook needs eight events, listed there too.
 
 ### Environment variables reference
 
 ```bash
-corepack pnpm install
+pnpm install
 cp .env.example .env.local   # then fill in the values
 ```
 
@@ -398,6 +475,12 @@ cp .env.example .env.local   # then fill in the values
 | `RESEND_API_KEY` | Production | Without it in development, emails print to the console |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Production | Without them, uploads show a "storage not configured" notice |
 | `R2_ADMIN_ACCESS_KEY_ID`, `R2_ADMIN_SECRET_ACCESS_KEY` | Only for `pnpm r2:setup` | An admin token used to configure the bucket. Never set on Vercel |
+| `NEXT_PUBLIC_SENTRY_DSN` | Optional | Turns on Sentry error tracking. It sends only from Vercel production and preview |
+| `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | Optional, build only | Source map upload. Without the token the build succeeds and uploads nothing. Set the token on the build environment only |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Optional | Turns on PostHog analytics |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Defaults to `https://eu.i.posthog.com` | PostHog ingestion host |
+| `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID` | Optional | Used only to delete a person's analytics data on erasure. Without them the erasure sweep reports itself skipped |
+| `VERCEL_ENV`, `NEXT_PUBLIC_VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA` | Optional, supplied by Vercel | Decide whether observability is enabled and tag releases. Enable "automatically expose system environment variables" in Vercel |
 | `SEED_ALLOW_HOST` | Development only | A non local database host that `pnpm db:seed` may write to |
 | `E2E_CLERK_USER_*`, `E2E_CLERK_CONTACT_*` | Optional | Dedicated Clerk development users for the browser suite. Tests that need them skip when unset |
 
@@ -409,7 +492,7 @@ cp .env.example .env.local   # then fill in the values
 | `pnpm db:generate` | Generate a migration from `src/db/schema/`. Never hand edit generated SQL |
 | `pnpm db:migrate` | Apply migrations over `DIRECT_URL` |
 | `pnpm db:migrate:check` | Fail if the schema and the committed migrations have drifted apart |
-| `pnpm db:schema:assert` | Read the live PostgreSQL catalogue and compare tables, constraints, indexes and delete actions with spec 0002 |
+| `pnpm db:schema:assert` | Read the live PostgreSQL catalogue and compare tables, constraints, indexes and delete actions with the documented schema |
 | `pnpm db:seed` | A repeatable development seed: an agency with staff, clients, contacts, projects, deliverables and invoices in every status. Running it again updates rather than duplicates |
 | `pnpm db:studio` | Drizzle Studio |
 | `pnpm r2:setup` | Configure the R2 bucket's CORS rule |
@@ -419,8 +502,8 @@ The seed refuses to open a connection unless the `DIRECT_URL` host is `localhost
 Then start the app:
 
 ```bash
-corepack pnpm db:migrate
-corepack pnpm dev
+pnpm db:migrate
+pnpm dev
 ```
 
 It serves on http://localhost:3000. For Stripe and Clerk events locally, forward them to the app with `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and the Clerk CLI relay described in `.env.example`. To trigger the daily sweeps by hand:
@@ -434,18 +517,18 @@ The Supabase free tier pauses a project after about a week without traffic. The 
 ### Running the verification suite
 
 ```bash
-corepack pnpm format:check      # Prettier
-corepack pnpm lint              # ESLint, including the two tenant isolation rules
-corepack pnpm typecheck         # next typegen, then tsc
-corepack pnpm test              # Vitest; database suites skip without DIRECT_URL
-corepack pnpm db:migrate:check  # schema and migrations still agree
-corepack pnpm test:e2e          # Playwright, against the dev server on port 3100
+pnpm format:check      # Prettier
+pnpm lint              # ESLint, including the two tenant isolation rules
+pnpm typecheck         # next typegen, then tsc
+pnpm test              # Vitest; database suites skip without DIRECT_URL
+pnpm db:migrate:check  # schema and migrations still agree
+pnpm test:e2e          # Playwright, against the dev server on port 3100
 ```
 
-To include the database suites, set `DIRECT_URL` to a migrated PostgreSQL and run them by file, for example:
+To include the database boundary tests, set `DIRECT_URL` to a migrated PostgreSQL and run them by file, for example:
 
 ```bash
-corepack pnpm vitest run src/db/tenant/tenancy.db.test.ts
+pnpm vitest run src/db/tenant/tenancy.db.test.ts
 ```
 
 `pnpm install` points `core.hooksPath` at `.githooks/`, so the pre commit checks run on their own. `git commit --no-verify` skips them, and CI runs the same checks either way.
@@ -456,34 +539,32 @@ These are decisions made on purpose and deferred, each with a reason and a trigg
 
 ### Database level row level security staging
 
-Today, tenant isolation is enforced in application code, and the database will hand over any row it is asked for. Row level security would fail closed at the database instead, and it is the single biggest security upgrade available to this design.
+**What is deferred.** Today, tenant isolation is enforced in application code, and the database will hand over any row it is asked for. Row level security would fail closed at the database instead, and it is the single biggest security upgrade available to this design.
 
-It was deferred because of serverless connection pooling, not because it is unwanted. The transaction mode pooler gives every transaction a different backend connection, so a per request setting has to be applied inside each transaction.
-
-The design is already unblocked: `org_id` is `NOT NULL` on every tenant table, and all access goes through one choke point.
+**Why it waits.** Not because it is unwanted, but because of serverless connection pooling. The transaction mode pooler gives every transaction a different backend connection, so a per request setting has to be applied inside each transaction rather than once per connection. The design is already unblocked: `org_id` is `NOT NULL` on every tenant table, and all access goes through one choke point.
 
 - **Trigger:** decide before a second real agency's data lives in the database. Not a date, and not launch, but the first moment two tenants share the tables.
 - **The work:** a dedicated application database role that does not bypass policies, a policy migration across the eight tenant tables (of shape `org_id = current_setting('app.current_org_id')::uuid`), and changing the layer's single choke point to open a transaction and set the setting.
 
 ### Timezone handling and localization
 
-No timezone is modelled anywhere. `issue_date` and the overdue sweep use the UTC calendar day, and billing, grace and invitation dates are rendered in UTC with an explicit label. The effect: an invoice issued at 23:00 in Los Angeles gets tomorrow's date.
+**What is deferred.** No timezone is modelled anywhere. `issue_date` and the overdue sweep use the UTC calendar day, and billing, grace and invitation dates are rendered in UTC with an explicit label. The effect: an invoice issued at 23:00 in Los Angeles gets tomorrow's date.
 
-The schema is shaped for the fix. Dates are `date` columns supplied by the application rather than by SQL `current_date`, and the UTC day comes from one helper.
+**Why it is cheap to fix later.** Dates are `date` columns supplied by the application rather than by SQL `current_date`, and the UTC day comes from one helper, so no timezone arithmetic is scattered through the code.
 
 - **Plan:** add `organizations.timezone` and a helper that returns the agency's calendar day, then use it for issue dates, the overdue sweep, and the project overdue badge (which already takes "today" as a parameter).
 - **Related, deferred with it:** agency locale and letterhead. The PDF uses A4 and `en-US` money formatting because `organizations` has no address, tax id, page size or locale columns.
 
 ### Non decimal currency support
 
-The invoice unit amount input and the money formatter assume two minor unit digits, which is right for USD, EUR and GBP. Every invoice carries its own `char(3)` currency, and the database constrains its format (three uppercase letters) rather than the ISO 4217 list, which would go stale inside a migration. A currency with zero or three minor units, such as JPY or KWD, would be entered and displayed inconsistently.
+**What is deferred.** The invoice unit amount input and the money formatter assume two minor unit digits, which is right for USD, EUR and GBP. Every invoice carries its own `char(3)` currency, and the database constrains its format (three uppercase letters) rather than the ISO 4217 list, which would go stale inside a migration. A currency with zero or three minor units, such as JPY or KWD, would be entered and displayed inconsistently.
 
 - **Plan:** a minor unit table keyed by currency, used by input parsing and formatting, decided before an agency outside the two decimal world signs up.
 
 ### Also deferred
 
-- Rate limits on uploads, invoice emails and agency creation: designed in [spec 0018](docs/specs/0018-rate-limiting/index.md), not built.
-- Error tracking and product analytics: needs a decision.
+- Closing out Feature 20: the live verification gaps listed in [section 1](#where-the-build-stands), creating the Sentry alert rule, and the terms of service and a lawyer reviewed privacy policy (the `/privacy` page is a plain language notice, not legal advice).
+- A hosted demo with a seeded, read only evaluation account, so a reviewer can walk the app without signing up. The Live Demo block at the top of this file is its placeholder. The local seed script already produces most of the data.
 - Purging a deleted agency (cancelling its Stripe subscription, then removing its rows and R2 objects after a grace period): destroys data, so it gets its own decision.
 - A queryable audit history, agency settings page, agency branding in the portal, a tagged (accessible) invoice PDF, and a staff preview of the portal.
 
@@ -492,7 +573,7 @@ Each is tracked with its origin in the Deferred section of [docs/scope/scope.md]
 ## Further reading
 
 - [docs/scope/scope.md](docs/scope/scope.md): the feature roadmap and live status
-- [docs/specs/](docs/specs/): one folder per decision, with acceptance criteria and rationale
-- [AGENTS.md](AGENTS.md) and [src/db/AGENTS.md](src/db/AGENTS.md): conventions and the tenant rule
+- [docs/specs/](docs/specs/): one folder per design decision, with acceptance criteria and rationale
+- [AGENTS.md](AGENTS.md) and the area guides it links: conventions and the tenant rule
 - [design.md](design.md): the design system
 - [CHANGELOG.md](CHANGELOG.md): what has changed
