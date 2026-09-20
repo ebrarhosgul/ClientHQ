@@ -18,7 +18,7 @@ Everything that talks to PostgreSQL: the connection handle, the Drizzle schema, 
 | `src/app/api/health/db/route.ts` | The same check from inside the running app |
 | `scripts/migrations-check.ts` (repo root) | Fails when the schema and the committed migrations have drifted apart |
 | `scripts/db-schema-assert.ts` (repo root) | Reads the PostgreSQL catalogue and checks the live schema against spec 0002 |
-| `scripts/db-seed.ts` (repo root) | A repeatable development seed, guarded so it refuses a non local host |
+| `scripts/db-seed.ts` (repo root) | A repeatable development seed, guarded so it refuses a non local host. It first deletes every row in the seed's fixed id namespace (`0190a000-0000-7000-8000-…`), then writes the dataset from `scripts/seed-dataset.ts` and uploads the bytes from `scripts/seed-files.ts` to R2 when configured. Real agencies have generated ids and are never touched |
 
 ## Commands
 

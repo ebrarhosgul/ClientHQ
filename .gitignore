@@ -34,6 +34,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# seed backups: JSON copies of data the seed replaced (may hold real emails)
+/.seed-backups/
+
 # vercel
 .vercel
 

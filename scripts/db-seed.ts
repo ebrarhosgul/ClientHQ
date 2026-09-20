@@ -1,38 +1,61 @@
 /**
- * Seed a development database with one realistic agency.
+ * Seed a development database with a working agency, "Apex Interactive
+ * Studio", and wipe whatever an earlier seed left behind first.
  *
- * Run it with `pnpm db:seed`. The dataset is the one spec 0002 names: 1 agency,
- * 2 staff (one admin, one member), 3 clients (one archived), 4 contacts (2
- * accepted, 1 invited and still pending, 1 never invited), 3 projects across
- * statuses, 4 deliverables (2 ready and visible to the client, 1 ready and
- * internal, 1 pending) and 5 invoices, one in each status, each with line
- * items and, for the four that were issued, the event history that got them
- * there (spec 0012). A subscription row is included too, so the access gate
- * has something to read.
+ * Run it with `pnpm db:seed`. What Apex has, all backdated across the last 60
+ * days from the moment the seed runs so nothing looks generated in one second:
  *
- * A second, much smaller agency sits beside it (spec 0008): one admin and a
- * subscription in `past_due` since an hour before the seed ran, so the grace
- * window banner is one seed away in development, and the lockout is one seed
- * plus a week away with nothing else run. It also carries one client of its
- * own, Fernwood Clinic, with one accepted contact bound to the same person as
- * Northwind's Priya Patel (spec 0014).
+ * - Its own profile on `organizations` (address, tax ID, currency) for
+ *   `/settings`, and an active subscription.
+ * - Three staff, one admin and two members, in the `users` and `memberships`
+ *   mirror. Note that `/team` reads live from Clerk (spec 0016), so these rows
+ *   do not appear there: a seeded person has no Clerk account.
+ * - Two clients. Northstar Cloud Solutions has two projects (one in progress,
+ *   one delivered); Harbor Lane Capital has one, in review.
+ * - Ten deliverables, six ready and shared with the client, three ready and
+ *   internal, one still pending. Each ready one has real bytes
+ *   (`scripts/seed-files.ts`), uploaded to R2 after the database write when R2
+ *   is configured.
+ * - Four invoices, one per state that matters: `paid` with its full history,
+ *   `sent` and still open, `overdue` by four days, and an unnumbered `draft`
+ *   only staff can see. Every line item is hours at an hourly rate.
+ * - Accepted portal contacts at both clients, one still pending invitation,
+ *   and one test person, Priya Patel, who holds an accepted row at each
+ *   company so a single login walks the client switcher.
  *
- * A third agency, Anchor Ridge, is smaller still: one admin, one client
- * (Cinder Media), and a subscription that is simply `canceled`, so it reads as
- * `locked` from the moment the seed runs rather than after a week's wait like
- * the grace org above. Priya holds an accepted row there too, so the client
- * portal's test user has three rows across three agencies: one `full`, one
- * `grace`, one `locked`, which is what the switcher and the locked agency's
- * unavailable page both need to be walked for real (spec 0014, AC-11, AC-16).
+ * Two smaller agencies sit beside it because two specs need states Apex cannot
+ * show. Harbor Lane has a subscription in `past_due` since an hour before the
+ * seed ran, so the grace window banner is one seed away and the lockout a week
+ * after (spec 0008). Anchor Ridge is simply `canceled`, so it reads as
+ * `locked` at once. Priya holds an accepted row at each, with Fernwood Clinic
+ * and Cinder Media, so the switcher and the locked agency's unavailable page
+ * can be walked for real (spec 0014, AC-11, AC-16). The name overlap between
+ * the Harbor Lane agency and Apex's client Harbor Lane Capital is chance.
  *
  * `E2E_CLERK_CONTACT_USER_ID`, when set, is written as Priya's `clerk_user_id`
  * so every one of her rows binds to a real Clerk development account the
- * browser suite can sign in as (spec 0014, AC-16); unset, she keeps the fixed
- * seed id every other run has used.
+ * browser suite can sign in as (spec 0014, AC-16); unset, she keeps a fixed
+ * seed id.
  *
- * Every id is a hardcoded constant, and every row is written with "insert, or
- * update on conflict", which is what makes running it twice an update rather
- * than a duplicate.
+ * Binding: with `SEED_CLERK_ORG_ID` set to a real Clerk organization, Apex is
+ * built inside that organization so you can sign in and see it. The
+ * organization keeps its own row, admin, memberships and subscription; only its
+ * name and profile change, and its real admin owns the seeded invoices and
+ * files. Its existing clients, projects, contacts, files and invoices are
+ * written to `.seed-backups/<timestamp>.json` and then replaced. Every refusal
+ * (no such organization, no admin) happens before anything is written.
+ *
+ * The wipe: before writing, every row the seed owns is deleted, in dependency
+ * order, in the same transaction as the writes, so a failure leaves the
+ * database exactly as it was. "The seed owns" means the fixed id namespace
+ * below: organizations and users whose id starts with it, and every tenant
+ * row under those organizations. A real agency, created through Clerk, has an
+ * ordinary generated id and is never touched.
+ *
+ * Every id is a hardcoded constant, and every row is then written with "insert,
+ * or update on conflict", so a second run replaces rather than duplicates.
+ * Timestamps are relative to the run, so a second run moves them forward and
+ * keeps the story the same age.
  *
  * The guard: this writes to `DIRECT_URL` only when its host is `localhost` or
  * the host named in `SEED_ALLOW_HOST`. Anything else exits non zero before a
@@ -42,15 +65,33 @@
  * Money goes through `src/lib/money.ts`, so the seeded totals satisfy the
  * CHECK constraints the same way real writes will.
  */
-import { getTableColumns, sql } from "drizzle-orm";
-import type { PgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
+import {
+  and,
+  asc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  not,
+  or,
+  sql,
+} from "drizzle-orm";
+import { mkdir, writeFile } from "node:fs/promises";
+import type { PgColumn, PgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "../src/db/schema";
 import { env } from "../src/lib/env";
 import { loadEnvFiles } from "../src/lib/load-env-files";
-import { invoiceTotals, lineAmountCents } from "../src/lib/money";
+import { isStorageConfigured, objectStorage } from "../src/storage";
+import {
+  buildDataset,
+  SEED_ID_PREFIX,
+  SEEDED_PLACEMENT,
+  type Placement,
+  type SeedObject,
+} from "./seed-dataset";
 
 loadEnvFiles();
 
@@ -88,680 +129,6 @@ export function checkSeedHost(
     problem:
       `Refusing to seed ${host}. The seed writes only to localhost, or to the host ` +
       `named in SEED_ALLOW_HOST${allowHost ? ` (currently ${allowHost})` : " (not set)"}.`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Fixed ids. The version nibble is 7 so they sort like real ids.
-// ---------------------------------------------------------------------------
-
-const fixedId = (block: number, n: number): string =>
-  `0190a000-0000-7000-8000-${block.toString(16).padStart(4, "0")}${n.toString(16).padStart(8, "0")}`;
-
-const ORG = fixedId(1, 1);
-/** The agency in its grace window. */
-const PAST_DUE_ORG = fixedId(1, 2);
-/** The agency a locked contact's walk needs (spec 0014, AC-16): `canceled`, not time dependent like the grace org above. */
-const LOCKED_ORG = fixedId(1, 3);
-const USER = {
-  admin: fixedId(2, 1),
-  member: fixedId(2, 2),
-  contactPriya: fixedId(2, 3),
-  contactMarcus: fixedId(2, 4),
-  pastDueAdmin: fixedId(2, 5),
-  lockedAdmin: fixedId(2, 6),
-};
-const MEMBERSHIP = {
-  admin: fixedId(3, 1),
-  member: fixedId(3, 2),
-  pastDueAdmin: fixedId(3, 3),
-  lockedAdmin: fixedId(3, 4),
-};
-const SUBSCRIPTION = fixedId(4, 1);
-const PAST_DUE_SUBSCRIPTION = fixedId(4, 2);
-const LOCKED_SUBSCRIPTION = fixedId(4, 3);
-const CLIENT = {
-  northwind: fixedId(5, 1),
-  lumen: fixedId(5, 2),
-  archivedHarbor: fixedId(5, 3),
-  /** Harbor Lane's own client (spec 0014), not to be confused with `archivedHarbor` above. */
-  fernwood: fixedId(5, 4),
-  /** Cinder Media, under the locked agency below (spec 0014, AC-16). */
-  cinder: fixedId(5, 5),
-};
-const CONTACT = {
-  priya: fixedId(6, 1),
-  marcus: fixedId(6, 2),
-  invited: fixedId(6, 3),
-  notInvited: fixedId(6, 4),
-  /** Priya's second accepted row, for Fernwood Clinic under Harbor Lane. */
-  priyaFernwood: fixedId(6, 5),
-  /** Priya's third accepted row, for Cinder Media under the locked agency. */
-  priyaCinder: fixedId(6, 6),
-};
-const PROJECT = {
-  brandRefresh: fixedId(7, 1),
-  websiteBuild: fixedId(7, 2),
-  launchCampaign: fixedId(7, 3),
-};
-const DELIVERABLE = {
-  logoPack: fixedId(8, 1),
-  styleGuide: fixedId(8, 2),
-  internalNotes: fixedId(8, 3),
-  pendingUpload: fixedId(8, 4),
-};
-const INVOICE = {
-  draft: fixedId(9, 1),
-  sent: fixedId(9, 2),
-  paid: fixedId(9, 3),
-  overdue: fixedId(9, 4),
-  void: fixedId(9, 5),
-};
-const lineId = (invoice: number, position: number): string =>
-  fixedId(10, invoice * 100 + position);
-const eventId = (invoice: number, n: number): string =>
-  fixedId(11, invoice * 100 + n);
-
-// ---------------------------------------------------------------------------
-// The dataset, as plain data
-// ---------------------------------------------------------------------------
-
-type LineInput = {
-  readonly description: string;
-  readonly quantity: string;
-  readonly unitAmountCents: number;
-};
-
-type InvoiceInput = {
-  readonly id: string;
-  readonly index: number;
-  readonly clientId: string;
-  readonly status: schema.InvoiceStatus;
-  readonly number?: number;
-  readonly issueDate?: string;
-  readonly dueDate?: string;
-  readonly paidAt?: Date;
-  readonly taxRateBp: number;
-  readonly lines: readonly LineInput[];
-};
-
-/** Build one invoice and its line items with totals that satisfy the CHECKs. */
-function buildInvoice(input: InvoiceInput): {
-  readonly invoice: typeof schema.invoices.$inferInsert;
-  readonly lineItems: readonly (typeof schema.invoiceLineItems.$inferInsert)[];
-} {
-  const lineItems = input.lines.map((line, index) => ({
-    id: lineId(input.index, index + 1),
-    orgId: ORG,
-    invoiceId: input.id,
-    description: line.description,
-    quantity: line.quantity,
-    unitAmountCents: line.unitAmountCents,
-    amountCents: lineAmountCents(line.quantity, line.unitAmountCents),
-    position: index + 1,
-  }));
-
-  const totals = invoiceTotals(
-    lineItems.map((line) => line.amountCents),
-    input.taxRateBp,
-  );
-
-  return {
-    invoice: {
-      id: input.id,
-      orgId: ORG,
-      clientId: input.clientId,
-      number: input.number,
-      status: input.status,
-      issueDate: input.issueDate,
-      dueDate: input.dueDate,
-      currency: "USD",
-      taxRateBp: input.taxRateBp,
-      paidAt: input.paidAt,
-      ...totals,
-    },
-    lineItems,
-  };
-}
-
-const INVOICES: readonly InvoiceInput[] = [
-  {
-    id: INVOICE.draft,
-    index: 1,
-    clientId: CLIENT.northwind,
-    status: "draft",
-    taxRateBp: 2000,
-    lines: [
-      {
-        description: "Discovery workshop",
-        quantity: "1",
-        unitAmountCents: 180000,
-      },
-      {
-        description: "Design revisions",
-        quantity: "3.5",
-        unitAmountCents: 12500,
-      },
-    ],
-  },
-  {
-    id: INVOICE.sent,
-    index: 2,
-    clientId: CLIENT.northwind,
-    status: "sent",
-    number: 1,
-    issueDate: "2026-08-20",
-    dueDate: "2026-09-19",
-    taxRateBp: 2000,
-    lines: [
-      {
-        description: "Brand refresh, phase one",
-        quantity: "1",
-        unitAmountCents: 450000,
-      },
-      {
-        description: "Stock photography licences",
-        quantity: "12",
-        unitAmountCents: 4900,
-      },
-    ],
-  },
-  {
-    id: INVOICE.paid,
-    index: 3,
-    clientId: CLIENT.lumen,
-    status: "paid",
-    number: 2,
-    issueDate: "2026-07-01",
-    dueDate: "2026-07-31",
-    paidAt: new Date("2026-07-28T14:05:00Z"),
-    taxRateBp: 0,
-    lines: [
-      {
-        description: "Website build, milestone one",
-        quantity: "1",
-        unitAmountCents: 820000,
-      },
-      { description: "Hosting setup", quantity: "2.25", unitAmountCents: 9000 },
-    ],
-  },
-  {
-    id: INVOICE.overdue,
-    index: 4,
-    clientId: CLIENT.lumen,
-    status: "overdue",
-    number: 3,
-    issueDate: "2026-07-15",
-    dueDate: "2026-08-14",
-    taxRateBp: 1500,
-    lines: [
-      {
-        description: "Website build, milestone two",
-        quantity: "1",
-        unitAmountCents: 640000,
-      },
-      { description: "Copywriting", quantity: "0.5", unitAmountCents: 15000 },
-    ],
-  },
-  {
-    id: INVOICE.void,
-    index: 5,
-    clientId: CLIENT.archivedHarbor,
-    status: "void",
-    number: 4,
-    issueDate: "2026-06-02",
-    dueDate: "2026-07-02",
-    taxRateBp: 2000,
-    lines: [
-      { description: "Retainer, June", quantity: "1", unitAmountCents: 250000 },
-    ],
-  },
-];
-
-/**
- * What happened to each issued invoice, in order (spec 0012, AC-18). The draft
- * has no history yet, which is the honest history of a draft. Timestamps are
- * fixed so a second run rewrites the same rows rather than adding a second
- * copy of the story.
- */
-const INVOICE_EVENTS: readonly (typeof schema.invoiceEvents.$inferInsert)[] = [
-  // INV-0001, sent to Northwind and still open.
-  {
-    id: eventId(2, 1),
-    orgId: ORG,
-    invoiceId: INVOICE.sent,
-    kind: "issued",
-    fromStatus: "draft",
-    toStatus: "sent",
-    actorUserId: USER.admin,
-    createdAt: new Date("2026-08-20T09:12:00Z"),
-  },
-  {
-    id: eventId(2, 2),
-    orgId: ORG,
-    invoiceId: INVOICE.sent,
-    kind: "notified",
-    actorUserId: USER.admin,
-    note: "delivered: priya.patel@northwind.example, devon.reyes@northwind.example",
-    createdAt: new Date("2026-08-20T09:12:04Z"),
-  },
-  // INV-0002, Lumen, paid four weeks after issue.
-  {
-    id: eventId(3, 1),
-    orgId: ORG,
-    invoiceId: INVOICE.paid,
-    kind: "issued",
-    fromStatus: "draft",
-    toStatus: "sent",
-    actorUserId: USER.member,
-    createdAt: new Date("2026-07-01T10:30:00Z"),
-  },
-  {
-    id: eventId(3, 2),
-    orgId: ORG,
-    invoiceId: INVOICE.paid,
-    kind: "notified",
-    actorUserId: USER.member,
-    note: "delivered: marcus.lindqvist@lumen.example, finance@lumen.example",
-    createdAt: new Date("2026-07-01T10:30:03Z"),
-  },
-  {
-    id: eventId(3, 3),
-    orgId: ORG,
-    invoiceId: INVOICE.paid,
-    kind: "paid",
-    fromStatus: "sent",
-    toStatus: "paid",
-    actorUserId: USER.admin,
-    createdAt: new Date("2026-07-28T14:05:00Z"),
-  },
-  // INV-0003, Lumen, moved to overdue by the nightly sweep (no actor).
-  {
-    id: eventId(4, 1),
-    orgId: ORG,
-    invoiceId: INVOICE.overdue,
-    kind: "issued",
-    fromStatus: "draft",
-    toStatus: "sent",
-    actorUserId: USER.member,
-    createdAt: new Date("2026-07-15T16:45:00Z"),
-  },
-  {
-    id: eventId(4, 2),
-    orgId: ORG,
-    invoiceId: INVOICE.overdue,
-    kind: "notification_failed",
-    actorUserId: USER.member,
-    note: "delivered: marcus.lindqvist@lumen.example; failed: finance@lumen.example (mailbox full)",
-    createdAt: new Date("2026-07-15T16:45:05Z"),
-  },
-  {
-    id: eventId(4, 3),
-    orgId: ORG,
-    invoiceId: INVOICE.overdue,
-    kind: "notified",
-    actorUserId: USER.member,
-    note: "delivered: marcus.lindqvist@lumen.example, finance@lumen.example",
-    createdAt: new Date("2026-07-15T17:02:00Z"),
-  },
-  {
-    id: eventId(4, 4),
-    orgId: ORG,
-    invoiceId: INVOICE.overdue,
-    kind: "overdue",
-    fromStatus: "sent",
-    toStatus: "overdue",
-    createdAt: new Date("2026-08-15T03:00:00Z"),
-  },
-  // INV-0004, Harbor Books, voided when the client was archived.
-  {
-    id: eventId(5, 1),
-    orgId: ORG,
-    invoiceId: INVOICE.void,
-    kind: "issued",
-    fromStatus: "draft",
-    toStatus: "sent",
-    actorUserId: USER.admin,
-    createdAt: new Date("2026-06-02T08:00:00Z"),
-  },
-  {
-    id: eventId(5, 2),
-    orgId: ORG,
-    invoiceId: INVOICE.void,
-    kind: "notification_failed",
-    actorUserId: USER.admin,
-    note: "no contacts to notify",
-    createdAt: new Date("2026-06-02T08:00:02Z"),
-  },
-  {
-    id: eventId(5, 3),
-    orgId: ORG,
-    invoiceId: INVOICE.void,
-    kind: "voided",
-    fromStatus: "sent",
-    toStatus: "void",
-    actorUserId: USER.admin,
-    note: "Engagement ended before the retainer started.",
-    createdAt: new Date("2026-06-10T11:20:00Z"),
-  },
-];
-
-function dataset() {
-  const built = INVOICES.map(buildInvoice);
-  const priyaClerkUserId = env().E2E_CLERK_CONTACT_USER_ID ?? "user_seed_priya";
-
-  return {
-    organizations: [
-      {
-        id: ORG,
-        clerkOrgId: "org_seed_studio_north",
-        name: "Studio North",
-        slug: "studio-north",
-        // Four invoices have been issued, so the next one takes 5.
-        nextInvoiceNumber: 5,
-        defaultCurrency: "USD",
-      },
-      {
-        id: PAST_DUE_ORG,
-        clerkOrgId: "org_seed_harbor_lane",
-        name: "Harbor Lane",
-        slug: "harbor-lane",
-        defaultCurrency: "USD",
-      },
-      {
-        id: LOCKED_ORG,
-        clerkOrgId: "org_seed_anchor_ridge",
-        name: "Anchor Ridge",
-        slug: "anchor-ridge",
-        defaultCurrency: "USD",
-      },
-    ] satisfies (typeof schema.organizations.$inferInsert)[],
-
-    users: [
-      {
-        id: USER.admin,
-        clerkUserId: "user_seed_admin",
-        email: "sarah.chen@studio-north.example",
-        name: "Sarah Chen",
-      },
-      {
-        id: USER.member,
-        clerkUserId: "user_seed_member",
-        email: "james.okafor@studio-north.example",
-        name: "James Okafor",
-      },
-      {
-        id: USER.contactPriya,
-        clerkUserId: priyaClerkUserId,
-        email: "priya.patel@northwind.example",
-        name: "Priya Patel",
-      },
-      {
-        id: USER.contactMarcus,
-        clerkUserId: "user_seed_marcus",
-        email: "marcus.lindqvist@lumen.example",
-        name: "Marcus Lindqvist",
-      },
-      {
-        id: USER.pastDueAdmin,
-        clerkUserId: "user_seed_harbor_admin",
-        email: "dana.reyes@harbor-lane.example",
-        name: "Dana Reyes",
-      },
-      {
-        id: USER.lockedAdmin,
-        clerkUserId: "user_seed_locked_admin",
-        email: "morgan.blake@anchor-ridge.example",
-        name: "Morgan Blake",
-      },
-    ] satisfies (typeof schema.users.$inferInsert)[],
-
-    memberships: [
-      { id: MEMBERSHIP.admin, orgId: ORG, userId: USER.admin, role: "admin" },
-      {
-        id: MEMBERSHIP.member,
-        orgId: ORG,
-        userId: USER.member,
-        role: "member",
-      },
-      {
-        id: MEMBERSHIP.pastDueAdmin,
-        orgId: PAST_DUE_ORG,
-        userId: USER.pastDueAdmin,
-        role: "admin",
-      },
-      {
-        id: MEMBERSHIP.lockedAdmin,
-        orgId: LOCKED_ORG,
-        userId: USER.lockedAdmin,
-        role: "admin",
-      },
-    ] satisfies (typeof schema.memberships.$inferInsert)[],
-
-    subscriptions: [
-      {
-        id: SUBSCRIPTION,
-        orgId: ORG,
-        stripeCustomerId: "cus_seed_studio_north",
-        stripeSubscriptionId: "sub_seed_studio_north",
-        stripePriceId: "price_seed_monthly",
-        status: "active",
-        currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
-        cancelAtPeriodEnd: false,
-      },
-      {
-        id: PAST_DUE_SUBSCRIPTION,
-        orgId: PAST_DUE_ORG,
-        stripeCustomerId: "cus_seed_harbor_lane",
-        stripeSubscriptionId: "sub_seed_harbor_lane",
-        stripePriceId: "price_seed_monthly",
-        status: "past_due",
-        currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
-        cancelAtPeriodEnd: false,
-        // Relative to the seed, so the window is open now and lapses on its
-        // own in a week: `grace` today, `locked` after 7 days, no job needed.
-        pastDueSince: new Date(Date.now() - 60 * 60 * 1000),
-      },
-      {
-        id: LOCKED_SUBSCRIPTION,
-        orgId: LOCKED_ORG,
-        stripeCustomerId: "cus_seed_anchor_ridge",
-        stripeSubscriptionId: "sub_seed_anchor_ridge",
-        stripePriceId: "price_seed_monthly",
-        // `canceled` locks unconditionally (`src/access/level.ts`), with no
-        // clock to wait on, unlike the grace org's `past_due` above.
-        status: "canceled",
-        currentPeriodEnd: new Date("2026-08-01T00:00:00Z"),
-        cancelAtPeriodEnd: false,
-      },
-    ] satisfies (typeof schema.subscriptions.$inferInsert)[],
-
-    clients: [
-      {
-        id: CLIENT.northwind,
-        orgId: ORG,
-        name: "Northwind Traders",
-        companyEmail: "hello@northwind.example",
-        notes: "Prefers video calls on Tuesdays.",
-      },
-      {
-        id: CLIENT.lumen,
-        orgId: ORG,
-        name: "Lumen Health",
-        companyEmail: "accounts@lumen.example",
-      },
-      {
-        id: CLIENT.archivedHarbor,
-        orgId: ORG,
-        name: "Harbor & Co",
-        companyEmail: "team@harbor.example",
-        notes: "Engagement ended June 2026.",
-        archivedAt: new Date("2026-07-05T09:00:00Z"),
-      },
-      {
-        id: CLIENT.fernwood,
-        orgId: PAST_DUE_ORG,
-        name: "Fernwood Clinic",
-        companyEmail: "hello@fernwood-clinic.example",
-      },
-      {
-        id: CLIENT.cinder,
-        orgId: LOCKED_ORG,
-        name: "Cinder Media",
-        companyEmail: "hello@cinder-media.example",
-      },
-    ] satisfies (typeof schema.clients.$inferInsert)[],
-
-    clientContacts: [
-      {
-        id: CONTACT.priya,
-        orgId: ORG,
-        clientId: CLIENT.northwind,
-        userId: USER.contactPriya,
-        email: "priya.patel@northwind.example",
-        name: "Priya Patel",
-        invitedAt: new Date("2026-08-01T10:00:00Z"),
-        acceptedAt: new Date("2026-08-01T16:20:00Z"),
-      },
-      {
-        id: CONTACT.marcus,
-        orgId: ORG,
-        clientId: CLIENT.lumen,
-        userId: USER.contactMarcus,
-        email: "marcus.lindqvist@lumen.example",
-        name: "Marcus Lindqvist",
-        invitedAt: new Date("2026-06-20T10:00:00Z"),
-        acceptedAt: new Date("2026-06-21T08:05:00Z"),
-      },
-      {
-        id: CONTACT.invited,
-        orgId: ORG,
-        clientId: CLIENT.northwind,
-        email: "devon.reyes@northwind.example",
-        name: "Devon Reyes",
-        // A hash shaped placeholder. No real token corresponds to it.
-        inviteTokenHash:
-          "9f2c4e1a7b3d5f6081a2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718",
-        inviteExpiresAt: new Date("2026-09-12T10:00:00Z"),
-        invitedAt: new Date("2026-09-05T10:00:00Z"),
-      },
-      {
-        id: CONTACT.notInvited,
-        orgId: ORG,
-        clientId: CLIENT.lumen,
-        email: "finance@lumen.example",
-        name: "Lumen Finance",
-      },
-      {
-        id: CONTACT.priyaFernwood,
-        orgId: PAST_DUE_ORG,
-        clientId: CLIENT.fernwood,
-        userId: USER.contactPriya,
-        email: "priya.patel@fernwood-clinic.example",
-        name: "Priya Patel",
-        // Accepted before the Northwind row below, on purpose: the fallback
-        // resolver (spec 0003, AC-5) picks the most recently accepted row
-        // with no cookie, and the walk's "lands on the Northwind overview"
-        // (spec 0014, AC-16) depends on Northwind staying that default.
-        invitedAt: new Date("2026-07-20T10:00:00Z"),
-        acceptedAt: new Date("2026-07-20T16:00:00Z"),
-      },
-      {
-        id: CONTACT.priyaCinder,
-        orgId: LOCKED_ORG,
-        clientId: CLIENT.cinder,
-        userId: USER.contactPriya,
-        email: "priya.patel@cinder-media.example",
-        name: "Priya Patel",
-        // Accepted before both rows above, so Northwind stays the
-        // cookie-less fallback (see the note on the Fernwood row).
-        invitedAt: new Date("2026-07-01T10:00:00Z"),
-        acceptedAt: new Date("2026-07-01T16:00:00Z"),
-      },
-    ] satisfies (typeof schema.clientContacts.$inferInsert)[],
-
-    projects: [
-      {
-        id: PROJECT.brandRefresh,
-        orgId: ORG,
-        clientId: CLIENT.northwind,
-        name: "Brand refresh",
-        description: "New identity, guidelines and asset pack.",
-        status: "in_review",
-        dueDate: "2026-09-30",
-      },
-      {
-        id: PROJECT.websiteBuild,
-        orgId: ORG,
-        clientId: CLIENT.lumen,
-        name: "Website build",
-        description: "Marketing site on the new brand.",
-        status: "in_progress",
-        dueDate: "2026-11-15",
-      },
-      {
-        id: PROJECT.launchCampaign,
-        orgId: ORG,
-        clientId: CLIENT.northwind,
-        name: "Launch campaign",
-        status: "planning",
-      },
-    ] satisfies (typeof schema.projects.$inferInsert)[],
-
-    deliverables: [
-      {
-        id: DELIVERABLE.logoPack,
-        orgId: ORG,
-        projectId: PROJECT.brandRefresh,
-        name: "Logo pack.zip",
-        r2Key: `org/${ORG}/project/${PROJECT.brandRefresh}/${DELIVERABLE.logoPack}`,
-        contentType: "application/zip",
-        sizeBytes: 48_213_904,
-        uploadedByUserId: USER.admin,
-        visibleToClient: true,
-        status: "ready",
-      },
-      {
-        id: DELIVERABLE.styleGuide,
-        orgId: ORG,
-        projectId: PROJECT.brandRefresh,
-        name: "Style guide v2.pdf",
-        r2Key: `org/${ORG}/project/${PROJECT.brandRefresh}/${DELIVERABLE.styleGuide}`,
-        contentType: "application/pdf",
-        sizeBytes: 6_402_118,
-        uploadedByUserId: USER.member,
-        visibleToClient: true,
-        status: "ready",
-      },
-      {
-        id: DELIVERABLE.internalNotes,
-        orgId: ORG,
-        projectId: PROJECT.websiteBuild,
-        name: "Internal QA notes.md",
-        r2Key: `org/${ORG}/project/${PROJECT.websiteBuild}/${DELIVERABLE.internalNotes}`,
-        contentType: "text/markdown",
-        sizeBytes: 12_880,
-        uploadedByUserId: USER.member,
-        visibleToClient: false,
-        status: "ready",
-      },
-      {
-        id: DELIVERABLE.pendingUpload,
-        orgId: ORG,
-        projectId: PROJECT.websiteBuild,
-        name: "Homepage hero.mp4",
-        r2Key: `org/${ORG}/project/${PROJECT.websiteBuild}/${DELIVERABLE.pendingUpload}`,
-        contentType: "video/mp4",
-        sizeBytes: 0,
-        uploadedByUserId: USER.admin,
-        visibleToClient: true,
-        status: "pending",
-      },
-    ] satisfies (typeof schema.deliverables.$inferInsert)[],
-
-    invoices: built.map((entry) => entry.invoice),
-    invoiceLineItems: built.flatMap((entry) => entry.lineItems),
-    invoiceEvents: INVOICE_EVENTS,
   };
 }
 
@@ -816,8 +183,408 @@ async function upsertAll<
   return rows.length;
 }
 
+/**
+ * Delete every row the seed owns, children before parents so no RESTRICT
+ * foreign key objects: events and line items, then invoices, deliverables,
+ * projects, contacts, clients, the subscription and memberships, then the
+ * organizations, then the users.
+ *
+ * "Owns" is the seed's id namespace and the organizations inside it. Bound to
+ * a real organization (`boundOrgId`), it also owns that organization's
+ * business data, whatever its ids: clients, projects, contacts, files and
+ * invoices. Never the organization, its memberships or its subscription,
+ * which are the real ones, unless their ids are the seed's own.
+ */
+async function wipeSeedData(
+  tx: Tx,
+  boundOrgId: string | undefined,
+): Promise<Readonly<Record<string, number>>> {
+  const prefix = `${SEED_ID_PREFIX}%`;
+
+  const seedOrgIds = tx
+    .select({ id: schema.organizations.id })
+    .from(schema.organizations)
+    .where(like(sql`${schema.organizations.id}::text`, prefix));
+
+  const inNamespace = (id: PgColumn) => like(sql`${id}::text`, prefix);
+
+  /** Seed organizations and namespace ids only: what identity rows use. */
+  const seedOwned = (columns: {
+    readonly id: PgColumn;
+    readonly orgId: PgColumn;
+  }) => or(inArray(columns.orgId, seedOrgIds), inNamespace(columns.id));
+
+  /** The same, plus every row of the bound organization: business data only. */
+  const businessOwned = (columns: {
+    readonly id: PgColumn;
+    readonly orgId: PgColumn;
+  }) =>
+    or(
+      seedOwned(columns),
+      boundOrgId === undefined ? undefined : eq(columns.orgId, boundOrgId),
+    );
+
+  const removed = async (rows: PromiseLike<readonly unknown[]>) =>
+    (await rows).length;
+
+  return {
+    invoice_events: await removed(
+      tx
+        .delete(schema.invoiceEvents)
+        .where(businessOwned(schema.invoiceEvents))
+        .returning({ id: schema.invoiceEvents.id }),
+    ),
+    invoice_line_items: await removed(
+      tx
+        .delete(schema.invoiceLineItems)
+        .where(businessOwned(schema.invoiceLineItems))
+        .returning({ id: schema.invoiceLineItems.id }),
+    ),
+    invoices: await removed(
+      tx
+        .delete(schema.invoices)
+        .where(businessOwned(schema.invoices))
+        .returning({ id: schema.invoices.id }),
+    ),
+    deliverables: await removed(
+      tx
+        .delete(schema.deliverables)
+        .where(businessOwned(schema.deliverables))
+        .returning({ id: schema.deliverables.id }),
+    ),
+    projects: await removed(
+      tx
+        .delete(schema.projects)
+        .where(businessOwned(schema.projects))
+        .returning({ id: schema.projects.id }),
+    ),
+    client_contacts: await removed(
+      tx
+        .delete(schema.clientContacts)
+        .where(businessOwned(schema.clientContacts))
+        .returning({ id: schema.clientContacts.id }),
+    ),
+    clients: await removed(
+      tx
+        .delete(schema.clients)
+        .where(businessOwned(schema.clients))
+        .returning({ id: schema.clients.id }),
+    ),
+    subscriptions: await removed(
+      tx
+        .delete(schema.subscriptions)
+        .where(seedOwned(schema.subscriptions))
+        .returning({ id: schema.subscriptions.id }),
+    ),
+    memberships: await removed(
+      tx
+        .delete(schema.memberships)
+        .where(seedOwned(schema.memberships))
+        .returning({ id: schema.memberships.id }),
+    ),
+    organizations: await removed(
+      tx
+        .delete(schema.organizations)
+        .where(inNamespace(schema.organizations.id))
+        .returning({ id: schema.organizations.id }),
+    ),
+    users: await removed(
+      tx
+        .delete(schema.users)
+        .where(inNamespace(schema.users.id))
+        .returning({ id: schema.users.id }),
+    ),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Binding to a real organization
+// ---------------------------------------------------------------------------
+
+export type PlacementLookup =
+  | { readonly ok: true; readonly placement: Placement }
+  | { readonly ok: false; readonly problem: string };
+
+/**
+ * Work out where Apex goes for a `SEED_CLERK_ORG_ID`. Every refusal is a
+ * value, and each happens before anything is written: an unknown or deleted
+ * organization, one that is the seed's own, or one with no admin to own the
+ * invoices. Unset, Apex is the seed's own organization.
+ */
+async function resolvePlacement(
+  db: Db,
+  clerkOrgId: string | undefined,
+): Promise<PlacementLookup> {
+  if (clerkOrgId === undefined) {
+    return { ok: true, placement: SEEDED_PLACEMENT };
+  }
+
+  const [org] = await db
+    .select({
+      id: schema.organizations.id,
+      name: schema.organizations.name,
+      deletedAt: schema.organizations.deletedAt,
+    })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.clerkOrgId, clerkOrgId))
+    .limit(1);
+
+  if (org === undefined || org.deletedAt !== null) {
+    return {
+      ok: false,
+      problem: `SEED_CLERK_ORG_ID ${clerkOrgId} has no live local organization. Sign in to the app once as a member so its row exists, then seed again.`,
+    };
+  }
+
+  if (org.id.startsWith(SEED_ID_PREFIX)) {
+    return {
+      ok: false,
+      problem: `SEED_CLERK_ORG_ID ${clerkOrgId} is one of the seed's own organizations, not a real one.`,
+    };
+  }
+
+  const [admin] = await db
+    .select({ userId: schema.memberships.userId })
+    .from(schema.memberships)
+    .where(
+      and(
+        eq(schema.memberships.orgId, org.id),
+        eq(schema.memberships.role, "admin"),
+        not(
+          like(sql`${schema.memberships.userId}::text`, `${SEED_ID_PREFIX}%`),
+        ),
+      ),
+    )
+    .orderBy(asc(schema.memberships.createdAt))
+    .limit(1);
+
+  if (admin === undefined) {
+    return {
+      ok: false,
+      problem: `${org.name} has no admin in its local membership mirror to own the seeded invoices and files.`,
+    };
+  }
+
+  const [subscription] = await db
+    .select({ id: schema.subscriptions.id })
+    .from(schema.subscriptions)
+    .where(
+      and(
+        eq(schema.subscriptions.orgId, org.id),
+        not(like(sql`${schema.subscriptions.id}::text`, `${SEED_ID_PREFIX}%`)),
+      ),
+    )
+    .limit(1);
+
+  return {
+    ok: true,
+    placement: {
+      orgId: org.id,
+      ownerId: admin.userId,
+      bound: true,
+      needsSubscription: subscription === undefined,
+    },
+  };
+}
+
+/**
+ * Write the bound organization's own business data to a JSON file before the
+ * wipe removes it, and say where. Only rows that are not the seed's (a
+ * previous run's rows are not worth keeping), and nothing is written when
+ * there are none. Every column of every row is kept, dates as ISO strings, so
+ * the file is enough to put the data back by hand.
+ */
+async function backupBusinessData(
+  db: Db,
+  orgId: string,
+  now: Date,
+): Promise<{ readonly path: string; readonly total: number } | undefined> {
+  const notSeed = (id: PgColumn) =>
+    not(like(sql`${id}::text`, `${SEED_ID_PREFIX}%`));
+
+  const tables = {
+    clients: await db
+      .select()
+      .from(schema.clients)
+      .where(and(eq(schema.clients.orgId, orgId), notSeed(schema.clients.id))),
+    client_contacts: await db
+      .select()
+      .from(schema.clientContacts)
+      .where(
+        and(
+          eq(schema.clientContacts.orgId, orgId),
+          notSeed(schema.clientContacts.id),
+        ),
+      ),
+    projects: await db
+      .select()
+      .from(schema.projects)
+      .where(
+        and(eq(schema.projects.orgId, orgId), notSeed(schema.projects.id)),
+      ),
+    deliverables: await db
+      .select()
+      .from(schema.deliverables)
+      .where(
+        and(
+          eq(schema.deliverables.orgId, orgId),
+          notSeed(schema.deliverables.id),
+        ),
+      ),
+    invoices: await db
+      .select()
+      .from(schema.invoices)
+      .where(
+        and(eq(schema.invoices.orgId, orgId), notSeed(schema.invoices.id)),
+      ),
+    invoice_line_items: await db
+      .select()
+      .from(schema.invoiceLineItems)
+      .where(
+        and(
+          eq(schema.invoiceLineItems.orgId, orgId),
+          notSeed(schema.invoiceLineItems.id),
+        ),
+      ),
+    invoice_events: await db
+      .select()
+      .from(schema.invoiceEvents)
+      .where(
+        and(
+          eq(schema.invoiceEvents.orgId, orgId),
+          notSeed(schema.invoiceEvents.id),
+        ),
+      ),
+  };
+
+  const total = Object.values(tables).reduce(
+    (sum, rows) => sum + rows.length,
+    0,
+  );
+
+  if (total === 0) {
+    return undefined;
+  }
+
+  const [organization] = await db
+    .select()
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId));
+
+  const directory = ".seed-backups";
+  const path = `${directory}/${now.toISOString().replace(/[:.]/g, "-")}.json`;
+
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    path,
+    `${JSON.stringify({ takenAt: now.toISOString(), organization, tables }, undefined, 2)}\n`,
+  );
+
+  return { path, total };
+}
+
+// ---------------------------------------------------------------------------
+// The files
+// ---------------------------------------------------------------------------
+
+export type UploadResult =
+  { readonly ok: true } | { readonly ok: false; readonly problem: string };
+
+/**
+ * Put one file in the bucket through a signed PUT, the same way the app's own
+ * upload does. An expected failure comes back as a value: the rows are already
+ * committed, and a missing object only means that file's download lands on the
+ * "This file is missing" page.
+ */
+async function uploadObject(
+  storage: NonNullable<ReturnType<typeof objectStorage>>,
+  object: SeedObject,
+): Promise<UploadResult> {
+  try {
+    const url = await storage.presignPut({
+      key: object.key,
+      contentType: object.contentType,
+      contentLength: object.bytes.length,
+      expiresInSeconds: 300,
+    });
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { "content-type": object.contentType },
+      body: Buffer.from(object.bytes),
+    });
+
+    return response.ok
+      ? { ok: true }
+      : {
+          ok: false,
+          problem: `${object.name}: R2 answered ${response.status}`,
+        };
+  } catch (error) {
+    return {
+      ok: false,
+      problem: `${object.name}: ${error instanceof Error ? error.message : "unknown error"}`,
+    };
+  }
+}
+
+async function uploadObjects(
+  objects: readonly SeedObject[],
+): Promise<
+  | { readonly skipped: true }
+  | { readonly skipped: false; readonly results: readonly UploadResult[] }
+> {
+  const storage = isStorageConfigured() ? objectStorage() : undefined;
+
+  if (storage === undefined) {
+    return { skipped: true };
+  }
+
+  const results = await Promise.all(
+    objects.map((object) => uploadObject(storage, object)),
+  );
+
+  return { skipped: false, results };
+}
+
+/**
+ * Delete the objects earlier seed runs left in the bucket. The row goes first
+ * only inside the wipe's transaction; here, after it, the objects are best
+ * effort: a failure is reported and never fails the seed. Only keys of rows in
+ * the seed's own namespace, and only ones the new dataset does not reuse, so a
+ * file the bound organization owned for real is never touched.
+ */
+async function removeStaleObjects(
+  keys: readonly string[],
+): Promise<{ readonly removed: number; readonly failed: number } | undefined> {
+  const storage = isStorageConfigured() ? objectStorage() : undefined;
+
+  if (storage === undefined || keys.length === 0) {
+    return undefined;
+  }
+
+  const results = await Promise.all(
+    keys.map((key) =>
+      storage.delete(key).then(
+        () => true,
+        () => false,
+      ),
+    ),
+  );
+
+  return {
+    removed: results.filter((ok) => ok).length,
+    failed: results.filter((ok) => !ok).length,
+  };
+}
+
 async function main(): Promise<number> {
-  const { DIRECT_URL, SEED_ALLOW_HOST } = env();
+  const {
+    DIRECT_URL,
+    SEED_ALLOW_HOST,
+    SEED_CLERK_ORG_ID,
+    E2E_CLERK_CONTACT_USER_ID,
+  } = env();
 
   const allowed = checkSeedHost(DIRECT_URL, SEED_ALLOW_HOST);
   if (!allowed.ok) {
@@ -825,49 +592,142 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const data = dataset();
+  const now = new Date();
   const client = postgres(DIRECT_URL, { prepare: false, max: 1 });
   const db = drizzle(client, { schema });
 
   try {
-    const counts = await db.transaction(async (tx) => ({
-      organizations: await upsertAll(
-        tx,
-        schema.organizations,
-        data.organizations,
-      ),
-      users: await upsertAll(tx, schema.users, data.users),
-      memberships: await upsertAll(tx, schema.memberships, data.memberships),
-      subscriptions: await upsertAll(
-        tx,
-        schema.subscriptions,
-        data.subscriptions,
-      ),
-      clients: await upsertAll(tx, schema.clients, data.clients),
-      client_contacts: await upsertAll(
-        tx,
-        schema.clientContacts,
-        data.clientContacts,
-      ),
-      projects: await upsertAll(tx, schema.projects, data.projects),
-      deliverables: await upsertAll(tx, schema.deliverables, data.deliverables),
-      invoices: await upsertAll(tx, schema.invoices, data.invoices),
-      invoice_line_items: await upsertAll(
-        tx,
-        schema.invoiceLineItems,
-        data.invoiceLineItems,
-      ),
-      invoice_events: await upsertAll(
-        tx,
-        schema.invoiceEvents,
-        data.invoiceEvents,
-      ),
-    }));
+    // Everything that can refuse happens here, before a single write.
+    const target = await resolvePlacement(db, SEED_CLERK_ORG_ID);
+    if (!target.ok) {
+      console.error(target.problem);
+      return 1;
+    }
 
-    console.log(`Seeded ${allowed.host}:`);
+    const { placement } = target;
+    const data = buildDataset({
+      now,
+      priyaClerkUserId: E2E_CLERK_CONTACT_USER_ID ?? "user_seed_priya",
+      placement,
+    });
+
+    const backup = placement.bound
+      ? await backupBusinessData(db, placement.orgId, now)
+      : undefined;
+
+    const oldObjects = await db
+      .select({ key: schema.deliverables.r2Key })
+      .from(schema.deliverables)
+      .where(like(sql`${schema.deliverables.id}::text`, `${SEED_ID_PREFIX}%`));
+
+    const { wiped, counts } = await db.transaction(async (tx) => {
+      const wiped = await wipeSeedData(
+        tx,
+        placement.bound ? placement.orgId : undefined,
+      );
+
+      // Bound, the organization is the real one: only its profile changes.
+      if (placement.bound) {
+        await tx
+          .update(schema.organizations)
+          .set(data.apexProfile)
+          .where(eq(schema.organizations.id, placement.orgId));
+      }
+
+      const counts = {
+        organizations: await upsertAll(
+          tx,
+          schema.organizations,
+          data.organizations,
+        ),
+        users: await upsertAll(tx, schema.users, data.users),
+        memberships: await upsertAll(tx, schema.memberships, data.memberships),
+        subscriptions: await upsertAll(
+          tx,
+          schema.subscriptions,
+          data.subscriptions,
+        ),
+        clients: await upsertAll(tx, schema.clients, data.clients),
+        client_contacts: await upsertAll(
+          tx,
+          schema.clientContacts,
+          data.clientContacts,
+        ),
+        projects: await upsertAll(tx, schema.projects, data.projects),
+        deliverables: await upsertAll(
+          tx,
+          schema.deliverables,
+          data.deliverables,
+        ),
+        invoices: await upsertAll(tx, schema.invoices, data.invoices),
+        invoice_line_items: await upsertAll(
+          tx,
+          schema.invoiceLineItems,
+          data.invoiceLineItems,
+        ),
+        invoice_events: await upsertAll(
+          tx,
+          schema.invoiceEvents,
+          data.invoiceEvents,
+        ),
+      };
+
+      return { wiped, counts };
+    });
+
+    const removedTotal = Object.values(wiped).reduce(
+      (total, count) => total + count,
+      0,
+    );
+
+    console.log(`Seeded ${allowed.host} (replaced ${removedTotal} old rows):`);
     for (const [table, count] of Object.entries(counts)) {
       console.log(`  ${table.padEnd(24)} ${count}`);
     }
+
+    console.log(
+      placement.bound
+        ? `Apex Interactive Studio is built inside the real organization ${SEED_CLERK_ORG_ID}.`
+        : "Apex Interactive Studio is the seed's own agency: nobody can sign in to it. " +
+            "Set SEED_CLERK_ORG_ID to build it inside a real organization.",
+    );
+
+    if (backup !== undefined) {
+      console.log(
+        `Backup: ${backup.total} rows of the organization's own data written to ${backup.path}.`,
+      );
+    }
+
+    const newKeys = new Set(data.deliverables.map((row) => row.r2Key));
+    const stale = await removeStaleObjects(
+      oldObjects.map((row) => row.key).filter((key) => !newKeys.has(key)),
+    );
+    if (stale !== undefined) {
+      console.log(
+        `Files: removed ${stale.removed} old seeded objects from R2` +
+          (stale.failed > 0 ? `, ${stale.failed} could not be removed.` : "."),
+      );
+    }
+
+    const uploaded = await uploadObjects(data.objects);
+
+    if (uploaded.skipped) {
+      console.log(
+        "Files: R2 is not configured, so no objects were uploaded. " +
+          "Downloads show the missing file page.",
+      );
+    } else {
+      const failed = uploaded.results.flatMap((result) =>
+        result.ok ? [] : [result.problem],
+      );
+      console.log(
+        `Files: ${uploaded.results.length - failed.length} of ${uploaded.results.length} uploaded to R2.`,
+      );
+      for (const problem of failed) {
+        console.warn(`  not uploaded, ${problem}`);
+      }
+    }
+
     return 0;
   } finally {
     await client.end();

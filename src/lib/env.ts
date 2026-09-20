@@ -142,6 +142,16 @@ const serverEnvSchema = z.object({
   SEED_ALLOW_HOST: optionalEnv(),
 
   /**
+   * Development only. The Clerk organization id (`org_...`) `pnpm db:seed`
+   * builds Apex Interactive Studio inside, so you can sign in and see it. The
+   * organization keeps its own row, admin, memberships and subscription; the
+   * seed replaces its clients, projects, contacts, files and invoices, after
+   * writing what was there to `.seed-backups/`. Unset, Apex is a seed only
+   * organization nobody can sign in to.
+   */
+  SEED_CLERK_ORG_ID: optionalEnv(),
+
+  /**
    * Feature 10, client contacts and portal invitations (spec 0009). The first
    * email the product sends, and the transport every later email reuses.
    *

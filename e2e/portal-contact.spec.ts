@@ -9,11 +9,13 @@ import { expectNoAccessibilityViolations, useTheme } from "./axe";
  * `E2E_CLERK_CONTACT_USERNAME`, `E2E_CLERK_CONTACT_PASSWORD` and
  * `E2E_CLERK_CONTACT_USER_ID` are all set, alongside both Clerk keys.
  *
- * Priya Patel, the seeded test user, holds three accepted rows: Northwind
- * under Studio North (`full`), Fernwood Clinic under Harbor Lane (`grace`,
- * one hour into its 7 day window) and Cinder Media under Anchor Ridge
- * (`canceled`, so `locked` unconditionally, with no clock to wait on). The
- * walk covers the Northwind overview and its three sections, a file
+ * Priya Patel, the seeded test user, holds four accepted rows: Northstar
+ * Cloud Solutions and Harbor Lane Capital, both under Apex Interactive Studio
+ * (`full`), Fernwood Clinic under Harbor Lane (`grace`, one hour into its 7
+ * day window) and Cinder Media under Anchor Ridge (`canceled`, so `locked`
+ * unconditionally, with no clock to wait on). Northstar is her most recently
+ * accepted row, so it is where she lands. The walk covers the Northstar
+ * overview and its three sections, a file
  * download, the not found page on another client's ids, the switcher, and
  * the locked agency's unavailable page: everything AC-16 names except the
  * Fernwood row, which stays a `grace` fixture for the agency side (spec
@@ -34,12 +36,14 @@ const CONTACT_USERNAME = process.env.E2E_CLERK_CONTACT_USERNAME;
 const CONTACT_PASSWORD = process.env.E2E_CLERK_CONTACT_PASSWORD;
 
 /**
- * Lumen's own seeded rows (`scripts/db-seed.ts`'s fixed ids): under Priya's
- * own agency, Studio North, but not her client, so they are foreign to her
- * Northwind contact the same way another agency's rows would be (AC-14).
+ * Harbor Lane Capital's own seeded rows (`scripts/seed-dataset.ts`'s fixed
+ * ids): under the same agency as Northstar, but a different client. Priya
+ * holds a row there too, yet her active row is Northstar's, and a contact
+ * reads one client at a time, so they are foreign to it the same way another
+ * agency's rows would be (AC-14).
  */
 const FOREIGN_INVOICE_ID = "0190a000-0000-7000-8000-000900000003";
-const FOREIGN_PROJECT_ID = "0190a000-0000-7000-8000-000700000002";
+const FOREIGN_PROJECT_ID = "0190a000-0000-7000-8000-000700000003";
 
 test.beforeEach(() => {
   test.skip(
@@ -58,7 +62,7 @@ async function signInAsContact(page: import("@playwright/test").Page) {
 }
 
 test.describe("the contact path", () => {
-  test("signs in and lands on the Northwind overview", async ({ page }) => {
+  test("signs in and lands on the Northstar overview", async ({ page }) => {
     await signInAsContact(page);
 
     await expect(page.getByRole("heading", { name: "Invoices" })).toBeVisible();
@@ -102,12 +106,16 @@ test.describe("projects and files", () => {
     await page.getByRole("link", { name: "Projects" }).click();
     await page.waitForURL("**/portal/projects");
 
-    const projectLink = page.getByRole("link", { name: "Brand refresh" });
+    const projectLink = page.getByRole("link", {
+      name: "Design System v2 Migration",
+    });
     await expect(projectLink).toBeVisible();
     await projectLink.click();
     await page.waitForURL("**/portal/projects/*");
 
-    const fileLink = page.getByRole("link", { name: "Logo pack.zip" });
+    const fileLink = page.getByRole("link", {
+      name: "design-tokens-v2.1.json",
+    });
     await expect(fileLink).toBeVisible();
 
     const [response] = await Promise.all([
@@ -213,7 +221,7 @@ test.describe("the switcher and the locked walk (spec 0014, AC-3, AC-11, AC-13)"
     await page.waitForURL("**/portal/unavailable");
 
     await page.getByRole("button", { name: /Switch client/ }).click();
-    await page.getByRole("menuitem", { name: /Northwind/ }).click();
+    await page.getByRole("menuitem", { name: /Northstar/ }).click();
     await page.waitForURL("**/portal");
 
     await expect(page.getByRole("heading", { name: "Invoices" })).toBeVisible();
