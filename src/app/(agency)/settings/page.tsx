@@ -1,17 +1,29 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+
+import { agencyContext } from "@/auth/context";
+import { agencySettings } from "@/db/tenant";
+import { isClerkConfigured } from "@/lib/env";
+import { SettingsView } from "@/settings/ui/settings-view";
+
+export const metadata: Metadata = {
+  title: "Settings",
+};
 
 /**
- * `/settings`, reserved.
+ * `/settings`: the agency's profile, read only. Agency name, default currency,
+ * tax ID and address, straight from the agency's own `organizations` row.
  *
- * The sidebar links to every path this product commits to (AC-23), including
- * the ones still to be built. This page keeps that honest: it hands off to the
- * route group's `not-found.tsx`, so the link lands inside the shell with an
- * explanation and a way back rather than on a bare 404, and the response is
- * still a real 404 rather than a page pretending the section exists.
+ * It sits outside the access gate on purpose, next to `/billing`: a locked
+ * agency can still see who it is. Editing any of it is a later feature; the
+ * page has no form and no action.
  *
- * **A later agency settings feature replaces this file** (agency name and
- * default currency). Spec 0015 built `/team` and deliberately left this one.
+ * With no Clerk publishable key there is no session to read a row for, so this
+ * shows the "could not be loaded" state a brand new environment would see
+ * rather than resolving a tenant context that cannot exist (spec 0004, AC-22).
  */
-export default function SettingsPlaceholder(): never {
-  notFound();
+export default async function SettingsPage() {
+  const ctx = isClerkConfigured() ? await agencyContext() : undefined;
+  const settings = ctx === undefined ? undefined : await agencySettings(ctx);
+
+  return <SettingsView settings={settings} />;
 }
