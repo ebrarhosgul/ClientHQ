@@ -26,7 +26,11 @@ import * as schema from "../schema";
 import { organizations } from "../schema";
 import type { ContactContext, StaffContext } from "./context";
 import type { TransactionExecutor } from "./executor";
-import { agencyProfile, deletedOrganizationClerkIds } from "./organization";
+import {
+  agencyProfile,
+  agencySettings,
+  deletedOrganizationClerkIds,
+} from "./organization";
 
 loadEnvFiles();
 
@@ -210,3 +214,67 @@ describe.skipIf(!url)(
     });
   },
 );
+
+describe.skipIf(!url)("agencySettings against real PostgreSQL", () => {
+  it("reads the business profile, with an unset column as undefined", async () => {
+    // A random slug: the dev database may already hold the seeded agency's.
+    const slug = clerkId("profile");
+
+    await inRollback(async (tx) => {
+      const [org] = await tx
+        .insert(organizations)
+        .values({
+          id: newId(),
+          clerkOrgId: clerkId("org"),
+          name: "Profile Test Agency",
+          slug,
+          taxId: "US-9482019",
+          addressLine1: "500 Howard Street",
+          city: "San Francisco",
+        })
+        .returning();
+
+      if (org === undefined) {
+        throw new Error("insert did not return a row");
+      }
+
+      await expect(agencySettings(staffContext(org.id), tx)).resolves.toEqual({
+        id: org.id,
+        name: "Profile Test Agency",
+        slug,
+        defaultCurrency: "USD",
+        description: undefined,
+        taxId: "US-9482019",
+        addressLine1: "500 Howard Street",
+        addressLine2: undefined,
+        city: "San Francisco",
+        region: undefined,
+        postalCode: undefined,
+        country: undefined,
+      });
+    });
+  });
+
+  it("resolves as undefined for a soft deleted organization", async () => {
+    await inRollback(async (tx) => {
+      const [org] = await tx
+        .insert(organizations)
+        .values({
+          id: newId(),
+          clerkOrgId: clerkId("org"),
+          name: "Doomed Agency",
+          slug: clerkId("doomed"),
+          deletedAt: new Date(),
+        })
+        .returning();
+
+      if (org === undefined) {
+        throw new Error("insert did not return a row");
+      }
+
+      await expect(
+        agencySettings(staffContext(org.id), tx),
+      ).resolves.toBeUndefined();
+    });
+  });
+});

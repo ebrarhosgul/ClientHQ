@@ -35,6 +35,20 @@ export const organizations = pgTable("organizations", {
   defaultCurrency: char("default_currency", { length: 3 })
     .notNull()
     .default("USD"),
+  /**
+   * The agency's own business profile, shown read only on `/settings`. Every
+   * column is nullable: the Clerk `organization.created` handler knows none of
+   * them, and a new agency has filled none in yet. Nothing here is copied onto
+   * an invoice; the PDF still prints the agency by name only.
+   */
+  description: text("description"),
+  taxId: text("tax_id"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  region: text("region"),
+  postalCode: text("postal_code"),
+  country: text("country"),
   /** Set by the Clerk `organization.deleted` webhook. Soft delete only. */
   deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
   ...timestamps(),

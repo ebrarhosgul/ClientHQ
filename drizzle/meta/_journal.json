@@ -43,6 +43,13 @@
       "when": 1789727281053,
       "tag": "0005_aspiring_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789917649355,
+      "tag": "0006_stormy_living_mummy",
+      "breakpoints": true
     }
   ]
 }
