@@ -18,7 +18,7 @@ Everything that talks to PostgreSQL: the connection handle, the Drizzle schema, 
 | `src/app/api/health/db/route.ts` | The same check from inside the running app |
 | `scripts/migrations-check.ts` (repo root) | Fails when the schema and the committed migrations have drifted apart |
 | `scripts/db-schema-assert.ts` (repo root) | Reads the PostgreSQL catalogue and checks the live schema against spec 0002 |
-| `scripts/db-seed.ts` (repo root) | A repeatable development seed, guarded so it refuses a non local host. It first deletes every row in the seed's fixed id namespace (`0190a000-0000-7000-8000-…`), then writes the dataset from `scripts/seed-dataset.ts` and uploads the bytes from `scripts/seed-files.ts` to R2 when configured. Real agencies have generated ids and are never touched |
+| `scripts/db-seed.ts` (repo root) | A repeatable development seed, guarded so it refuses a non local host. It first deletes every row in the seed's fixed id namespace (`0190a000-0000-7000-8000-…`), then writes the dataset from `scripts/seed-dataset.ts` and uploads the bytes from `scripts/seed-files.ts` to R2 when configured. Real agencies have generated ids and are never touched, unless `SEED_CLERK_ORG_ID` (a Clerk `org_...` id) binds Apex to one: that organization keeps its own row, admin, memberships and subscription, and its clients, projects, contacts, files and invoices are copied to `.seed-backups/` (git ignored, may hold real emails) and then replaced |
 
 ## Commands
 
