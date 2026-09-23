@@ -134,5 +134,6 @@ MCP servers: Sentry (`getsentry/sentry-mcp`, recommended, connect by OAuth at ht
 - [src/contacts/AGENTS.md](src/contacts/AGENTS.md): client contacts and the single use portal invitation token
 - [src/storage/AGENTS.md](src/storage/AGENTS.md): the four operation R2 port, its fake and the R2 quirks
 - [src/rate-limit/AGENTS.md](src/rate-limit/AGENTS.md): the three named ceilings and how they fail open
+- [src/settings/AGENTS.md](src/settings/AGENTS.md): the read only `/settings` agency profile and its separate reader
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

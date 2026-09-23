@@ -60,6 +60,63 @@ export async function agencyProfile(
 }
 
 /**
+ * The agency's own business profile, as `/settings` shows it. Every field
+ * after `defaultCurrency` is optional in the data: a new agency has filled in
+ * none of them.
+ */
+export type AgencySettings = AgencyProfile & {
+  readonly description: string | undefined;
+  readonly taxId: string | undefined;
+  readonly addressLine1: string | undefined;
+  readonly addressLine2: string | undefined;
+  readonly city: string | undefined;
+  readonly region: string | undefined;
+  readonly postalCode: string | undefined;
+  readonly country: string | undefined;
+};
+
+/** A nullable column, as the `undefined` the rest of the code prefers. */
+const orUndefined = (value: string | null): string | undefined =>
+  value ?? undefined;
+
+/**
+ * The acting agency's profile with its business details, or `undefined` when
+ * it is soft deleted. A separate reader from `agencyProfile` on purpose: that
+ * one is on the invoice and portal paths and carries only what they print.
+ */
+export async function agencySettings(
+  ctx: StaffContext,
+  executor?: Executor,
+): Promise<AgencySettings | undefined> {
+  const db = executor ?? (await pooledDb());
+
+  const [row] = await db
+    .select()
+    .from(organizations)
+    .where(
+      and(eq(organizations.id, ctx.orgId), isNull(organizations.deletedAt)),
+    )
+    .limit(1);
+
+  return row === undefined
+    ? undefined
+    : {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        defaultCurrency: row.defaultCurrency,
+        description: orUndefined(row.description),
+        taxId: orUndefined(row.taxId),
+        addressLine1: orUndefined(row.addressLine1),
+        addressLine2: orUndefined(row.addressLine2),
+        city: orUndefined(row.city),
+        region: orUndefined(row.region),
+        postalCode: orUndefined(row.postalCode),
+        country: orUndefined(row.country),
+      };
+}
+
+/**
  * Which of these Clerk organization ids are soft deleted locally.
  *
  * Read by `/onboarding` before it decides whether a Clerk membership auto
