@@ -2,31 +2,25 @@
 
 > ### 🚀 Live Demo
 >
-> [![Live Demo](https://img.shields.io/badge/Live_Demo-Open_the_app-2ea44f?style=for-the-badge)](https://REPLACE_WITH_DEMO_URL)
+> [![Live Demo](https://img.shields.io/badge/Live_Demo-Open_the_app-2ea44f?style=for-the-badge)](https://client-hq-ebrar.vercel.app/)
 >
-> **Try it as an agency.** Sign in with the evaluation account below to see the agency dashboard, then open a client's portal invitation to see what their clients see.
+> **[client-hq-ebrar.vercel.app](https://client-hq-ebrar.vercel.app/)** is a live deployment of this repository. It signs you in through Clerk rather than a shared password, so there is no evaluation login to publish here: use `Sign up` on the deployment itself to create your own account and agency.
 >
-> | | |
-> |---|---|
-> | **URL** | `https://REPLACE_WITH_DEMO_URL` |
-> | **Email** | `demo.agency@example.com` |
-> | **Password** | `REPLACE_WITH_DEMO_PASSWORD` |
->
-> _Placeholders. No hosted demo is published yet. Before you replace these, use a dedicated throwaway agency on a Stripe test mode subscription with seeded sample data, and never real customer data or a password you use anywhere else. The account is public once it is written here._
+> A fresh agency starts `unsubscribed`, the same as in [section 3](#dynamic-read-time-subscription-gating), so `/clients`, `/projects`, `/invoices` and `/team` redirect to `/billing` until a subscription exists on that deployment's own Stripe account. That gate is real product behaviour, not a demo limitation, and the two screenshots below are what the gated pages look like once it is cleared.
 
 A multi tenant portal where agencies run their clients, projects, deliverables and invoices in one place, and each of their clients gets a read only window onto their own work.
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="./docs/assets/dashboard-preview.png" alt="Agency dashboard preview: clients, projects and invoices at a glance" width="100%" />
+      <img src="./docs/assets/client-record-preview.png" alt="A client record: company details, billing address, and the two portal contacts invited to it" width="100%" />
       <br />
-      <sub><b>Agency dashboard</b></sub>
+      <sub><b>Client record</b></sub>
     </td>
     <td width="50%" align="center">
-      <img src="./docs/assets/portal-preview.png" alt="Client portal preview: a client's own projects, shared files and invoices" width="100%" />
+      <img src="./docs/assets/invoices-preview.png" alt="The invoices list: every invoice across all clients, filterable by status and client, draft, sent, overdue and paid shown with their totals" width="100%" />
       <br />
-      <sub><b>Client portal</b></sub>
+      <sub><b>Invoices</b></sub>
     </td>
   </tr>
 </table>
