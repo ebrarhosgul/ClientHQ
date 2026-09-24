@@ -36,6 +36,32 @@ export function addDaysUtc(day: string, days: number): string {
 }
 
 /**
+ * Whole calendar days from `from` to `to`, both `YYYY-MM-DD`. Positive when
+ * `to` is later. Used for "N days overdue" (spec 0020, AC-5), so a due date of
+ * yesterday against today is `1`, never `0` or a fraction: both sides are
+ * parsed as UTC midnight, so no daylight or timezone shift can round a day
+ * away.
+ */
+export function daysBetweenUtc(from: string, to: string): number {
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`);
+  const toMs = Date.parse(`${to}T00:00:00.000Z`);
+
+  return Math.round((toMs - fromMs) / 86_400_000);
+}
+
+/**
+ * The first day of the UTC calendar month five months before `today`'s month,
+ * `YYYY-MM-DD`. The start of a six month window that ends with `today`'s own
+ * month (spec 0020 addendum, the invoiced by month chart): `today` in April
+ * gives the previous November 1st, so November through April is six months.
+ */
+export function sixMonthWindowStart(today: string): string {
+  const [year, month] = today.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1 - 5, 1)).toISOString().slice(0, 10);
+}
+
+/**
  * `YYYY-MM-DD`, and a real calendar day. Matching the pattern is not enough
  * on its own: `2026-02-30` matches it and is not a real day, so the string is
  * round tripped through `Date.UTC` and compared back to itself (spec 0010 and

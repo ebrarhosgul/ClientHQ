@@ -160,10 +160,7 @@ export default async function InvoiceDetailPage({
             Paid on {invoice.paidAt.toISOString().slice(0, 10)}
           </span>
         ) : undefined}
-        <Link
-          href="/invoices"
-          className="ml-auto text-sm text-muted-foreground underline-offset-2 hover:underline"
-        >
+        <Link href="/invoices" className="link-accent ml-auto text-sm">
           All invoices
         </Link>
       </div>

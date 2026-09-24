@@ -56,10 +56,21 @@ import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
 import { PortalTopBar } from "@/portal/ui/portal-top-bar";
 import { SectionNav } from "@/portal/ui/section-nav";
 import { AddressFields } from "@/ui/patterns/address-fields";
+import {
+  DashboardSection,
+  DashboardSectionSkeleton,
+} from "@/dashboard/ui/dashboard-section";
+import { InvoicedTrendChart } from "@/dashboard/ui/invoiced-trend-chart";
+import {
+  SummaryCard,
+  SummaryCardsGrid,
+  SummaryCardsSkeleton,
+} from "@/dashboard/ui/summary-cards";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
 import { PageHeader } from "@/ui/patterns/page-header";
+import { type ChartConfig } from "@/ui/primitives/chart";
 import {
   DeliverableStatusChip,
   InvoiceStatusChip,
@@ -720,6 +731,9 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
               <Badge variant="secondary">Secondary</Badge>
               <Badge variant="outline">Outline</Badge>
               <Badge variant="destructive">Destructive</Badge>
+              <Badge variant="link" asChild>
+                <a href="#">Link</a>
+              </Badge>
             </Row>
 
             <Row label="avatar">
@@ -1142,7 +1156,7 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3"
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate font-medium underline underline-offset-2">
+                    <span className="link-accent truncate">
                       {deliverable.name}
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -1513,6 +1527,237 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
           Nothing to render here: the proof is the keyboard, and it is the same
           ring on every control above.
         </p>
+      </Section>
+
+      <Section
+        id={scoped("dashboard-summary")}
+        title="Dashboard summary"
+        description="The three /dashboard sections share one frame (heading, count line, list, footer link) and one skeleton (spec 0020)."
+      >
+        <div className="flex flex-col gap-4">
+          <DashboardSection
+            headingId={scoped("dashboard-summary-loaded-heading")}
+            heading="Overdue invoices"
+            countLine={
+              <>
+                <p>2 overdue invoices</p>
+                <p>{fixtureMoney(420000)} overdue</p>
+              </>
+            }
+            viewAll={{ href: "#", label: "View all overdue invoices" }}
+          >
+            <ul className="flex flex-col gap-2">
+              <li className="flex flex-col gap-0.5 rounded-md border border-border p-3">
+                <a href="#" className="link-accent">
+                  INV-0007, Acme Ltd
+                </a>
+                <span className="text-xs text-muted-foreground">
+                  {fixtureMoney(320000)} · Due 2026-09-10 · 14 days overdue
+                </span>
+              </li>
+              <li className="flex flex-col gap-0.5 rounded-md border border-border p-3">
+                <a href="#" className="link-accent">
+                  INV-0009, Bilbo &amp; Co
+                </a>
+                <span className="text-xs text-muted-foreground">
+                  {fixtureMoney(100000)} · Due 2026-09-23 · 1 day overdue
+                </span>
+              </li>
+            </ul>
+          </DashboardSection>
+
+          <DashboardSection
+            headingId={scoped("dashboard-summary-empty-heading")}
+            heading="Open projects"
+            countLine={<p>0 open projects</p>}
+          >
+            <EmptyState
+              heading="No open projects"
+              description="Projects that are planned, in progress or in review will show up here."
+              action={<Button size="sm">New project</Button>}
+            />
+          </DashboardSection>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              errored: the rest of the dashboard is fine (AC-11)
+            </p>
+            <section
+              aria-labelledby={scoped("dashboard-summary-error-heading")}
+              className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+            >
+              <h2
+                id={scoped("dashboard-summary-error-heading")}
+                className="text-base font-semibold tracking-tight"
+              >
+                Recent deliverables
+              </h2>
+              <ErrorState
+                heading="Recent deliverables could not be loaded"
+                description="The rest of the dashboard is fine. Try again to load this section."
+                action={<Button variant="outline">Try again</Button>}
+              />
+            </section>
+          </div>
+
+          <DashboardSectionSkeleton
+            headingId={scoped("dashboard-summary-loading-heading")}
+            heading="Recent deliverables"
+            label="Loading recent deliverables"
+          />
+        </div>
+      </Section>
+
+      <Section
+        id={scoped("dashboard-overview")}
+        title="Overview cards and invoiced by month"
+        description="The Overview row of stat cards and the invoiced by month chart above the three dashboard sections (spec 0020 addendum)."
+      >
+        <div className="flex flex-col gap-6">
+          <SummaryCardsGrid>
+            <SummaryCard
+              label="Overdue"
+              value="3 overdue"
+              href="#"
+              detail={
+                <div className="flex flex-col gap-0.5">
+                  <span>{fixtureMoney(420000)}</span>
+                </div>
+              }
+            />
+            <SummaryCard label="Open projects" value="7 open" href="#" />
+            <SummaryCard label="Active clients" value="12 active" href="#" />
+            <SummaryCard
+              label="New deliverables"
+              value="4 added"
+              detail="in the last 7 days"
+            />
+          </SummaryCardsGrid>
+
+          {(() => {
+            const chartConfig: ChartConfig = {
+              USD: { label: "USD", color: "var(--chart-1)" },
+              EUR: { label: "EUR", color: "var(--chart-2)" },
+            };
+            const chartData = [
+              { month: "Apr 2026", USD: 120000, EUR: 40000 },
+              { month: "May 2026", USD: 180000, EUR: 60000 },
+              { month: "Jun 2026", USD: 90000, EUR: 0 },
+              { month: "Jul 2026", USD: 220000, EUR: 80000 },
+              { month: "Aug 2026", USD: 160000, EUR: 50000 },
+              { month: "Sep 2026", USD: 240000, EUR: 100000 },
+            ];
+
+            return (
+              <section
+                aria-labelledby={scoped("dashboard-overview-chart-heading")}
+                className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
+              >
+                <h2
+                  id={scoped("dashboard-overview-chart-heading")}
+                  className="text-base font-semibold tracking-tight"
+                >
+                  Invoiced by month
+                </h2>
+
+                <InvoicedTrendChart
+                  config={chartConfig}
+                  data={chartData}
+                  currencies={["USD", "EUR"]}
+                />
+
+                <div className="sr-only">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead scope="col">Month</TableHead>
+                        <TableHead scope="col">USD</TableHead>
+                        <TableHead scope="col">EUR</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {chartData.map((row) => (
+                        <TableRow key={row.month}>
+                          <TableHead scope="row">{row.month}</TableHead>
+                          <TableCell>
+                            {row.USD === 0 ? "—" : fixtureMoney(row.USD)}
+                          </TableCell>
+                          <TableCell>
+                            {row.EUR === 0 ? "—" : fixtureMoney(row.EUR)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            );
+          })()}
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              empty: no invoices in the last 6 months (AC-23)
+            </p>
+            <section
+              aria-labelledby={scoped("dashboard-overview-chart-empty-heading")}
+              className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
+            >
+              <h2
+                id={scoped("dashboard-overview-chart-empty-heading")}
+                className="text-base font-semibold tracking-tight"
+              >
+                Invoiced by month
+              </h2>
+              <EmptyState
+                heading="No invoices in the last 6 months"
+                description="Once an invoice is issued, this chart will show the trend by month."
+              />
+            </section>
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              errored: the rest of the dashboard is fine (AC-24)
+            </p>
+            <section
+              aria-labelledby={scoped("dashboard-overview-error-heading")}
+              className="flex flex-col gap-4"
+            >
+              <h2
+                id={scoped("dashboard-overview-error-heading")}
+                className="text-base font-semibold tracking-tight"
+              >
+                Overview
+              </h2>
+              <ErrorState
+                heading="Overview could not be loaded"
+                description="The rest of the dashboard is fine. Try again to load this section."
+                action={<Button variant="outline">Try again</Button>}
+              />
+            </section>
+          </div>
+
+          <SummaryCardsSkeleton
+            headingId={scoped("dashboard-overview-loading-heading")}
+            heading="Overview"
+            label="Loading overview"
+          />
+
+          <section
+            aria-labelledby={scoped("dashboard-overview-chart-loading-heading")}
+            className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
+          >
+            <h2
+              id={scoped("dashboard-overview-chart-loading-heading")}
+              className="text-base font-semibold tracking-tight"
+            >
+              Invoiced by month
+            </h2>
+            <SkeletonRegion label="Loading invoiced by month">
+              <Skeleton className="h-64 w-full" />
+            </SkeletonRegion>
+          </section>
+        </div>
       </Section>
     </div>
   );

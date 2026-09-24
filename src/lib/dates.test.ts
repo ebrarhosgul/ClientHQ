@@ -8,7 +8,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { addDaysUtc, isRealCalendarDay, todayUtc } from "./dates";
+import {
+  addDaysUtc,
+  daysBetweenUtc,
+  isRealCalendarDay,
+  sixMonthWindowStart,
+  todayUtc,
+} from "./dates";
 
 describe("todayUtc", () => {
   it("returns the UTC calendar day as YYYY-MM-DD", () => {
@@ -75,5 +81,37 @@ describe("isRealCalendarDay", () => {
   it("refuses month 13 and day 0", () => {
     expect(isRealCalendarDay("2026-13-01")).toBe(false);
     expect(isRealCalendarDay("2026-01-00")).toBe(false);
+  });
+});
+
+describe("daysBetweenUtc (spec 0020, AC-5)", () => {
+  it("is one for a due date of yesterday", () => {
+    expect(daysBetweenUtc("2026-09-23", "2026-09-24")).toBe(1);
+  });
+
+  it("is zero for the same day", () => {
+    expect(daysBetweenUtc("2026-09-24", "2026-09-24")).toBe(0);
+  });
+
+  it("carries over a month boundary", () => {
+    expect(daysBetweenUtc("2026-08-31", "2026-09-02")).toBe(2);
+  });
+
+  it("is negative when `to` is earlier than `from`", () => {
+    expect(daysBetweenUtc("2026-09-24", "2026-09-20")).toBe(-4);
+  });
+});
+
+describe("sixMonthWindowStart (spec 0020 addendum)", () => {
+  it("is the first of the month five months back, within a year", () => {
+    expect(sixMonthWindowStart("2026-09-24")).toBe("2026-04-01");
+  });
+
+  it("carries over a year boundary", () => {
+    expect(sixMonthWindowStart("2026-02-15")).toBe("2025-09-01");
+  });
+
+  it("is a no op on the day, only the day of month is dropped", () => {
+    expect(sixMonthWindowStart("2026-06-01")).toBe("2026-01-01");
   });
 });

@@ -41,7 +41,7 @@ export function AuthFrame({ children }: AuthFrameProps) {
           their own portal.
         </p>
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          <Link href="/privacy" className="underline underline-offset-4">
+          <Link href="/privacy" className="link-accent">
             Privacy notice
           </Link>
         </p>

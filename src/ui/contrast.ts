@@ -228,6 +228,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   textPair("destructive text on the page", "--destructive", "--background"),
   textPair("destructive text on a card", "--destructive", "--card"),
 
+  // Spec 0021: the `link-accent` and `link-accent-inline` utilities' resting
+  // colour. `--link` copies `--primary`'s literal value (see globals.css); the
+  // hover/focus background reuses "accent surface label" above.
+  textPair("link text on a card", "--link", "--card"),
+
   // Status chips, both halves of every tint.
   textPair("neutral chip", "--chip-neutral-foreground", "--chip-neutral"),
   textPair("info chip", "--chip-info-foreground", "--chip-info"),
@@ -256,6 +261,14 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
 
   decorativePair("separator on the page", "--border", "--background"),
   decorativePair("separator on a card", "--border", "--card"),
+
+  // Invoiced by month chart lines (spec 0020 addendum): a line is a shape
+  // that carries meaning (which currency), so it clears the non text floor
+  // against the card the chart sits on, the same rule as the focus ring.
+  shapePair("chart line 1 on a card", "--chart-1", "--card"),
+  shapePair("chart line 2 on a card", "--chart-2", "--card"),
+  shapePair("chart line 3 on a card", "--chart-3", "--card"),
+  shapePair("chart line 4 on a card", "--chart-4", "--card"),
 ];
 
 export type PairMeasurement = ContrastPair & {

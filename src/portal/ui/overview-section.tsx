@@ -23,10 +23,7 @@ export function OverviewSection({
         <h2 id={headingId} className="text-base font-semibold tracking-tight">
           {title}
         </h2>
-        <Link
-          href={`/portal/${id}`}
-          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-        >
+        <Link href={`/portal/${id}`} className="link-accent text-sm">
           See all
         </Link>
       </div>

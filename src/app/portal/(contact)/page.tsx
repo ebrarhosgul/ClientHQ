@@ -73,7 +73,7 @@ export default async function PortalOverviewPage() {
               >
                 <Link
                   href={`/portal/projects/${project.id}`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className="link-accent"
                 >
                   {project.name}
                 </Link>
@@ -105,13 +105,13 @@ export default async function PortalOverviewPage() {
               >
                 <Link
                   href={`/deliverables/${file.id}/download`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className="link-accent"
                 >
                   {file.name}
                 </Link>
                 <Link
                   href={`/portal/projects/${file.projectId}`}
-                  className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+                  className="link-accent text-sm"
                 >
                   {file.projectName}
                 </Link>
@@ -145,7 +145,7 @@ export default async function PortalOverviewPage() {
               >
                 <Link
                   href={`/portal/invoices/${invoice.id}`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className="link-accent"
                 >
                   {formatInvoiceNumber(invoice.number)}
                 </Link>
