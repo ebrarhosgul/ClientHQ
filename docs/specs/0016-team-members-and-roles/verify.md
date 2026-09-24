@@ -1,6 +1,6 @@
-# Verify: team members and roles · spec 0015 · updated 2026-09-17
+# Verify: team members and roles · spec 0016 · updated 2026-09-17
 
-_Steps derived from spec 0015 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
+_Steps derived from spec 0016 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
 ## Known gaps (accepted 2026-09-17)
 

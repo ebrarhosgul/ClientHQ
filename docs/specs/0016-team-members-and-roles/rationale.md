@@ -1,4 +1,4 @@
-# 0015. Team members and roles: rationale
+# 0016. Team members and roles: rationale
 
 The decision record behind [index.md](index.md). `/develop` reads the index; this file is for the humans who want the why.
 
