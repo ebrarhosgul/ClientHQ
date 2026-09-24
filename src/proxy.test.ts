@@ -17,7 +17,7 @@
  */
 import { createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AGENCY_ROUTES, PUBLIC_ROUTES } from "./proxy";
 import { ALL_NAV } from "./ui/shell/navigation";
@@ -124,4 +124,66 @@ describe("the agency organization check (AC-5, AC-20)", () => {
       expect(isAgency(request(path))).toBe(false);
     },
   );
+});
+
+describe("the onboarding redirect's origin (security audit finding #2)", () => {
+  // `request.url` is built from the Host header the Edge runtime sees, which is
+  // not trustworthy. The redirect must be pinned to the app's own configured
+  // origin regardless of what a caller sends.
+  it("redirects to the configured app origin, not a forged Host header", async () => {
+    vi.resetModules();
+
+    vi.doMock("@/lib/env", () => ({
+      env: () => ({ NEXT_PUBLIC_APP_URL: "https://clienthq.example" }),
+      isClerkConfigured: () => true,
+    }));
+
+    vi.doMock("@clerk/nextjs/server", async (importOriginal) => {
+      const actual =
+        await importOriginal<typeof import("@clerk/nextjs/server")>();
+
+      return {
+        ...actual,
+        clerkMiddleware:
+          (
+            handler: (
+              auth: () => Promise<{
+                userId: string;
+                orgId: string | undefined;
+                redirectToSignIn: () => never;
+              }>,
+              request: NextRequest,
+            ) => unknown,
+          ) =>
+          (req: NextRequest) =>
+            handler(
+              async () => ({
+                userId: "user_1",
+                orgId: undefined,
+                redirectToSignIn: () => {
+                  throw new Error("not expected to be called in this test");
+                },
+              }),
+              req,
+            ),
+      };
+    });
+
+    const { default: proxy } = await import("./proxy");
+
+    const forgedRequest = new NextRequest(
+      new URL("/dashboard", "https://attacker.example"),
+    );
+
+    const response = (await proxy(forgedRequest, {} as never)) as
+      Response | undefined;
+
+    expect(response?.headers.get("location")).toBe(
+      "https://clienthq.example/onboarding",
+    );
+
+    vi.doUnmock("@/lib/env");
+    vi.doUnmock("@clerk/nextjs/server");
+    vi.resetModules();
+  });
 });
