@@ -461,6 +461,22 @@ describe.skipIf(!url)(
               status: "ready",
               createdAt: new Date("2026-09-23T00:00:00Z"),
             },
+            // Same, but filed under A's own active project: the project id
+            // list alone would let this through, so only the deliverables
+            // read's own org scoping can exclude it.
+            {
+              id: newId(),
+              orgId: orgB,
+              projectId: active.id,
+              name: "other-agency-on-a-project.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userB,
+              visibleToClient: false,
+              status: "ready",
+              createdAt: new Date("2026-09-23T00:00:00Z"),
+            },
           ]);
 
           const summary = await recentDeliverablesSummary(
