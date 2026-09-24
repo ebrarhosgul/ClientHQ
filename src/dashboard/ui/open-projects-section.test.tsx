@@ -7,8 +7,18 @@
  * streaming renderer like `page.test.tsx`. `src/dashboard/queries` is
  * stubbed; which projects count and their order is `queries.test.ts`'s job.
  */
+import { redirect } from "next/navigation";
 import { renderToReadableStream } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+function redirectError(path: string): unknown {
+  try {
+    redirect(path);
+  } catch (error) {
+    return error;
+  }
+  throw new Error("redirect() did not throw");
+}
 
 const mocks = vi.hoisted(() => ({
   openProjectsSummary: vi.fn(),
@@ -124,5 +134,16 @@ describe("OpenProjectsSection", () => {
       error,
       expect.objectContaining({ tags: { section: "open_projects" } }),
     );
+  });
+
+  it("rethrows a redirect instead of reporting or rendering an error (AC-11)", async () => {
+    const error = redirectError("/onboarding");
+    mocks.openProjectsSummary.mockRejectedValue(error);
+
+    await expect(
+      OpenProjectsSection({ ctx: CTX, todayUtc: "2026-09-24" }),
+    ).rejects.toBe(error);
+
+    expect(mocks.reportException).not.toHaveBeenCalled();
   });
 });

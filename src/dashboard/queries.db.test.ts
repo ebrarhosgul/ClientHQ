@@ -80,6 +80,7 @@ type Fixture = {
   readonly clientA: string;
   readonly clientB: string;
   readonly userA: string;
+  readonly userB: string;
 };
 
 async function seedOrganization(
@@ -133,6 +134,7 @@ async function seedFixture(tx: TransactionExecutor): Promise<Fixture> {
     clientA: a.clientId,
     clientB: b.clientId,
     userA: a.userId,
+    userB: b.userId,
   };
 }
 
@@ -348,102 +350,133 @@ describe.skipIf(!url)("openProjectsSummary against real PostgreSQL", () => {
 describe.skipIf(!url)(
   "recentDeliverablesSummary against real PostgreSQL",
   () => {
-    it("excludes pending and deliverables on archived projects, and windows the headline (AC-7)", async () => {
-      await inRollback(async (tx, { orgA, clientA, userA }) => {
-        const [active] = await tx
-          .insert(projects)
-          .values({
-            id: newId(),
-            orgId: orgA,
-            clientId: clientA,
-            name: "Active",
-            status: "in_progress",
-          })
-          .returning();
-        const [archived] = await tx
-          .insert(projects)
-          .values({
-            id: newId(),
-            orgId: orgA,
-            clientId: clientA,
-            name: "Archived",
-            status: "in_progress",
-            archivedAt: new Date("2026-09-01T00:00:00Z"),
-          })
-          .returning();
+    it("excludes pending and deliverables on archived projects, and never another agency's deliverable (AC-7, AC-12)", async () => {
+      await inRollback(
+        async (tx, { orgA, orgB, clientA, clientB, userA, userB }) => {
+          const [active] = await tx
+            .insert(projects)
+            .values({
+              id: newId(),
+              orgId: orgA,
+              clientId: clientA,
+              name: "Active",
+              status: "in_progress",
+            })
+            .returning();
+          const [archived] = await tx
+            .insert(projects)
+            .values({
+              id: newId(),
+              orgId: orgA,
+              clientId: clientA,
+              name: "Archived",
+              status: "in_progress",
+              archivedAt: new Date("2026-09-01T00:00:00Z"),
+            })
+            .returning();
+          const [otherAgency] = await tx
+            .insert(projects)
+            .values({
+              id: newId(),
+              orgId: orgB,
+              clientId: clientB,
+              name: "Other agency",
+              status: "in_progress",
+            })
+            .returning();
 
-        if (active === undefined || archived === undefined) {
-          throw new Error("insert did not return a row");
-        }
+          if (
+            active === undefined ||
+            archived === undefined ||
+            otherAgency === undefined
+          ) {
+            throw new Error("insert did not return a row");
+          }
 
-        await tx.insert(deliverables).values([
-          {
-            id: newId(),
-            orgId: orgA,
-            projectId: active.id,
-            name: "recent-ready.pdf",
-            r2Key: r2Key(),
-            contentType: "application/pdf",
-            sizeBytes: 100,
-            uploadedByUserId: userA,
-            visibleToClient: true,
-            status: "ready",
-            createdAt: new Date("2026-09-23T00:00:00Z"),
-          },
-          {
-            id: newId(),
-            orgId: orgA,
-            projectId: active.id,
-            name: "old-ready.pdf",
-            r2Key: r2Key(),
-            contentType: "application/pdf",
-            sizeBytes: 100,
-            uploadedByUserId: userA,
-            visibleToClient: false,
-            status: "ready",
-            createdAt: new Date("2026-09-01T00:00:00Z"),
-          },
-          {
-            id: newId(),
-            orgId: orgA,
-            projectId: active.id,
-            name: "pending.pdf",
-            r2Key: r2Key(),
-            contentType: "application/pdf",
-            sizeBytes: 100,
-            uploadedByUserId: userA,
-            visibleToClient: false,
-            status: "pending",
-            createdAt: new Date("2026-09-23T00:00:00Z"),
-          },
-          {
-            id: newId(),
-            orgId: orgA,
-            projectId: archived.id,
-            name: "on-archived-project.pdf",
-            r2Key: r2Key(),
-            contentType: "application/pdf",
-            sizeBytes: 100,
-            uploadedByUserId: userA,
-            visibleToClient: false,
-            status: "ready",
-            createdAt: new Date("2026-09-23T00:00:00Z"),
-          },
-        ]);
+          await tx.insert(deliverables).values([
+            {
+              id: newId(),
+              orgId: orgA,
+              projectId: active.id,
+              name: "recent-ready.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userA,
+              visibleToClient: true,
+              status: "ready",
+              createdAt: new Date("2026-09-23T00:00:00Z"),
+            },
+            {
+              id: newId(),
+              orgId: orgA,
+              projectId: active.id,
+              name: "old-ready.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userA,
+              visibleToClient: false,
+              status: "ready",
+              createdAt: new Date("2026-09-01T00:00:00Z"),
+            },
+            {
+              id: newId(),
+              orgId: orgA,
+              projectId: active.id,
+              name: "pending.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userA,
+              visibleToClient: false,
+              status: "pending",
+              createdAt: new Date("2026-09-23T00:00:00Z"),
+            },
+            {
+              id: newId(),
+              orgId: orgA,
+              projectId: archived.id,
+              name: "on-archived-project.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userA,
+              visibleToClient: false,
+              status: "ready",
+              createdAt: new Date("2026-09-23T00:00:00Z"),
+            },
+            // Another agency's deliverable must never appear in A's summary,
+            // in its rows or in its 7 day count.
+            {
+              id: newId(),
+              orgId: orgB,
+              projectId: otherAgency.id,
+              name: "other-agency-ready.pdf",
+              r2Key: r2Key(),
+              contentType: "application/pdf",
+              sizeBytes: 100,
+              uploadedByUserId: userB,
+              visibleToClient: false,
+              status: "ready",
+              createdAt: new Date("2026-09-23T00:00:00Z"),
+            },
+          ]);
 
-        const summary = await recentDeliverablesSummary(
-          staffContext(orgA),
-          NOW,
-        );
+          const summary = await recentDeliverablesSummary(
+            staffContext(orgA),
+            NOW,
+          );
 
-        expect(summary.rows.map((row) => row.name)).toEqual([
-          "recent-ready.pdf",
-          "old-ready.pdf",
-        ]);
-        // Exactly one falls inside the last 7 days from NOW (2026-09-17..24).
-        expect(summary.addedLast7Days).toBe(1);
-        expect(summary.rows[0]?.visibleToClient).toBe(true);
-      });
+          expect(summary.rows.map((row) => row.name)).toEqual([
+            "recent-ready.pdf",
+            "old-ready.pdf",
+          ]);
+          // Exactly one falls inside the last 7 days from NOW (2026-09-17..24).
+          expect(summary.addedLast7Days).toBe(1);
+          expect(summary.rows[0]?.visibleToClient).toBe(true);
+        },
+      );
     });
 
     it("returns zero rows with no second query when the agency has no active project", async () => {

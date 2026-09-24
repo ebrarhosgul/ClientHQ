@@ -388,7 +388,7 @@ Replace the dashboard's placeholder empty state with a real one: the agency's op
   - [x] Accessibility and proof: `/design` gallery entries with axe in both themes, pure unit tests, real PostgreSQL tests for tenancy and archive exclusions, the updated page test · AC-3 to AC-7, AC-9, AC-11, AC-12, AC-13, AC-15
 - [x] Verify it: `/check verify dashboard summary`
 - [x] Test it: `/test dashboard summary`
-- [ ] Review it (fresh model): `/check review dashboard summary`
+- [x] Review it (fresh model): `/check review dashboard summary`
 - [ ] Document it: `/document dashboard summary`
 Spec [0020](../specs/0020-dashboard-summary/index.md) · atomic build tasks in its `## Build plan`
 

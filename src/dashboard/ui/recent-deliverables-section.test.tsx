@@ -9,10 +9,20 @@
  * Unlike the other two sections, this one never renders a "view all" link:
  * there is no deliverables list to point at (spec 0020).
  */
+import { redirect } from "next/navigation";
 import { renderToReadableStream } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatBillingDate } from "@/payments/billing-state";
+
+function redirectError(path: string): unknown {
+  try {
+    redirect(path);
+  } catch (error) {
+    return error;
+  }
+  throw new Error("redirect() did not throw");
+}
 
 const mocks = vi.hoisted(() => ({
   recentDeliverablesSummary: vi.fn(),
@@ -126,5 +136,16 @@ describe("RecentDeliverablesSection", () => {
       error,
       expect.objectContaining({ tags: { section: "recent_deliverables" } }),
     );
+  });
+
+  it("rethrows a redirect instead of reporting or rendering an error (AC-11)", async () => {
+    const error = redirectError("/onboarding");
+    mocks.recentDeliverablesSummary.mockRejectedValue(error);
+
+    await expect(
+      RecentDeliverablesSection({ ctx: CTX, now: NOW }),
+    ).rejects.toBe(error);
+
+    expect(mocks.reportException).not.toHaveBeenCalled();
   });
 });

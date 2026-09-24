@@ -9,10 +9,20 @@
  * stubbed here; which invoices count and how they're ordered is
  * `queries.test.ts`'s job, not this file's.
  */
+import { redirect } from "next/navigation";
 import { renderToReadableStream } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatMoney } from "@/lib/money";
+
+function redirectError(path: string): unknown {
+  try {
+    redirect(path);
+  } catch (error) {
+    return error;
+  }
+  throw new Error("redirect() did not throw");
+}
 
 const mocks = vi.hoisted(() => ({
   overdueInvoicesSummary: vi.fn(),
@@ -141,5 +151,16 @@ describe("OverdueInvoicesSection", () => {
       error,
       expect.objectContaining({ tags: { section: "overdue_invoices" } }),
     );
+  });
+
+  it("rethrows a redirect instead of reporting or rendering an error (AC-11)", async () => {
+    const error = redirectError("/onboarding");
+    mocks.overdueInvoicesSummary.mockRejectedValue(error);
+
+    await expect(
+      OverdueInvoicesSection({ ctx: CTX, todayUtc: "2026-09-24" }),
+    ).rejects.toBe(error);
+
+    expect(mocks.reportException).not.toHaveBeenCalled();
   });
 });
