@@ -48,7 +48,7 @@ export async function RecentDeliverablesSection({
     return (
       <section
         aria-labelledby={RECENT_DELIVERABLES_HEADING_ID}
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+        className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
       >
         <h2
           id={RECENT_DELIVERABLES_HEADING_ID}
@@ -74,7 +74,7 @@ export async function RecentDeliverablesSection({
       headingId={RECENT_DELIVERABLES_HEADING_ID}
       heading="Recent deliverables"
       countLine={
-        <p>
+        <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
           {summary.addedLast7Days === 0
             ? "None added in the last 7 days"
             : `${summary.addedLast7Days} added in the last 7 days`}
@@ -87,11 +87,11 @@ export async function RecentDeliverablesSection({
           description="Files are uploaded from a project's own page. Ones added there will show up here."
         />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y divide-border">
           {summary.rows.map((row) => (
             <li
               key={row.id}
-              className="flex flex-col gap-0.5 rounded-md border border-border p-3"
+              className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-3 transition-surface first:pt-0 last:pb-0 hover:bg-muted"
             >
               <Link
                 href={`/projects/${row.projectId}`}
@@ -99,7 +99,7 @@ export async function RecentDeliverablesSection({
               >
                 {row.name}, {row.clientName}
               </Link>
-              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground tabular-nums">
                 <span>{row.projectName}</span>
                 <StatusChip tint={row.visibleToClient ? "info" : "neutral"}>
                   {row.visibleToClient ? "Shared with client" : "Internal"}

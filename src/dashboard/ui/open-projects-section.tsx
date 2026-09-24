@@ -44,7 +44,7 @@ export async function OpenProjectsSection({
     return (
       <section
         aria-labelledby={OPEN_PROJECTS_HEADING_ID}
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+        className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
       >
         <h2
           id={OPEN_PROJECTS_HEADING_ID}
@@ -70,7 +70,7 @@ export async function OpenProjectsSection({
       headingId={OPEN_PROJECTS_HEADING_ID}
       heading="Open projects"
       countLine={
-        <p>
+        <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
           {summary.count} open project{summary.count === 1 ? "" : "s"}
         </p>
       }
@@ -91,11 +91,11 @@ export async function OpenProjectsSection({
           }
         />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y divide-border">
           {summary.rows.map((row) => (
             <li
               key={row.id}
-              className="flex flex-col gap-0.5 rounded-md border border-border p-3"
+              className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-3 transition-surface first:pt-0 last:pb-0 hover:bg-muted"
             >
               <Link
                 href={`/projects/${row.id}`}
@@ -103,7 +103,7 @@ export async function OpenProjectsSection({
               >
                 {row.name}, {row.clientName}
               </Link>
-              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground tabular-nums">
                 <ProjectStatusChip status={row.status} />
                 <span>{row.dueDate ?? "No due date"}</span>
                 {row.overdue ? <OverdueBadge /> : undefined}

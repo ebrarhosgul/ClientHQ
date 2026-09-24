@@ -25,13 +25,13 @@ export function DashboardSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+      className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         <h2 id={headingId} className="text-base font-semibold tracking-tight">
           {heading}
         </h2>
-        <div className="text-sm text-muted-foreground">{countLine}</div>
+        <div className="flex flex-col gap-1">{countLine}</div>
       </div>
 
       {children}
@@ -39,7 +39,7 @@ export function DashboardSection({
       {viewAll ? (
         <Link
           href={viewAll.href}
-          className="self-start text-sm font-medium underline underline-offset-2"
+          className="self-start text-sm font-medium text-primary underline underline-offset-2"
         >
           {viewAll.label}
         </Link>
@@ -69,18 +69,20 @@ export function DashboardSectionSkeleton({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+      className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
     >
-      <h2 id={headingId} className="text-base font-semibold tracking-tight">
-        {heading}
-      </h2>
+      <div className="flex flex-col gap-2">
+        <h2 id={headingId} className="text-base font-semibold tracking-tight">
+          {heading}
+        </h2>
+        <Skeleton className="h-8 w-32" />
+      </div>
 
       <SkeletonRegion label={label}>
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-3/4" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-3/4" />
         </div>
       </SkeletonRegion>
     </section>

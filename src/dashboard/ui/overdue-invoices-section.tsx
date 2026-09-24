@@ -47,7 +47,7 @@ export async function OverdueInvoicesSection({
     return (
       <section
         aria-labelledby={OVERDUE_INVOICES_HEADING_ID}
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+        className="flex flex-col gap-5 rounded-lg border border-border bg-card p-4 text-card-foreground"
       >
         <h2
           id={OVERDUE_INVOICES_HEADING_ID}
@@ -74,14 +74,21 @@ export async function OverdueInvoicesSection({
       heading="Overdue invoices"
       countLine={
         <>
-          <p>
+          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
             {summary.count} overdue invoice{summary.count === 1 ? "" : "s"}
           </p>
-          {summary.totals.map((total) => (
-            <p key={total.currency}>
-              {formatMoney(total.cents, total.currency)} overdue
-            </p>
-          ))}
+          {summary.totals.length > 0 ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {summary.totals.map((total) => (
+                <p
+                  key={total.currency}
+                  className="text-sm font-medium tabular-nums text-muted-foreground"
+                >
+                  {formatMoney(total.cents, total.currency)} overdue
+                </p>
+              ))}
+            </div>
+          ) : undefined}
         </>
       }
       viewAll={
@@ -99,11 +106,11 @@ export async function OverdueInvoicesSection({
           description="Invoices that are overdue, or sent and past their due date, will show up here."
         />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y divide-border">
           {summary.rows.map((row) => (
             <li
               key={row.id}
-              className="flex flex-col gap-0.5 rounded-md border border-border p-3"
+              className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-3 transition-surface first:pt-0 last:pb-0 hover:bg-muted"
             >
               <Link
                 href={`/invoices/${row.id}`}
@@ -111,7 +118,7 @@ export async function OverdueInvoicesSection({
               >
                 {formatInvoiceNumber(row.number)}, {row.clientName}
               </Link>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {formatMoney(row.totalCents, row.currency)} · Due {row.dueDate}{" "}
                 · {row.daysOverdue} day{row.daysOverdue === 1 ? "" : "s"}{" "}
                 overdue

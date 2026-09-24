@@ -73,7 +73,7 @@ export default async function DashboardPage() {
 
   if (session === undefined) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <PageHeader
           title="Dashboard"
           description="Where your agency's week is summarised, once there is a week to summarise."
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
   const anyClient = await hasAnyClient(ctx);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Dashboard"
         description={`${agency.name} · ${ROLE_LABEL[ctx.role]}`}
