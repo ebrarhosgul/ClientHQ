@@ -31,6 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 18 | Daily cron sweeps | Slice 9 | in-progress |
 | 19 | Rate limiting | Slice 9 | in-progress |
 | 20 | Product analytics & error tracking | Slice 9 | in-progress |
+| 21 | Dashboard summary | Slice 10 | in-progress |
 
 ## Foundations
 
@@ -374,6 +375,23 @@ Knowing what happens in production: errors and traces across server and browser,
 - [ ] Document it: `/document product analytics & error tracking`
 Spec [0019](../specs/0019-product-analytics-and-error-tracking/index.md) · atomic build tasks in its `## Build plan`
 
+## Slice 10: Dashboard
+
+### 21. Dashboard summary · in-progress
+Replace the dashboard's placeholder empty state with a real one: the agency's open projects, overdue invoices and recently added deliverables, each pulled live from the data features 11, 12 and 13 already built, and each linking through to its own list.
+**Done when:** a signed in agency user sees their own genuinely open projects, overdue invoices and recently added deliverables on `/dashboard`, every query runs through the tenant scoping layer, and each section shows its own correct empty state when there is nothing yet to show.
+- [x] Design it (spec): `/architect dashboard summary`
+- [ ] Build it: `/develop dashboard summary`
+  - [ ] The thread: `src/dashboard/` with `openProjectsSummary`, the shared section frame, the reworked header (agency · role), the open projects section streamed in its own Suspense boundary with real rows, links and empty state · AC-1, AC-6, AC-8, AC-12, AC-14
+  - [ ] The other two sections: overdue invoices (overdue or sent past due, per currency totals, days overdue) and recent deliverables (ready on active projects, shared or internal chip, 7 day headline) · AC-2, AC-3, AC-4, AC-5, AC-7, AC-8
+  - [ ] Loading, failure and first run: announced skeletons, per section error isolation with `unstable_rethrow` and `reportException`, the "Add a client" first run state and the no Clerk path · AC-9, AC-10, AC-11, AC-13
+  - [ ] Accessibility and proof: `/design` gallery entries with axe in both themes, pure unit tests, real PostgreSQL tests for tenancy and archive exclusions, the updated page test · AC-3 to AC-7, AC-9, AC-11, AC-12, AC-13, AC-15
+- [ ] Verify it: `/check verify dashboard summary`
+- [ ] Test it: `/test dashboard summary`
+- [ ] Review it (fresh model): `/check review dashboard summary`
+- [ ] Document it: `/document dashboard summary`
+Spec [0020](../specs/0020-dashboard-summary/index.md) · atomic build tasks in its `## Build plan`
+
 ## Deferred
 Out of scope for the current build pass, kept so the plan stays honest.
 - **Marketing landing page & SEO**: a public page with metadata, sitemap and social cards. You left it out, so `/` stays a minimal entry point to sign in and sign up · needs a decision
@@ -400,6 +418,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Deliverable `shared_at`**: the portal labels a file's date `Added` from `created_at` because flipping visibility records no time. One column set and cleared by `setDeliverableVisibility` would make it an exact `Shared on` · from spec 0014 · needs a decision
 - **Silent client switch on a revoked cookie row**: when the contact cookie names a row that was since removed, the resolver falls back to the person's other row without saying so. Nothing leaks, but a one line notice would stop the surprise · from spec 0014 · needs a decision
 - **Deleted agency purge**: spec 0015 soft deletes an agency and stops there, and spec 0017 now reconciles its Stripe subscription state faithfully but deliberately does not cancel it. What remains is the destructive half: cancel the Stripe subscription of a soft deleted agency and, after a grace period, remove its rows and its R2 objects. Its own decision because it destroys data: `/architect deleted agency purge`. Until then storage cost accrues for dead agencies and their subscription bills on · from spec 0015 and spec 0017 · needs a decision
+- **Overdue filter on `/invoices` including past due**: the dashboard counts a `sent` invoice past its due date as overdue at once, but `/invoices?status=overdue` only lists the stored `overdue` status, so the two can differ until the nightly sweep runs (at most a day). Widening that filter changes feature 13's list behaviour and tests; worth doing only if the mismatch confuses someone · from spec 0020 · needs a decision
 
 ## Legend
 
