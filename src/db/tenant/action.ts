@@ -11,6 +11,7 @@
  * and the two PostgreSQL constraint violations. Everything else propagates,
  * because an unexpected exception is a bug, not a business outcome.
  */
+import { sql } from "drizzle-orm";
 import { revalidatePath, updateTag } from "next/cache";
 import { flattenError, type ZodType } from "zod";
 
@@ -62,6 +63,20 @@ export type ActionConfig<TSchema extends ZodType, TData> = {
   readonly revalidate?: RevalidateConfig;
   /** Run the handler inside one transaction, so a throw rolls back every write. */
   readonly transaction?: boolean;
+  /**
+   * Serialize concurrent calls for the same organization behind a Postgres
+   * advisory lock, held for the handler's whole span, external calls
+   * included. Requires `transaction: true`; the lock is transaction scoped
+   * (`pg_advisory_xact_lock`), which is what makes it survive the Supabase
+   * pooler's transaction mode, and it releases itself on commit or rollback,
+   * so a thrown refusal never leaves it held.
+   *
+   * For an action whose read-decide-write span reaches an external system
+   * with no compare-and-swap of its own (Clerk's membership API, notably),
+   * this is the only thing standing between two concurrent calls and both
+   * reading the same stale snapshot.
+   */
+  readonly lockOrg?: boolean;
   readonly handler: (
     args: ActionHandlerArgs<TSchema["_output"]>,
   ) => Promise<TData>;
@@ -298,13 +313,19 @@ export function withTenantAction<TSchema extends ZodType, TData>(
       const data = config.transaction
         ? await (
             await pooledDb()
-          ).transaction(async (tx) =>
-            config.handler({
+          ).transaction(async (tx) => {
+            if (config.lockOrg) {
+              await tx.execute(
+                sql`select pg_advisory_xact_lock(hashtextextended(${ctx.orgId}, 0))`,
+              );
+            }
+
+            return config.handler({
               input: parsed.data,
               ctx,
               db: tenantDb(ctx, tx),
-            }),
-          )
+            });
+          })
         : await config.handler({
             input: parsed.data,
             ctx,
