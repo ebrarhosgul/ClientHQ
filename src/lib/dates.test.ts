@@ -12,6 +12,7 @@ import {
   addDaysUtc,
   daysBetweenUtc,
   isRealCalendarDay,
+  sixMonthWindowStart,
   todayUtc,
 } from "./dates";
 
@@ -98,5 +99,19 @@ describe("daysBetweenUtc (spec 0020, AC-5)", () => {
 
   it("is negative when `to` is earlier than `from`", () => {
     expect(daysBetweenUtc("2026-09-24", "2026-09-20")).toBe(-4);
+  });
+});
+
+describe("sixMonthWindowStart (spec 0020 addendum)", () => {
+  it("is the first of the month five months back, within a year", () => {
+    expect(sixMonthWindowStart("2026-09-24")).toBe("2026-04-01");
+  });
+
+  it("carries over a year boundary", () => {
+    expect(sixMonthWindowStart("2026-02-15")).toBe("2025-09-01");
+  });
+
+  it("is a no op on the day, only the day of month is dropped", () => {
+    expect(sixMonthWindowStart("2026-06-01")).toBe("2026-01-01");
   });
 });

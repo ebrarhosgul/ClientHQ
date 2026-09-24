@@ -3,8 +3,17 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { agencyContext, currentAgency } from "@/auth/context";
-import { hasAnyClient } from "@/dashboard/queries";
+import {
+  hasAnyClient,
+  openProjectsSummary,
+  overdueInvoicesSummary,
+  recentDeliverablesSummary,
+} from "@/dashboard/queries";
 import { DashboardSectionSkeleton } from "@/dashboard/ui/dashboard-section";
+import {
+  InvoicedTrendSection,
+  InvoicedTrendSkeleton,
+} from "@/dashboard/ui/invoiced-trend-section";
 import {
   OVERDUE_INVOICES_HEADING_ID,
   OverdueInvoicesSection,
@@ -14,9 +23,14 @@ import {
   OpenProjectsSection,
 } from "@/dashboard/ui/open-projects-section";
 import {
+  OVERVIEW_HEADING_ID,
+  OverviewSection,
+} from "@/dashboard/ui/overview-section";
+import {
   RECENT_DELIVERABLES_HEADING_ID,
   RecentDeliverablesSection,
 } from "@/dashboard/ui/recent-deliverables-section";
+import { SummaryCardsSkeleton } from "@/dashboard/ui/summary-cards";
 import type { MembershipRole } from "@/db/schema";
 import { isClerkConfigured } from "@/lib/env";
 import { todayUtc } from "@/lib/dates";
@@ -61,12 +75,14 @@ function FirstRunEmptyState() {
 }
 
 /**
- * Where signed in agency staff land (spec 0020).
+ * Where signed in agency staff land (spec 0020, addendum).
  *
  * The header resolves before any section starts: which agency, and whether it
- * has a client at all, decide the page's shape (AC-9). The three sections
- * that follow are independent, each in its own `<Suspense>` boundary, so one
- * slow or failing read never blocks or blanks the other two (AC-10, AC-11).
+ * has a client at all, decide the page's shape (AC-9). The five sections that
+ * follow are independent, each in its own `<Suspense>` boundary, so one slow
+ * or failing read never blocks or blanks the others (AC-10, AC-11, AC-24).
+ * Overview and three of the detail sections share the same three promises
+ * (started once, above), so a shared read never runs twice.
  */
 export default async function DashboardPage() {
   const session = await welcome();
@@ -88,6 +104,26 @@ export default async function DashboardPage() {
   const now = new Date();
   const anyClient = await hasAnyClient(ctx);
 
+  if (!anyClient) {
+    return (
+      <div className="flex flex-col gap-8">
+        <PageHeader
+          title="Dashboard"
+          description={`${agency.name} · ${ROLE_LABEL[ctx.role]}`}
+        />
+        <FirstRunEmptyState />
+      </div>
+    );
+  }
+
+  // Started once, unawaited, immediately after the client check: `Overview`
+  // and the matching detail section below each await the same promise, so
+  // the query never runs twice and the two can never disagree within one
+  // page load (spec 0020 addendum, Feature design).
+  const overdueInvoicesPromise = overdueInvoicesSummary(ctx, today);
+  const openProjectsPromise = openProjectsSummary(ctx, today);
+  const recentDeliverablesPromise = recentDeliverablesSummary(ctx, now);
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
@@ -95,8 +131,29 @@ export default async function DashboardPage() {
         description={`${agency.name} · ${ROLE_LABEL[ctx.role]}`}
       />
 
-      {anyClient ? (
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <Suspense
+          fallback={
+            <SummaryCardsSkeleton
+              headingId={OVERVIEW_HEADING_ID}
+              heading="Overview"
+              label="Loading overview"
+            />
+          }
+        >
+          <OverviewSection
+            ctx={ctx}
+            overdueInvoices={overdueInvoicesPromise}
+            openProjects={openProjectsPromise}
+            recentDeliverables={recentDeliverablesPromise}
+          />
+        </Suspense>
+
+        <Suspense fallback={<InvoicedTrendSkeleton />}>
+          <InvoicedTrendSection ctx={ctx} todayUtc={today} />
+        </Suspense>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Suspense
             fallback={
               <DashboardSectionSkeleton
@@ -106,7 +163,7 @@ export default async function DashboardPage() {
               />
             }
           >
-            <OverdueInvoicesSection ctx={ctx} todayUtc={today} />
+            <OverdueInvoicesSection summary={overdueInvoicesPromise} />
           </Suspense>
 
           <Suspense
@@ -118,7 +175,7 @@ export default async function DashboardPage() {
               />
             }
           >
-            <OpenProjectsSection ctx={ctx} todayUtc={today} />
+            <OpenProjectsSection summary={openProjectsPromise} />
           </Suspense>
 
           <Suspense
@@ -130,12 +187,10 @@ export default async function DashboardPage() {
               />
             }
           >
-            <RecentDeliverablesSection ctx={ctx} now={now} />
+            <RecentDeliverablesSection summary={recentDeliverablesPromise} />
           </Suspense>
         </div>
-      ) : (
-        <FirstRunEmptyState />
-      )}
+      </div>
     </div>
   );
 }

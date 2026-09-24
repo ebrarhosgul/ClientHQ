@@ -113,7 +113,7 @@ export default async function PortalProjectPage({
               >
                 <Link
                   href={`/deliverables/${file.id}/download`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className="link-accent"
                 >
                   {file.name}
                 </Link>

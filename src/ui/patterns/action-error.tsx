@@ -25,10 +25,7 @@ export function ActionErrorMessage({ error }: ActionErrorMessageProps) {
       {error.code === "subscription_inactive" ? (
         <>
           {" "}
-          <Link
-            href="/billing"
-            className="font-medium underline underline-offset-2"
-          >
+          <Link href="/billing" className="link-accent-inline">
             Go to billing
           </Link>
         </>

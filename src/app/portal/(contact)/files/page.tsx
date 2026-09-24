@@ -89,7 +89,7 @@ export default async function PortalFilesPage({
               >
                 <Link
                   href={`/portal/projects/${group.projectId}`}
-                  className="underline-offset-2 hover:underline"
+                  className="link-accent"
                 >
                   {group.projectName}
                 </Link>
@@ -103,7 +103,7 @@ export default async function PortalFilesPage({
                   >
                     <Link
                       href={`/deliverables/${file.id}/download`}
-                      className="font-medium underline-offset-2 hover:underline"
+                      className="link-accent"
                     >
                       {file.name}
                     </Link>

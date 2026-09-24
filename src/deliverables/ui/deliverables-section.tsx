@@ -100,7 +100,7 @@ export function DeliverablesSection({
               <div className="flex min-w-0 flex-col gap-0.5">
                 <a
                   href={`/deliverables/${deliverable.id}/download`}
-                  className="truncate font-medium underline underline-offset-2"
+                  className="link-accent truncate"
                 >
                   {deliverable.name}
                 </a>

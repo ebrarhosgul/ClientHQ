@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import type { InvoiceStatus } from "@/db/schema";
 
-import { summariseOverdue } from "./queries";
+import { summariseInvoicedByMonth, summariseOverdue } from "./queries";
 
 const TODAY = "2026-09-24";
 
@@ -180,5 +180,114 @@ describe("summariseOverdue", () => {
     );
 
     expect(summary.rows[0]?.clientName).toBe("Bilbo & Co");
+  });
+});
+
+describe("summariseInvoicedByMonth (spec 0020 addendum, AC-21, AC-22)", () => {
+  function invoiced(overrides: {
+    readonly issueDate: string | null;
+    readonly currency?: string;
+    readonly totalCents?: number;
+  }) {
+    return {
+      issueDate: overrides.issueDate,
+      currency: overrides.currency ?? "USD",
+      totalCents: overrides.totalCents ?? 10_000,
+    };
+  }
+
+  it("returns exactly 6 months, oldest first, ending with today's month", () => {
+    const trend = summariseInvoicedByMonth([], TODAY);
+
+    expect(trend.months.map((month) => month.month)).toEqual([
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+    ]);
+  });
+
+  it("sums per month and per currency", () => {
+    const trend = summariseInvoicedByMonth(
+      [
+        invoiced({
+          issueDate: "2026-06-05",
+          currency: "USD",
+          totalCents: 1_000,
+        }),
+        invoiced({ issueDate: "2026-06-20", currency: "USD", totalCents: 500 }),
+        invoiced({
+          issueDate: "2026-06-10",
+          currency: "EUR",
+          totalCents: 2_000,
+        }),
+      ],
+      TODAY,
+    );
+
+    const june = trend.months.find((month) => month.month === "2026-06");
+    expect(june?.totalsByCurrency).toEqual([
+      { currency: "EUR", cents: 2_000 },
+      { currency: "USD", cents: 1_500 },
+    ]);
+  });
+
+  it("leaves a month with nothing invoiced an empty totalsByCurrency", () => {
+    const trend = summariseInvoicedByMonth(
+      [invoiced({ issueDate: "2026-06-05" })],
+      TODAY,
+    );
+
+    const july = trend.months.find((month) => month.month === "2026-07");
+    expect(july?.totalsByCurrency).toEqual([]);
+  });
+
+  it("computes currencies as the sorted union of every currency with a bucket anywhere in the window", () => {
+    const trend = summariseInvoicedByMonth(
+      [
+        invoiced({ issueDate: "2026-04-01", currency: "GBP" }),
+        invoiced({ issueDate: "2026-09-01", currency: "USD" }),
+        invoiced({ issueDate: "2026-06-01", currency: "AUD" }),
+      ],
+      TODAY,
+    );
+
+    expect(trend.currencies).toEqual(["AUD", "GBP", "USD"]);
+  });
+
+  it("includes the window boundary day and excludes the day before it", () => {
+    const trend = summariseInvoicedByMonth(
+      [
+        invoiced({ issueDate: "2026-04-01", totalCents: 100 }),
+        invoiced({ issueDate: "2026-03-31", totalCents: 999 }),
+      ],
+      TODAY,
+    );
+
+    const april = trend.months.find((month) => month.month === "2026-04");
+    expect(april?.totalsByCurrency).toEqual([{ currency: "USD", cents: 100 }]);
+    // The invoice from March 31st never lands in any bucket: outside the window.
+    const total = trend.months.reduce(
+      (sum, month) =>
+        sum + month.totalsByCurrency.reduce((inner, t) => inner + t.cents, 0),
+      0,
+    );
+    expect(total).toBe(100);
+  });
+
+  it("ignores a null issueDate", () => {
+    const trend = summariseInvoicedByMonth(
+      [invoiced({ issueDate: null, totalCents: 5_000 })],
+      TODAY,
+    );
+
+    const total = trend.months.reduce(
+      (sum, month) =>
+        sum + month.totalsByCurrency.reduce((inner, t) => inner + t.cents, 0),
+      0,
+    );
+    expect(total).toBe(0);
   });
 });

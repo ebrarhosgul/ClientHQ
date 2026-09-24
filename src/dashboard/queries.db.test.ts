@@ -18,6 +18,7 @@
  *
  * Skipped when `DIRECT_URL` is not set, like the other database suites.
  */
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,7 +41,9 @@ const state = vi.hoisted(() => ({ tx: undefined as unknown }));
 vi.mock("@/db/tenant/executor", () => ({ pooledDb: async () => state.tx }));
 
 const {
+  activeClientsCount,
   hasAnyClient,
+  invoicedTrend,
   openProjectsSummary,
   overdueInvoicesSummary,
   recentDeliverablesSummary,
@@ -503,6 +506,152 @@ describe.skipIf(!url)(
         );
 
         expect(summary).toEqual({ addedLast7Days: 0, rows: [] });
+      });
+    });
+  },
+);
+
+describe.skipIf(!url)(
+  "activeClientsCount against real PostgreSQL (spec 0020 addendum)",
+  () => {
+    it("counts only non archived clients, and never another agency's (AC-19, AC-25)", async () => {
+      await inRollback(async (tx, { orgA, orgB }) => {
+        await tx.insert(clients).values([
+          { id: newId(), orgId: orgA, name: "Active Two" },
+          {
+            id: newId(),
+            orgId: orgA,
+            name: "Archived One",
+            archivedAt: new Date("2026-09-01T00:00:00Z"),
+          },
+        ]);
+
+        // orgA: the seed fixture's own client, plus "Active Two", both
+        // active; "Archived One" never counts.
+        await expect(activeClientsCount(staffContext(orgA))).resolves.toBe(2);
+        // orgB's own single, active client is unaffected by orgA's inserts.
+        await expect(activeClientsCount(staffContext(orgB))).resolves.toBe(1);
+      });
+    });
+
+    it("is 0 when every client is archived, reachable since AC-9 only checks for any client at all (AC-19)", async () => {
+      await inRollback(async (tx, { orgA, clientA }) => {
+        await tx
+          .update(clients)
+          .set({ archivedAt: new Date("2026-09-01T00:00:00Z") })
+          .where(eq(clients.id, clientA));
+
+        await expect(activeClientsCount(staffContext(orgA))).resolves.toBe(0);
+      });
+    });
+  },
+);
+
+describe.skipIf(!url)(
+  "invoicedTrend against real PostgreSQL (spec 0020 addendum)",
+  () => {
+    it("buckets by month and currency, only sent/overdue/paid inside the window, and never another agency's (AC-21, AC-25)", async () => {
+      await inRollback(async (tx, { orgA, orgB, clientA, clientB }) => {
+        await tx.insert(invoices).values([
+          {
+            id: newId(),
+            orgId: orgA,
+            clientId: clientA,
+            number: 1,
+            status: "paid",
+            issueDate: "2026-06-05",
+            dueDate: "2026-07-05",
+            currency: "USD",
+            subtotalCents: 1_000,
+            totalCents: 1_000,
+            paidAt: new Date("2026-06-10T00:00:00Z"),
+          },
+          {
+            id: newId(),
+            orgId: orgA,
+            clientId: clientA,
+            number: 2,
+            status: "sent",
+            issueDate: "2026-06-20",
+            dueDate: "2026-07-20",
+            currency: "USD",
+            subtotalCents: 500,
+            totalCents: 500,
+          },
+          // Draft: no issue date, never counts (and would break a strict
+          // date comparison if it somehow did).
+          {
+            id: newId(),
+            orgId: orgA,
+            clientId: clientA,
+            status: "draft",
+            issueDate: null,
+            dueDate: null,
+            currency: "USD",
+            subtotalCents: 999,
+            totalCents: 999,
+          },
+          // Void: has an issue date inside the window, never counts.
+          {
+            id: newId(),
+            orgId: orgA,
+            clientId: clientA,
+            number: 3,
+            status: "void",
+            issueDate: "2026-06-01",
+            dueDate: "2026-07-01",
+            currency: "USD",
+            subtotalCents: 777,
+            totalCents: 777,
+          },
+          // Overdue, but issued the day before the 6 month window starts
+          // (TODAY is 2026-09-24, so the window starts 2026-04-01): outside
+          // the window, never counts.
+          {
+            id: newId(),
+            orgId: orgA,
+            clientId: clientA,
+            number: 4,
+            status: "overdue",
+            issueDate: "2026-03-31",
+            dueDate: "2026-04-30",
+            currency: "USD",
+            subtotalCents: 999_999,
+            totalCents: 999_999,
+          },
+          // Another agency's paid invoice, same month and currency: must
+          // never reach orgA's totals.
+          {
+            id: newId(),
+            orgId: orgB,
+            clientId: clientB,
+            number: 1,
+            status: "paid",
+            issueDate: "2026-06-05",
+            dueDate: "2026-07-05",
+            currency: "USD",
+            subtotalCents: 88_888,
+            totalCents: 88_888,
+            paidAt: new Date("2026-06-10T00:00:00Z"),
+          },
+        ]);
+
+        const trend = await invoicedTrend(staffContext(orgA), TODAY);
+
+        expect(trend.months.map((month) => month.month)).toEqual([
+          "2026-04",
+          "2026-05",
+          "2026-06",
+          "2026-07",
+          "2026-08",
+          "2026-09",
+        ]);
+
+        const june = trend.months.find((month) => month.month === "2026-06");
+        expect(june?.totalsByCurrency).toEqual([
+          { currency: "USD", cents: 1_500 },
+        ]);
+        expect(trend.currencies).toEqual(["USD"]);
       });
     });
   },

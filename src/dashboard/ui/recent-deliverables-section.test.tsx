@@ -4,16 +4,20 @@
  * covers: spec 0020 AC-7, AC-8, AC-11
  *
  * `RecentDeliverablesSection` is an async Server Component, rendered with
- * React's streaming renderer like `page.test.tsx`. `src/dashboard/queries` is
- * stubbed; which deliverables count as recent is `queries.test.ts`'s job.
- * Unlike the other two sections, this one never renders a "view all" link:
- * there is no deliverables list to point at (spec 0020).
+ * React's streaming renderer like `page.test.tsx`. It now receives its
+ * summary as a promise, shared with `OverviewSection` (spec 0020 addendum):
+ * the test builds that promise directly rather than stubbing
+ * `src/dashboard/queries`. Which deliverables count as recent is
+ * `queries.test.ts`'s job. Unlike the other two sections, this one never
+ * renders a "view all" link: there is no deliverables list to point at.
  */
 import { redirect } from "next/navigation";
 import { renderToReadableStream } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatBillingDate } from "@/payments/billing-state";
+
+import type { RecentDeliverablesSummary } from "../queries";
 
 function redirectError(path: string): unknown {
   try {
@@ -25,12 +29,7 @@ function redirectError(path: string): unknown {
 }
 
 const mocks = vi.hoisted(() => ({
-  recentDeliverablesSummary: vi.fn(),
   reportException: vi.fn(),
-}));
-
-vi.mock("../queries", () => ({
-  recentDeliverablesSummary: mocks.recentDeliverablesSummary,
 }));
 
 vi.mock("@/observability/sentry", () => ({
@@ -40,14 +39,11 @@ vi.mock("@/observability/sentry", () => ({
 const { RecentDeliverablesSection } =
   await import("./recent-deliverables-section");
 
-const CTX = { kind: "staff", orgId: "org-1" } as Parameters<
-  typeof RecentDeliverablesSection
->[0]["ctx"];
-const NOW = new Date("2026-09-24T00:00:00.000Z");
-
-async function renderSection(): Promise<string> {
+async function renderSection(
+  summary: Promise<RecentDeliverablesSummary>,
+): Promise<string> {
   const stream = await renderToReadableStream(
-    await RecentDeliverablesSection({ ctx: CTX, now: NOW }),
+    await RecentDeliverablesSection({ summary }),
   );
   await stream.allReady;
 
@@ -70,12 +66,9 @@ beforeEach(() => {
 
 describe("RecentDeliverablesSection", () => {
   it("shows the empty state and the None headline, with no view all link (AC-8)", async () => {
-    mocks.recentDeliverablesSummary.mockResolvedValue({
-      addedLast7Days: 0,
-      rows: [],
-    });
-
-    const html = await renderSection();
+    const html = await renderSection(
+      Promise.resolve({ addedLast7Days: 0, rows: [] }),
+    );
 
     expect(html).toContain("No deliverables yet");
     expect(html).toContain("None added in the last 7 days");
@@ -84,33 +77,33 @@ describe("RecentDeliverablesSection", () => {
 
   it("shows the shared and internal chips, uploader and date (AC-7)", async () => {
     const createdAt = new Date("2026-09-22T00:00:00.000Z");
-    mocks.recentDeliverablesSummary.mockResolvedValue({
-      addedLast7Days: 2,
-      rows: [
-        {
-          id: "del-1",
-          name: "Final logo.ai",
-          projectId: "proj-1",
-          projectName: "Rebrand",
-          clientName: "Acme Ltd",
-          visibleToClient: true,
-          uploadedByName: "Jordan Lee",
-          createdAt,
-        },
-        {
-          id: "del-2",
-          name: "Internal notes.pdf",
-          projectId: "proj-1",
-          projectName: "Rebrand",
-          clientName: "Acme Ltd",
-          visibleToClient: false,
-          uploadedByName: "Jordan Lee",
-          createdAt,
-        },
-      ],
-    });
-
-    const html = await renderSection();
+    const html = await renderSection(
+      Promise.resolve({
+        addedLast7Days: 2,
+        rows: [
+          {
+            id: "del-1",
+            name: "Final logo.ai",
+            projectId: "proj-1",
+            projectName: "Rebrand",
+            clientName: "Acme Ltd",
+            visibleToClient: true,
+            uploadedByName: "Jordan Lee",
+            createdAt,
+          },
+          {
+            id: "del-2",
+            name: "Internal notes.pdf",
+            projectId: "proj-1",
+            projectName: "Rebrand",
+            clientName: "Acme Ltd",
+            visibleToClient: false,
+            uploadedByName: "Jordan Lee",
+            createdAt,
+          },
+        ],
+      }),
+    );
 
     expect(html).toContain("2 added in the last 7 days");
     expect(html).toContain("Final logo.ai, Acme Ltd");
@@ -126,9 +119,7 @@ describe("RecentDeliverablesSection", () => {
 
   it("shows an isolated error state and reports it without throwing (AC-11)", async () => {
     const error = new Error("db exploded");
-    mocks.recentDeliverablesSummary.mockRejectedValue(error);
-
-    const html = await renderSection();
+    const html = await renderSection(Promise.reject(error));
 
     expect(html).toContain("Recent deliverables could not be loaded");
     expect(html).toContain("Try again");
@@ -140,10 +131,9 @@ describe("RecentDeliverablesSection", () => {
 
   it("rethrows a redirect instead of reporting or rendering an error (AC-11)", async () => {
     const error = redirectError("/onboarding");
-    mocks.recentDeliverablesSummary.mockRejectedValue(error);
 
     await expect(
-      RecentDeliverablesSection({ ctx: CTX, now: NOW }),
+      RecentDeliverablesSection({ summary: Promise.reject(error) }),
     ).rejects.toBe(error);
 
     expect(mocks.reportException).not.toHaveBeenCalled();

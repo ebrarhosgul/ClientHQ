@@ -1,40 +1,39 @@
 import { unstable_rethrow } from "next/navigation";
 import Link from "next/link";
 
-import type { StaffContext } from "@/db/tenant";
-import { formatBillingDate } from "@/payments/billing-state";
 import { reportException } from "@/observability/sentry";
+import { formatBillingDate } from "@/payments/billing-state";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
 import { StatusChip } from "@/ui/patterns/status-chip";
 import { Button } from "@/ui/primitives/button";
 
-import {
-  recentDeliverablesSummary,
-  type RecentDeliverablesSummary,
-} from "../queries";
+import type { RecentDeliverablesSummary } from "../queries";
 import { DashboardSection } from "./dashboard-section";
 
 export const RECENT_DELIVERABLES_HEADING_ID = "dashboard-deliverables-heading";
 
 export type RecentDeliverablesSectionProps = {
-  readonly ctx: StaffContext;
-  readonly now: Date;
+  /**
+   * Started once in `page.tsx` and shared with `OverviewSection`'s new
+   * deliverables card (spec 0020 addendum, Feature design), so the two can
+   * never disagree within one page load and the query never runs twice.
+   */
+  readonly summary: Promise<RecentDeliverablesSummary>;
 };
 
 /**
  * The recent deliverables section (spec 0020, AC-2, AC-7, AC-8, AC-11). Its
- * own try/catch: a failed read never blanks the other two sections. No "view
+ * own try/catch: a failed read never blanks the other sections. No "view
  * all" link (AC-7): there is no deliverables list to point at.
  */
 export async function RecentDeliverablesSection({
-  ctx,
-  now,
+  summary: summaryPromise,
 }: RecentDeliverablesSectionProps) {
   let summary: RecentDeliverablesSummary | undefined;
 
   try {
-    summary = await recentDeliverablesSummary(ctx, now);
+    summary = await summaryPromise;
   } catch (error) {
     unstable_rethrow(error);
 
@@ -93,10 +92,7 @@ export async function RecentDeliverablesSection({
               key={row.id}
               className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-3 transition-surface first:pt-0 last:pb-0 hover:bg-muted"
             >
-              <Link
-                href={`/projects/${row.projectId}`}
-                className="font-medium underline underline-offset-2"
-              >
+              <Link href={`/projects/${row.projectId}`} className="link-accent">
                 {row.name}, {row.clientName}
               </Link>
               <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground tabular-nums">

@@ -32,6 +32,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 19 | Rate limiting | Slice 9 | in-progress |
 | 20 | Product analytics & error tracking | Slice 9 | in-progress |
 | 21 | Dashboard summary | Slice 10 | in-progress |
+| 22 | Link styling | Slice 11 | in-progress |
 
 ## Foundations
 
@@ -378,19 +379,39 @@ Spec [0019](../specs/0019-product-analytics-and-error-tracking/index.md) · atom
 ## Slice 10: Dashboard
 
 ### 21. Dashboard summary · in-progress
-Replace the dashboard's placeholder empty state with a real one: the agency's open projects, overdue invoices and recently added deliverables, each pulled live from the data features 11, 12 and 13 already built, and each linking through to its own list.
-**Done when:** a signed in agency user sees their own genuinely open projects, overdue invoices and recently added deliverables on `/dashboard`, every query runs through the tenant scoping layer, and each section shows its own correct empty state when there is nothing yet to show.
+Replace the dashboard's placeholder empty state with a real one: the agency's open projects, overdue invoices and recently added deliverables, each pulled live from the data features 11, 12 and 13 already built, each linking through to its own list, plus a glanceable "Overview" row of stat cards and a 6 month invoiced by month chart above them.
+**Done when:** a signed in agency user sees their own genuinely open projects, overdue invoices and recently added deliverables on `/dashboard`, an Overview row of stat cards and an invoiced by month chart above them, every query runs through the tenant scoping layer, and each section shows its own correct empty state when there is nothing yet to show.
 - [x] Design it (spec): `/architect dashboard summary`
 - [x] Build it: `/develop dashboard summary`
   - [x] The thread: `src/dashboard/` with `openProjectsSummary`, the shared section frame, the reworked header (agency · role), the open projects section streamed in its own Suspense boundary with real rows, links and empty state · AC-1, AC-6, AC-8, AC-12, AC-14
   - [x] The other two sections: overdue invoices (overdue or sent past due, per currency totals, days overdue) and recent deliverables (ready on active projects, shared or internal chip, 7 day headline) · AC-2, AC-3, AC-4, AC-5, AC-7, AC-8
   - [x] Loading, failure and first run: announced skeletons, per section error isolation with `unstable_rethrow` and `reportException`, the "Add a client" first run state and the no Clerk path · AC-9, AC-10, AC-11, AC-13
   - [x] Accessibility and proof: `/design` gallery entries with axe in both themes, pure unit tests, real PostgreSQL tests for tenancy and archive exclusions, the updated page test · AC-3 to AC-7, AC-9, AC-11, AC-12, AC-13, AC-15
-- [x] Verify it: `/check verify dashboard summary`
-- [x] Test it: `/test dashboard summary`
-- [x] Review it (fresh model): `/check review dashboard summary`
+  - [x] Overview cards and the invoiced by month chart: shared-promise Overview stat cards (overdue, open projects, active clients, new deliverables), the chart with its accessible table, the two column detail grid, and failure isolation for both new sections · AC-16 to AC-25
+  - [x] Accessibility and proof for the addendum: `/design` gallery entries for the cards and chart in every state with axe in both themes, unit tests for the new pure functions, real PostgreSQL tests for the two new reads · AC-15, AC-22
+- [ ] Verify it: `/check verify dashboard summary`
+- [ ] Test it: `/test dashboard summary`
+- [ ] Review it (fresh model): `/check review dashboard summary`
 - [ ] Document it: `/document dashboard summary`
 Spec [0020](../specs/0020-dashboard-summary/index.md) · atomic build tasks in its `## Build plan`
+
+_Verify, Test and Review were previously complete for the original three sections; they are reopened because the 2026-09-24 `/architect` update added real new build scope (Overview cards, the invoiced by month chart) that has not yet been built or checked._
+
+## Slice 11: Product polish
+
+### 22. Link styling · in-progress
+Replace the underline used on every clickable row, card value and inline link across the product with a shared brand teal colour and weight, a background highlight on hover or focus, and one enforced convention instead of the two inconsistent hand copied classes in use today.
+**Done when:** every row link, stat card link, and standalone paragraph link in the product uses the new `link-accent` treatment with no static underline, the two links that sit inline in a sentence use `link-accent-inline` instead, and a Vitest check fails the build if a raw `underline` class reappears anywhere else in `src/`.
+- [x] Design it (spec): `/architect link styling`
+- [x] Build it: `/develop link styling`
+  - [x] Token, utilities and enforcement: the `--link` token in all three theme blocks, the `link-accent` and `link-accent-inline` utilities in `globals.css`, the new contrast pair, and the widened, extended `token-discipline.test.ts` check
+  - [x] Shared primitives: the `Button` and `Badge` `link` variants migrated and proven in `/design`
+  - [x] Migrate every product call site: the dashboard, invoice, project, portal, deliverable, auth and analytics files the underline scan found, including the two inline exceptions on `link-accent-inline`
+- [ ] Verify it: `/check verify link styling`
+- [ ] Test it: `/test link styling`
+- [ ] Review it (fresh model): `/check review link styling`
+- [ ] Document it: `/document link styling`
+Spec [0021](../specs/0021-link-styling/index.md) · code in `src/app/globals.css`, `src/ui/contrast.ts`, `src/ui/token-discipline.test.ts`, `src/ui/primitives/button.tsx`, `src/ui/primitives/badge.tsx`, the migrated call sites across `src/dashboard/ui/`, `src/invoices/ui/`, `src/portal/ui/`, `src/deliverables/ui/`, `src/auth/ui/`, `src/analytics/ui/`, `src/ui/patterns/action-error.tsx`, `src/app/(agency)/`, `src/app/portal/`, `src/app/design/gallery.tsx`
 
 ## Deferred
 Out of scope for the current build pass, kept so the plan stays honest.

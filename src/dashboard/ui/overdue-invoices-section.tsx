@@ -1,7 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import Link from "next/link";
 
-import type { StaffContext } from "@/db/tenant";
 import { formatInvoiceNumber } from "@/invoices/status";
 import { formatMoney } from "@/lib/money";
 import { reportException } from "@/observability/sentry";
@@ -9,31 +8,31 @@ import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
 import { Button } from "@/ui/primitives/button";
 
-import {
-  overdueInvoicesSummary,
-  type OverdueInvoicesSummary,
-} from "../queries";
+import type { OverdueInvoicesSummary } from "../queries";
 import { DashboardSection } from "./dashboard-section";
 
 export const OVERDUE_INVOICES_HEADING_ID = "dashboard-overdue-heading";
 
 export type OverdueInvoicesSectionProps = {
-  readonly ctx: StaffContext;
-  readonly todayUtc: string;
+  /**
+   * Started once in `page.tsx` and shared with `OverviewSection`'s overdue
+   * card (spec 0020 addendum, Feature design), so the two can never disagree
+   * within one page load and the query never runs twice.
+   */
+  readonly summary: Promise<OverdueInvoicesSummary>;
 };
 
 /**
  * The overdue invoices section (spec 0020, AC-2 to AC-5, AC-8, AC-11). Its own
- * try/catch: a failed read never blanks the other two sections.
+ * try/catch: a failed read never blanks the other sections.
  */
 export async function OverdueInvoicesSection({
-  ctx,
-  todayUtc,
+  summary: summaryPromise,
 }: OverdueInvoicesSectionProps) {
   let summary: OverdueInvoicesSummary | undefined;
 
   try {
-    summary = await overdueInvoicesSummary(ctx, todayUtc);
+    summary = await summaryPromise;
   } catch (error) {
     unstable_rethrow(error);
 
@@ -112,10 +111,7 @@ export async function OverdueInvoicesSection({
               key={row.id}
               className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-3 transition-surface first:pt-0 last:pb-0 hover:bg-muted"
             >
-              <Link
-                href={`/invoices/${row.id}`}
-                className="font-medium underline underline-offset-2"
-              >
+              <Link href={`/invoices/${row.id}`} className="link-accent">
                 {formatInvoiceNumber(row.number)}, {row.clientName}
               </Link>
               <span className="text-xs text-muted-foreground tabular-nums">

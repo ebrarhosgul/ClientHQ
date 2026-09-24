@@ -159,10 +159,7 @@ export default async function ProjectDetailPage({
         <Detail
           label="Client"
           value={
-            <Link
-              href={`/clients/${project.clientId}`}
-              className="font-medium underline underline-offset-2"
-            >
+            <Link href={`/clients/${project.clientId}`} className="link-accent">
               {project.clientName}
             </Link>
           }

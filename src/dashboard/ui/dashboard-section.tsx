@@ -37,10 +37,7 @@ export function DashboardSection({
       {children}
 
       {viewAll ? (
-        <Link
-          href={viewAll.href}
-          className="self-start text-sm font-medium text-primary underline underline-offset-2"
-        >
+        <Link href={viewAll.href} className="link-accent self-start text-sm">
           {viewAll.label}
         </Link>
       ) : undefined}

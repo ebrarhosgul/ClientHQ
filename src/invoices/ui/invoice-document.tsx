@@ -123,10 +123,7 @@ export function InvoiceDocument({
               clientHref === undefined ? (
                 invoice.client.name
               ) : (
-                <Link
-                  href={clientHref}
-                  className="font-medium underline underline-offset-2"
-                >
+                <Link href={clientHref} className="link-accent">
                   {invoice.client.name}
                 </Link>
               )
@@ -172,10 +169,7 @@ export function InvoiceDocument({
         </div>
 
         {presentation ? (
-          <Link
-            href={pdfHref}
-            className="shrink-0 text-sm font-medium underline underline-offset-2"
-          >
+          <Link href={pdfHref} className="link-accent shrink-0 text-sm">
             Download PDF
             <span className="sr-only"> {presentation.number}</span>
           </Link>

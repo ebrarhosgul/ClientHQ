@@ -58,10 +58,7 @@ export function CookieBanner() {
       <p className="text-sm">
         Page view analytics run without a cookie until you accept one. Read what
         is collected in the{" "}
-        <Link
-          href="/privacy"
-          className="font-medium underline underline-offset-4"
-        >
+        <Link href="/privacy" className="link-accent-inline">
           privacy notice
         </Link>
         .

@@ -12,6 +12,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNull,
   lt,
@@ -21,9 +22,9 @@ import {
 
 import { clients, deliverables, invoices, projects } from "@/db/schema";
 import { tenantDb, type StaffContext } from "@/db/tenant";
-import { daysBetweenUtc } from "@/lib/dates";
+import { daysBetweenUtc, sixMonthWindowStart } from "@/lib/dates";
 import { isOverdue } from "@/projects/status";
-import { isPastDue } from "@/invoices/status";
+import { CLIENT_VISIBLE_STATUSES, isPastDue } from "@/invoices/status";
 
 export const DASHBOARD_SECTION_ROW_LIMIT = 5;
 const RECENT_DELIVERABLE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -263,4 +264,111 @@ export async function recentDeliverablesSummary(
 export async function hasAnyClient(ctx: StaffContext): Promise<boolean> {
   const row = await tenantDb(ctx).findFirst(clients);
   return row !== undefined;
+}
+
+/**
+ * The agency's clients that are not archived (AC-19, the Overview card).
+ * Reachable at zero even with clients on record: AC-9 only checks for any
+ * client at all, active or archived.
+ */
+export async function activeClientsCount(ctx: StaffContext): Promise<number> {
+  return tenantDb(ctx).count(clients, { where: isNull(clients.archivedAt) });
+}
+
+export type InvoicedMonthTotal = {
+  readonly currency: string;
+  readonly cents: number;
+};
+
+export type InvoicedMonth = {
+  /** `YYYY-MM`, the UTC calendar month. */
+  readonly month: string;
+  readonly totalsByCurrency: readonly InvoicedMonthTotal[];
+};
+
+export type InvoicedTrend = {
+  /** Exactly 6 entries, oldest first, ending with `todayUtc`'s own month. */
+  readonly months: readonly InvoicedMonth[];
+  /** The sorted union of every currency with a non zero bucket anywhere in the window. */
+  readonly currencies: readonly string[];
+};
+
+/** A row of `invoices`, as `invoicedTrend` reads it (no relation needed). */
+type InvoiceForTrend = Pick<
+  typeof invoices.$inferSelect,
+  "issueDate" | "currency" | "totalCents"
+>;
+
+/**
+ * Pure: buckets every matching invoice by the UTC calendar month of its
+ * `issueDate` and by `currency`, and returns exactly 6 months (AC-21, AC-22).
+ * Kept apart from the read so a test can fix `todayUtc` and the window it
+ * implies, without a database.
+ */
+export function summariseInvoicedByMonth(
+  rows: readonly InvoiceForTrend[],
+  todayUtc: string,
+): InvoicedTrend {
+  const windowStart = sixMonthWindowStart(todayUtc);
+  const [startYear, startMonth] = windowStart.split("-").map(Number);
+
+  const monthKeys = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(Date.UTC(startYear, startMonth - 1 + index, 1));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+
+  const buckets = new Map<string, Map<string, number>>(
+    monthKeys.map((key) => [key, new Map<string, number>()]),
+  );
+
+  for (const row of rows) {
+    if (row.issueDate === null) {
+      continue;
+    }
+
+    const monthBucket = buckets.get(row.issueDate.slice(0, 7));
+    if (monthBucket === undefined) {
+      // Outside the window: the caller's own `where` already excludes this,
+      // this guard just keeps the function honest as a pure one.
+      continue;
+    }
+
+    monthBucket.set(
+      row.currency,
+      (monthBucket.get(row.currency) ?? 0) + row.totalCents,
+    );
+  }
+
+  const currencies = [
+    ...new Set([...buckets.values()].flatMap((bucket) => [...bucket.keys()])),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const months = monthKeys.map((month) => ({
+    month,
+    totalsByCurrency: [...(buckets.get(month) ?? new Map()).entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, cents]) => ({ currency, cents })),
+  }));
+
+  return { months, currencies };
+}
+
+/**
+ * Every invoice counting toward the last 6 months of invoiced volume
+ * (`sent`, `overdue` or `paid`, issued inside the window), summarised in
+ * memory by `summariseInvoicedByMonth` (AC-21). The window is small by
+ * construction, the same tradeoff `overdueInvoicesSummary` already makes.
+ */
+export async function invoicedTrend(
+  ctx: StaffContext,
+  todayUtc: string,
+): Promise<InvoicedTrend> {
+  const rows = await tenantDb(ctx).findMany(invoices, {
+    where: and(
+      inArray(invoices.status, CLIENT_VISIBLE_STATUSES),
+      gte(invoices.issueDate, sixMonthWindowStart(todayUtc)),
+    ),
+  });
+
+  return summariseInvoicedByMonth(rows, todayUtc);
 }

@@ -69,3 +69,45 @@ Option 2 is the one that does the job the scope row describes. It answers "what 
 The two definitions that needed a real call were settled with the engineer. An overdue invoice includes the `sent` past due ones, because the user already sees a past due badge on those in `/invoices`, and a dashboard that ignores them for up to a day would under report debt. The cost is a known, bounded mismatch with the "View all" filter, recorded as a follow-up rather than fixed by changing feature 13 now. Open projects use exactly the `/projects` default (not delivered, not archived) and the same order, so the dashboard's top five are the list's first five and the counts agree.
 
 Streaming each section in its own Suspense boundary with its own catch comes from the same "design for failure" instinct as the rest of the product. A summary page is three unrelated reads, and one failing should cost one box, not the page. The deliverables read uses an id list rather than a raw SQL subquery so it stays inside the accessor's typed `where`, like every other feature read. Its cost only matters far beyond any realistic agency, and the fix at that point (a new tenant layer reader) is noted in Consequences. The first run state exists because three empty boxes on day one read as broken, while one clear "add your first client" gives a new owner their next step.
+
+## Addendum (2026-09-24): Overview cards and an invoiced by month chart
+
+### Context
+
+Once the three detail sections shipped, `/dashboard` still read as a chase list rather than a picture of the agency's week: a staff member had to read three lists to get a sense of scale, and nothing on the page showed a trend. A visual reference (a consumer billing dashboard with stat tiles, a bill summary and a bill history chart) prompted a page layout overhaul toward a true dashboard feel: glanceable numbers first, then a trend, then the detail. Two decisions needed a real call, both settled with the engineer: what the four cards should show, and what the chart should plot.
+
+### Options considered
+
+**Cards: which four numbers**
+
+*Option A (chosen)*: overdue total, open projects, active clients, new deliverables this week. Reuses three already computed reads plus one new trivial count.
+- Pros: cheapest option; spans all three entities the original spec already summarises, plus one (clients) that no section covered.
+- Cons: no revenue figure, so an owner still cannot see billed amount at a glance without reading the chart.
+
+*Option B*: the same four, plus a fifth "paid this month" revenue card.
+- Pros: closer to a finance dashboard.
+- Cons: needs a new sum by paid month read that mostly duplicates the chart's own read; two near identical revenue reads on one page was judged not worth it.
+
+**Chart: what to plot**
+
+*Option A (chosen)*: invoiced amount issued per month, by `issue_date`, last 6 months.
+- Pros: shows billing volume regardless of collection status; every agency has data to show from its first issued invoice.
+- Cons: an agency that issues late or backdates invoices sees a lumpier trend than a strict "when the work happened" view would.
+
+*Option B*: paid amount per month, by `paid_at`.
+- Pros: closer to the reference image's bill history, answers "how much came in."
+- Cons: an agency early in its life, or slow to mark invoices paid, would show a flat or empty chart for months, which reads as broken rather than quiet.
+
+**Chart library**
+
+*Option A (chosen)*: shadcn's `chart` primitive, wrapping Recharts (a React charting library).
+- Pros: shadcn is already this project's component source, so this is the smallest new surface; Recharts gives axes, a legend and hover detail without hand building them, and composes with CSS variable colours, matching the token driven theme (`src/ui/AGENTS.md`).
+- Cons: the first non shadcn native runtime dependency in `src/ui`, a bundle size and a maintenance surface the project did not carry before.
+
+*Option B*: a hand rolled inline SVG line, no new dependency.
+- Pros: zero new dependency, full control over markup.
+- Cons: rebuilding axis ticks, a legend, hover detail and the accessible table alternative by hand is real, ongoing work for one chart, against a well trodden library that already fits the design system.
+
+### Rationale
+
+Reusing the already computed reads for the cards keeps the Overview row honest with the same rules the detail sections already enforce (AC-3, AC-6, AC-7), at the cost of a few extra small queries, consistent with this spec's existing "no caching by choice" stance. Issue date based invoicing volume was chosen over paid date revenue because it is available to every agency immediately, while a paid date chart would read as broken for an agency that has not yet had time to collect on its early invoices, a worse first impression than a chart that is merely quieter early on. shadcn's chart primitive is the boring choice: it composes with the token system this project already enforces rather than asking the codebase to invent chart specific theming, and Recharts is a proven, widely used library, not a new or exciting one chosen for its own sake.

@@ -51,6 +51,10 @@
   --primary-foreground: oklch(0.99 0.005 182);
   --primary-hover: oklch(0.46 0.085 182);
 
+  /* Same value as --primary, kept separate because contrast.ts reads a
+     literal, not a var() reference (spec 0021). Keep the two in sync by hand. */
+  --link: oklch(0.52 0.09 182);
+
   --secondary: oklch(0.955 0.005 70);
   --secondary-foreground: oklch(0.22 0.008 70);
   --secondary-hover: oklch(0.92 0.006 70);
@@ -84,6 +88,11 @@
   --chip-warning-foreground: oklch(0.42 0.09 75);
   --chip-danger: oklch(0.955 0.03 27);
   --chip-danger-foreground: oklch(0.45 0.16 27);
+
+  --chart-1: oklch(0.52 0.14 220);
+  --chart-2: oklch(0.52 0.16 300);
+  --chart-3: oklch(0.55 0.15 100);
+  --chart-4: oklch(0.53 0.18 350);
 }
 
 /* tokens:dark-system */
@@ -107,6 +116,8 @@
     --primary: oklch(0.72 0.11 182);
     --primary-foreground: oklch(0.18 0.03 182);
     --primary-hover: oklch(0.79 0.1 182);
+
+    --link: oklch(0.72 0.11 182);
 
     --secondary: oklch(0.265 0.007 70);
     --secondary-foreground: oklch(0.945 0.004 70);
@@ -143,6 +154,11 @@
     --chip-warning-foreground: oklch(0.82 0.11 75);
     --chip-danger: oklch(0.28 0.045 27);
     --chip-danger-foreground: oklch(0.82 0.11 27);
+
+    --chart-1: oklch(0.72 0.13 220);
+    --chart-2: oklch(0.72 0.14 300);
+    --chart-3: oklch(0.75 0.13 100);
+    --chart-4: oklch(0.72 0.15 350);
   }
 }
 
@@ -166,6 +182,8 @@
   --primary: oklch(0.72 0.11 182);
   --primary-foreground: oklch(0.18 0.03 182);
   --primary-hover: oklch(0.79 0.1 182);
+
+  --link: oklch(0.72 0.11 182);
 
   --secondary: oklch(0.265 0.007 70);
   --secondary-foreground: oklch(0.945 0.004 70);
@@ -200,6 +218,11 @@
   --chip-warning-foreground: oklch(0.82 0.11 75);
   --chip-danger: oklch(0.28 0.045 27);
   --chip-danger-foreground: oklch(0.82 0.11 27);
+
+  --chart-1: oklch(0.72 0.13 220);
+  --chart-2: oklch(0.72 0.14 300);
+  --chart-3: oklch(0.75 0.13 100);
+  --chart-4: oklch(0.72 0.15 350);
 }
 
 /**
@@ -237,6 +260,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-link: var(--link);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-hover: var(--secondary-hover);
@@ -265,6 +289,11 @@
   --color-chip-warning-foreground: var(--chip-warning-foreground);
   --color-chip-danger: var(--chip-danger);
   --color-chip-danger-foreground: var(--chip-danger-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
 
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -369,6 +398,58 @@
     color, background-color, border-color, text-decoration-color, fill, stroke;
   transition-timing-function: var(--default-transition-timing-function);
   transition-duration: var(--default-transition-duration);
+}
+
+/**
+ * Spec 0021, revised. A link that is its own whole line, row, or value: the
+ * large majority of links in the product. `--link` is reserved for the
+ * moment someone actually points at or focuses the link, not painted on
+ * every row at rest, so colour stays a purposeful signal instead of a
+ * blanket tint. The underline is a `background-image` sized 0 wide and
+ * grown to full width on hover/focus (not `text-decoration-line`, which
+ * cannot be animated), so it draws in from the left with no layout shift:
+ * a background never changes box size the way a border or padding would.
+ * Complete in itself, not paired with `transition-surface` (that utility
+ * doesn't cover `background-size`).
+ */
+@utility link-accent {
+  font-weight: 500;
+  background-image: linear-gradient(currentcolor, currentcolor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1.5px;
+  transition-property: color, background-size;
+  transition-timing-function: var(--default-transition-timing-function);
+  transition-duration: var(--default-transition-duration);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--link);
+    background-size: 100% 1.5px;
+  }
+}
+
+/**
+ * Spec 0021. The small, named set of links that sit inline inside a sentence
+ * of plain text, where colour alone cannot clear WCAG 1.4.1 in dark mode
+ * (`--link` on `--foreground` measures 2.01:1 there). Keeps a permanent line
+ * for that reason; the two links here are rare enough that a constant tint
+ * on them doesn't reintroduce the "everything is teal" problem `link-accent`
+ * now avoids.
+ */
+@utility link-accent-inline {
+  color: var(--link);
+  font-weight: 500;
+  text-decoration-line: underline;
+  text-underline-offset: 2px;
+  transition-property: color;
+  transition-timing-function: var(--default-transition-timing-function);
+  transition-duration: var(--default-transition-duration);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent-foreground);
+  }
 }
 
 /**
