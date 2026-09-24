@@ -69,7 +69,7 @@ These three rules shape every design decision below. If a change would weaken on
 
 **Fail closed security.** When something is unknown, missing or unresolved, the answer is refusal:
 
-- The proxy protects every route except a short public list, so a route nobody has written yet is protected by default.
+- The proxy protects every route except a short public list, so a route nobody has written yet is protected by default. Its own redirects are built from the app's configured URL, never from the incoming request's `Host` header, so a forged header cannot send a signed in visitor to an attacker's origin.
 - A subscription status this build has never heard of locks the agency rather than unlocking it.
 - If a request cannot be resolved to a tenant, it is refused. Tenant identity never comes from a URL segment, form field or header.
 - A webhook whose signature fails writes nothing at all, and the daily cron route reads and writes nothing without its bearer secret.
@@ -401,7 +401,7 @@ Automated tools do not replace a person with a keyboard and a screen reader, so 
 
 ### Static guardrails
 
-- `clienthq/no-raw-db-import` blocks importing `src/db/client.ts` outside the data access layer.
+- `clienthq/no-raw-db-import` blocks importing `src/db/client.ts` outside the data access layer, including through a dynamic `import()` written as a template literal, which the rule was hardened to catch after a security review found it slipped through as a computed specifier.
 - `clienthq/no-system-access-import` blocks the unscoped door outside the two webhook routes and the cron route.
 - `tenant-isolation-config.test.mts` fails if either allowed list stops matching the documented design.
 - Restricted import rules keep the AWS SDK inside the storage port and the PDF renderer inside `src/invoices/pdf/`. The PostHog and Sentry SDK boundaries are documented conventions checked in code review.
@@ -482,6 +482,7 @@ cp .env.example .env.local   # then fill in the values
 | `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID` | Optional | Used only to delete a person's analytics data on erasure. Without them the erasure sweep reports itself skipped |
 | `VERCEL_ENV`, `NEXT_PUBLIC_VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA` | Optional, supplied by Vercel | Decide whether observability is enabled and tag releases. Enable "automatically expose system environment variables" in Vercel |
 | `SEED_ALLOW_HOST` | Development only | A non local database host that `pnpm db:seed` may write to |
+| `SEED_CLERK_ORG_ID` | Development only | A real Clerk organization id. Set, `pnpm db:seed` builds the demo agency (Apex Interactive Studio) inside it, so you can sign in and see it; anything already there is backed up to `.seed-backups/` first. Unset, the seed builds a separate agency nobody can sign in to |
 | `E2E_CLERK_USER_*`, `E2E_CLERK_CONTACT_*` | Optional | Dedicated Clerk development users for the browser suite. Tests that need them skip when unset |
 
 ### Database migrations, schema assertions and seed scripts
@@ -493,7 +494,7 @@ cp .env.example .env.local   # then fill in the values
 | `pnpm db:migrate` | Apply migrations over `DIRECT_URL` |
 | `pnpm db:migrate:check` | Fail if the schema and the committed migrations have drifted apart |
 | `pnpm db:schema:assert` | Read the live PostgreSQL catalogue and compare tables, constraints, indexes and delete actions with the documented schema |
-| `pnpm db:seed` | A repeatable development seed: an agency with staff, clients, contacts, projects, deliverables and invoices in every status. Running it again updates rather than duplicates |
+| `pnpm db:seed` | A repeatable development seed: a working agency, Apex Interactive Studio, with staff, clients, contacts, projects, deliverables and invoices in every status, backdated across the last 60 days, plus two smaller agencies in a grace window and locked. Running it again updates rather than duplicates. Set `SEED_CLERK_ORG_ID` first to build Apex inside a real Clerk organization you can sign in to |
 | `pnpm db:studio` | Drizzle Studio |
 | `pnpm r2:setup` | Configure the R2 bucket's CORS rule |
 
@@ -564,9 +565,10 @@ These are decisions made on purpose and deferred, each with a reason and a trigg
 ### Also deferred
 
 - Closing out Feature 20: the live verification gaps listed in [section 1](#where-the-build-stands), creating the Sentry alert rule, and the terms of service and a lawyer reviewed privacy policy (the `/privacy` page is a plain language notice, not legal advice).
-- A hosted demo with a seeded, read only evaluation account, so a reviewer can walk the app without signing up. The Live Demo block at the top of this file is its placeholder. The local seed script already produces most of the data.
+- A hosted demo with a seeded, read only evaluation account, so a reviewer can walk the app without signing up. The Live Demo block at the top of this file is its placeholder. `pnpm db:seed` already produces the data (a full agency, Apex Interactive Studio, backdated across 60 days); pointing `SEED_CLERK_ORG_ID` at a real Clerk organization is what would make it sign in able, which is the one piece a hosted demo still needs.
 - Purging a deleted agency (cancelling its Stripe subscription, then removing its rows and R2 objects after a grace period): destroys data, so it gets its own decision.
-- A queryable audit history, agency settings page, agency branding in the portal, a tagged (accessible) invoice PDF, and a staff preview of the portal.
+- Editing the agency profile. `/settings` now shows the agency's name, default currency, description, tax id and address read only (see [src/settings/AGENTS.md](src/settings/AGENTS.md)); a form and a Server Action to change them are a feature of their own.
+- A queryable audit history, agency branding in the portal, a tagged (accessible) invoice PDF, and a staff preview of the portal.
 
 Each is tracked with its origin in the Deferred section of [docs/scope/scope.md](docs/scope/scope.md).
 
