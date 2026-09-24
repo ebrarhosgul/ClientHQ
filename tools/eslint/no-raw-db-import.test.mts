@@ -53,6 +53,13 @@ describe("clienthq/no-raw-db-import", () => {
           code: `import { env } from "../lib/env";`,
           filename: file("src/db/scoped.ts"),
         },
+        // A template-literal dynamic import of something else entirely is
+        // still left alone; the fail-closed branch only fires on specifiers
+        // that can't be resolved, not on every template literal.
+        {
+          code: "await import(`@/db/schema`);",
+          filename: file("src/invoices/queries.ts"),
+        },
       ],
 
       invalid: [
@@ -102,6 +109,20 @@ describe("clienthq/no-raw-db-import", () => {
           code: `const { db } = require("../src/db/client");`,
           filename: file("scripts/backfill.cjs"),
           errors: rawDbImport,
+        },
+        // A no-substitution template literal resolves identically to the
+        // equivalent quoted string at runtime, so it must be caught too.
+        {
+          code: "await import(`@/db/client`);",
+          filename: file("src/app/api/leak/route.ts"),
+          errors: rawDbImport,
+        },
+        // A computed specifier can't be resolved statically at all. Rather
+        // than silently let it through, the rule fails closed.
+        {
+          code: "const p = `@/db/${segment}`; await import(p);",
+          filename: file("src/app/api/leak/route.ts"),
+          errors: [{ messageId: "unresolvableGuardedSpecifier" }],
         },
       ],
     });

@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-import { isClerkConfigured } from "@/lib/env";
+import { env, isClerkConfigured } from "@/lib/env";
 
 /**
  * The only routes reachable without a session.
@@ -89,7 +89,9 @@ export default isClerkConfigured()
       }
 
       if (!orgId && isAgencyRoute(request)) {
-        return NextResponse.redirect(new URL("/onboarding", request.url));
+        return NextResponse.redirect(
+          new URL("/onboarding", env().NEXT_PUBLIC_APP_URL),
+        );
       }
 
       return NextResponse.next();

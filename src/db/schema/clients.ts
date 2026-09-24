@@ -110,3 +110,42 @@ export const clientContacts = pgTable(
     ),
   ],
 );
+
+/**
+ * One row per invitation successfully handed to the email provider, keyed by
+ * address rather than by `client_contacts.id` (spec 0009's cooldown and daily
+ * cap, security audit finding: a deleted and re-added contact must not reset
+ * either limit, since nothing here is deleted when the contact row is).
+ *
+ * Append only: `src/contacts/send-invitation.ts` inserts a row at the exact
+ * moment it stamps `client_contacts.invited_at`, and nothing ever updates or
+ * deletes one except the retention sweep. Rows answer their question inside a
+ * day at most, so `src/cron/retention-sweep.ts` prunes them on the same
+ * shorter cutoff as `rate_limit_windows`.
+ */
+export const invitationSends = pgTable(
+  "invitation_sends",
+  {
+    id: id(),
+    orgId: orgId("cascade"),
+    /** Lowercase, matching `client_contacts.email`; not a foreign key, so it outlives the contact row. */
+    contactEmail: text("contact_email").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // The cooldown's lookup: this org, this address, most recent first.
+    index("invitation_sends_org_id_contact_email_sent_at_idx").on(
+      t.orgId,
+      t.contactEmail,
+      t.sentAt,
+    ),
+    // The daily cap's lookup: this org, inside the last day.
+    index("invitation_sends_org_id_sent_at_idx").on(t.orgId, t.sentAt),
+    check(
+      "invitation_sends_contact_email_lowercase_check",
+      sql`${t.contactEmail} = lower(${t.contactEmail})`,
+    ),
+  ],
+);

@@ -30,6 +30,12 @@ export const removeTeamMember = withTenantAction({
   input: membershipIdInput,
   requireRole: "admin",
   revalidate: { paths: ["/team"] },
+  // Same race as changeTeamMemberRole: the last admin check reads Clerk's
+  // membership list, decides, then writes back to Clerk, which offers no
+  // compare-and-swap. Without this, two concurrent removals for the same org
+  // can both read "two admins" and both proceed, leaving zero.
+  transaction: true,
+  lockOrg: true,
   handler: async ({ input, ctx, db }): Promise<RemovedMember> => {
     const base = {
       operation: "remove",

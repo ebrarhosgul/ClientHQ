@@ -1,8 +1,9 @@
 /**
  * Prove the applied schema is the one spec 0002 describes (plus the `notes`
  * column and `invoice_events` table spec 0012 adds, the `cron_runs` table spec
- * 0017 adds, and the `rate_limit_windows` table spec 0018 adds), by reading
- * the PostgreSQL catalogue rather than by eye.
+ * 0017 adds, the `rate_limit_windows` table spec 0018 adds, and the
+ * `invitation_sends` table the security audit fix for spec 0009's rate limit
+ * bypass adds), by reading the PostgreSQL catalogue rather than by eye.
  *
  * CI runs this right after `pnpm db:migrate` against a throwaway container, and
  * you can run it against any database with `pnpm db:schema:assert`. It asserts:
@@ -60,6 +61,7 @@ const TABLES: readonly string[] = [
   "processed_webhook_events",
   "cron_runs",
   "rate_limit_windows",
+  "invitation_sends",
 ];
 
 /**
@@ -77,6 +79,7 @@ const TENANT_SCOPED: readonly string[] = [
   "invoices",
   "invoice_line_items",
   "invoice_events",
+  "invitation_sends",
 ];
 
 /**
@@ -137,6 +140,7 @@ const CHECK_CONSTRAINTS: Readonly<Record<string, readonly string[]>> = {
   ],
   processed_webhook_events: ["processed_webhook_events_source_check"],
   cron_runs: ["cron_runs_outcome_check"],
+  invitation_sends: ["invitation_sends_contact_email_lowercase_check"],
 };
 
 /** Plain (non unique) indexes, by column list in order. */
@@ -170,6 +174,10 @@ const INDEXES: Readonly<Record<string, readonly (readonly string[])[]>> = {
   processed_webhook_events: [["processed_at"]],
   cron_runs: [["started_at"]],
   rate_limit_windows: [["window_start"]],
+  invitation_sends: [
+    ["org_id", "contact_email", "sent_at"],
+    ["org_id", "sent_at"],
+  ],
 };
 
 const FOREIGN_KEYS: readonly ForeignKey[] = [
@@ -292,6 +300,12 @@ const FOREIGN_KEYS: readonly ForeignKey[] = [
     column: "actor_user_id",
     references: "users",
     onDelete: "set null",
+  },
+  {
+    table: "invitation_sends",
+    column: "org_id",
+    references: "organizations",
+    onDelete: "cascade",
   },
 ];
 

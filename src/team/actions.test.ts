@@ -156,6 +156,24 @@ describe("every action is admin only with the default gate (AC-8)", () => {
   });
 });
 
+describe("the last admin actions lock the organization (security audit finding #3)", () => {
+  // The last admin check reads Clerk's membership list, decides, then writes
+  // back to Clerk, which offers no compare-and-swap of its own. A Postgres
+  // advisory lock held for the transaction's whole span is what keeps two
+  // concurrent calls for the same org from both reading "two admins" and both
+  // proceeding. See src/db/tenant/action.lock.db.test.ts for proof the lock
+  // primitive itself actually serializes concurrent transactions.
+  it.each(["changeTeamMemberRole", "removeTeamMember"])(
+    "%s opts into transaction: true and lockOrg: true",
+    (name) => {
+      const config = state.configs.find((c) => c.name === name);
+
+      expect(config?.transaction).toBe(true);
+      expect(config?.lockOrg).toBe(true);
+    },
+  );
+});
+
 describe("inviteTeamMember (AC-2, AC-3)", () => {
   it("creates the invitation with the organization, the inviter, the role and the sign up redirect", async () => {
     const result = await inviteTeamMember({

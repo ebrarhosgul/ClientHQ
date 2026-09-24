@@ -12,13 +12,20 @@
  * the two writes leaves a row whose status reads `unsent`, never one that
  * claims an email was delivered.
  *
+ * The cooldown and the daily cap read `invitation_sends`, an append only
+ * ledger keyed on the address, not `client_contacts.id`: a row here survives
+ * the contact being removed and re-added, which `invited_at` on the contact
+ * row itself cannot (security audit finding #4). A row is inserted at the
+ * same instant `invited_at` is stamped, and nothing here ever updates or
+ * deletes one.
+ *
  * The token exists in three places for a moment: this handler's stack, the
  * outgoing email, and the person's inbox. It is not in the row, not in a log
  * line, and not in the returned data.
  */
-import { eq, gt } from "drizzle-orm";
+import { desc, eq, gt } from "drizzle-orm";
 
-import { clientContacts, memberships } from "@/db/schema";
+import { clientContacts, invitationSends, memberships } from "@/db/schema";
 import {
   agencyProfile,
   tenantActionError,
@@ -80,7 +87,15 @@ export const sendInvitation = withTenantAction({
 
     const now = new Date();
 
-    if (cooldownRefuses(contact.invitedAt, now)) {
+    // Both limits read the append only send ledger, keyed on the address
+    // rather than this contact row's id: deleting and re-adding a contact
+    // must not reset either one (security audit finding #4).
+    const lastSend = await db.findFirst(invitationSends, {
+      where: eq(invitationSends.contactEmail, contact.email),
+      orderBy: desc(invitationSends.sentAt),
+    });
+
+    if (cooldownRefuses(lastSend?.sentAt ?? null, now)) {
       throw tenantActionError({
         ...RATE_LIMITED,
         message:
@@ -88,9 +103,9 @@ export const sendInvitation = withTenantAction({
       });
     }
 
-    const recent = await db.findMany(clientContacts, {
+    const recent = await db.findMany(invitationSends, {
       where: gt(
-        clientContacts.invitedAt,
+        invitationSends.sentAt,
         new Date(now.getTime() - DAILY_WINDOW_MS),
       ),
       limit: DAILY_CAP,
@@ -98,7 +113,7 @@ export const sendInvitation = withTenantAction({
 
     if (
       dailyCapRefuses(
-        recent.flatMap((row) => row.invitedAt ?? []),
+        recent.map((row) => row.sentAt),
         now,
       )
     ) {
@@ -168,7 +183,10 @@ export const sendInvitation = withTenantAction({
       });
     }
 
-    await db.update(clientContacts, contact.id, { invitedAt: new Date() });
+    const sentAt = new Date();
+
+    await db.update(clientContacts, contact.id, { invitedAt: sentAt });
+    await db.insert(invitationSends, { contactEmail: contact.email, sentAt });
 
     logContactEvent({
       operation: "send",

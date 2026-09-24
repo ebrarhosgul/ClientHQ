@@ -29,6 +29,7 @@ import * as schema from "@/db/schema";
 import {
   clientContacts,
   clients,
+  invitationSends,
   memberships,
   organizations,
   subscriptions,
@@ -377,6 +378,22 @@ async function rowOf(tx: TransactionExecutor, id: string) {
   return row;
 }
 
+/**
+ * Back date every `invitation_sends` row for this address, the ledger the
+ * cooldown and the daily cap actually read (security audit finding #4). Tests
+ * that used to reach into `client_contacts.invited_at` reach in here instead.
+ */
+async function backdateSends(
+  tx: TransactionExecutor,
+  email: string,
+  sentAt: Date,
+): Promise<void> {
+  await tx
+    .update(invitationSends)
+    .set({ sentAt })
+    .where(eq(invitationSends.contactEmail, email));
+}
+
 /** The token from the last message the transport saw, as the email carries it. */
 async function lastToken(): Promise<string> {
   const message = state.sent.at(-1);
@@ -619,10 +636,11 @@ describe.skipIf(url === undefined)(
           await sendInvitation({ contactId: fixture.contactA1 });
           const first = await lastToken();
 
-          await tx
-            .update(clientContacts)
-            .set({ invitedAt: new Date(Date.now() - 10 * MINUTE) })
-            .where(eq(clientContacts.id, fixture.contactA1));
+          await backdateSends(
+            tx,
+            fixture.contactA1Email,
+            new Date(Date.now() - 10 * MINUTE),
+          );
 
           const resent = await sendInvitation({ contactId: fixture.contactA1 });
           expect(resent.ok).toBe(true);
@@ -696,10 +714,11 @@ describe.skipIf(url === undefined)(
           });
           expect(state.sent).toHaveLength(1);
 
-          await tx
-            .update(clientContacts)
-            .set({ invitedAt: new Date(Date.now() - 5 * MINUTE - 1000) })
-            .where(eq(clientContacts.id, fixture.contactA1));
+          await backdateSends(
+            tx,
+            fixture.contactA1Email,
+            new Date(Date.now() - 5 * MINUTE - 1000),
+          );
 
           expect(
             (await sendInvitation({ contactId: fixture.contactA1 })).ok,
@@ -707,31 +726,22 @@ describe.skipIf(url === undefined)(
         });
       });
 
-      it("refuses when fifty of the agency's contacts were invited inside the last day, counting only that agency", async () => {
+      it("refuses when fifty of the agency's sends happened inside the last day, counting only that agency", async () => {
         await inRollback(async (tx, fixture) => {
-          const recent = (
-            count: number,
-            orgId: string,
-            clientId: string,
-            ageMs: number,
-          ) =>
+          const recent = (count: number, orgId: string, ageMs: number) =>
             Array.from({ length: count }, (_, i) => ({
               id: newId(),
               orgId,
-              clientId,
-              email: `bulk-${orgId}-${i}-${fixture.tag}@example.test`,
-              name: `Bulk ${i}`,
-              inviteTokenHash: "a".repeat(64),
-              inviteExpiresAt: new Date(Date.now() + DAY),
-              invitedAt: new Date(Date.now() - ageMs),
+              contactEmail: `bulk-${orgId}-${i}-${fixture.tag}@example.test`,
+              sentAt: new Date(Date.now() - ageMs),
             }));
 
           // 49 of A's, plus 50 of B's, which must not count against A.
           await tx
-            .insert(clientContacts)
+            .insert(invitationSends)
             .values([
-              ...recent(49, fixture.orgA, fixture.clientA2, HOUR),
-              ...recent(50, fixture.orgB, fixture.clientB1, HOUR),
+              ...recent(49, fixture.orgA, HOUR),
+              ...recent(50, fixture.orgB, HOUR),
             ]);
 
           expect(
@@ -757,15 +767,52 @@ describe.skipIf(url === undefined)(
             },
           );
 
-          // A stamp exactly a day old is outside the window, so it frees a slot.
-          await tx
-            .update(clientContacts)
-            .set({ invitedAt: new Date(Date.now() - DAY - 1000) })
-            .where(eq(clientContacts.id, fixture.contactA1));
+          // A stamp exactly a day old is outside the window, so it frees a
+          // slot: back date the send this test itself just made.
+          await backdateSends(
+            tx,
+            fixture.contactA1Email,
+            new Date(Date.now() - DAY - 1000),
+          );
 
           expect((await sendInvitation({ contactId: another.id })).ok).toBe(
             true,
           );
+        });
+      });
+
+      it("is not reset by deleting and re-adding the contact (security audit finding #4)", async () => {
+        await inRollback(async (_tx, fixture) => {
+          const email = `victim-${fixture.tag}@example.test`;
+
+          const added = await addContact({
+            clientId: fixture.clientA1,
+            name: "Victim",
+            email,
+          });
+          expect(added.ok).toBe(true);
+          if (!added.ok) return;
+
+          const sent = await sendInvitation({ contactId: added.data.id });
+          expect(sent.ok).toBe(true);
+
+          const removed = await removeContact({ contactId: added.data.id });
+          expect(removed.ok).toBe(true);
+
+          // Same address, brand new contact row: the old approach (reading
+          // `client_contacts.invited_at`) would see a fresh row with a null
+          // stamp and let this straight through.
+          const readded = await addContact({
+            clientId: fixture.clientA1,
+            name: "Victim",
+            email,
+          });
+          expect(readded.ok).toBe(true);
+          if (!readded.ok) return;
+
+          expect(
+            await sendInvitation({ contactId: readded.data.id }),
+          ).toMatchObject({ ok: false, error: { code: "rate_limited" } });
         });
       });
     });

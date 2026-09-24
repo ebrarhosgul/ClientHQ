@@ -79,7 +79,11 @@ export function createGuardedImportRule({
       type: "problem",
       docs: { description },
       schema: [],
-      messages: { [messageId]: message },
+      messages: {
+        [messageId]: message,
+        unresolvableGuardedSpecifier:
+          "This dynamic import's specifier can't be resolved statically, so it can't be checked against the guarded module. Use a plain string literal instead.",
+      },
     },
 
     create(context) {
@@ -90,17 +94,41 @@ export function createGuardedImportRule({
        * @param {import("estree").Node | null | undefined} source its source literal
        */
       const checkSource = (node, source) => {
-        if (
-          source === null ||
-          source === undefined ||
-          source.type !== "Literal" ||
-          typeof source.value !== "string"
-        ) {
+        if (source === null || source === undefined) return;
+
+        if (source.type === "Literal" && typeof source.value === "string") {
+          if (resolveSpecifier(source.value, filename) === guardedPath) {
+            context.report({ node, messageId });
+          }
           return;
         }
 
-        if (resolveSpecifier(source.value, filename) === guardedPath) {
-          context.report({ node, messageId });
+        // A no-substitution template literal resolves identically to the
+        // equivalent quoted string in Node, webpack, and Turbopack.
+        if (
+          source.type === "TemplateLiteral" &&
+          source.expressions.length === 0
+        ) {
+          const cooked = source.quasis[0]?.value.cooked;
+          if (typeof cooked === "string") {
+            if (resolveSpecifier(cooked, filename) === guardedPath) {
+              context.report({ node, messageId });
+            }
+            return;
+          }
+        }
+
+        // Any other computed specifier reaching a guarded import()/require()
+        // call can't be resolved statically — fail closed instead of
+        // silently passing.
+        const isDynamicCall =
+          node.type === "ImportExpression" ||
+          (node.type === "CallExpression" &&
+            node.callee.type === "Identifier" &&
+            node.callee.name === "require");
+
+        if (isDynamicCall && source.type !== "Literal") {
+          context.report({ node, messageId: "unresolvableGuardedSpecifier" });
         }
       };
 

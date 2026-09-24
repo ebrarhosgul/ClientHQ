@@ -35,6 +35,12 @@ export const changeTeamMemberRole = withTenantAction({
   input: changeRoleInput,
   requireRole: "admin",
   revalidate: { paths: ["/team"] },
+  // The last admin check reads Clerk's membership list, decides, then writes
+  // back to Clerk, an external system with no compare-and-swap. Without this,
+  // two concurrent calls for the same org (e.g. two admins acting on each
+  // other) can both read "two admins" and both proceed, leaving zero.
+  transaction: true,
+  lockOrg: true,
   handler: async ({ input, ctx, db }): Promise<ChangedRole> => {
     const base = {
       operation: "change_role",
