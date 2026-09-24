@@ -8,7 +8,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { addDaysUtc, isRealCalendarDay, todayUtc } from "./dates";
+import {
+  addDaysUtc,
+  daysBetweenUtc,
+  isRealCalendarDay,
+  todayUtc,
+} from "./dates";
 
 describe("todayUtc", () => {
   it("returns the UTC calendar day as YYYY-MM-DD", () => {
@@ -75,5 +80,23 @@ describe("isRealCalendarDay", () => {
   it("refuses month 13 and day 0", () => {
     expect(isRealCalendarDay("2026-13-01")).toBe(false);
     expect(isRealCalendarDay("2026-01-00")).toBe(false);
+  });
+});
+
+describe("daysBetweenUtc (spec 0020, AC-5)", () => {
+  it("is one for a due date of yesterday", () => {
+    expect(daysBetweenUtc("2026-09-23", "2026-09-24")).toBe(1);
+  });
+
+  it("is zero for the same day", () => {
+    expect(daysBetweenUtc("2026-09-24", "2026-09-24")).toBe(0);
+  });
+
+  it("carries over a month boundary", () => {
+    expect(daysBetweenUtc("2026-08-31", "2026-09-02")).toBe(2);
+  });
+
+  it("is negative when `to` is earlier than `from`", () => {
+    expect(daysBetweenUtc("2026-09-24", "2026-09-20")).toBe(-4);
   });
 });

@@ -381,11 +381,11 @@ Spec [0019](../specs/0019-product-analytics-and-error-tracking/index.md) · atom
 Replace the dashboard's placeholder empty state with a real one: the agency's open projects, overdue invoices and recently added deliverables, each pulled live from the data features 11, 12 and 13 already built, and each linking through to its own list.
 **Done when:** a signed in agency user sees their own genuinely open projects, overdue invoices and recently added deliverables on `/dashboard`, every query runs through the tenant scoping layer, and each section shows its own correct empty state when there is nothing yet to show.
 - [x] Design it (spec): `/architect dashboard summary`
-- [ ] Build it: `/develop dashboard summary`
-  - [ ] The thread: `src/dashboard/` with `openProjectsSummary`, the shared section frame, the reworked header (agency · role), the open projects section streamed in its own Suspense boundary with real rows, links and empty state · AC-1, AC-6, AC-8, AC-12, AC-14
-  - [ ] The other two sections: overdue invoices (overdue or sent past due, per currency totals, days overdue) and recent deliverables (ready on active projects, shared or internal chip, 7 day headline) · AC-2, AC-3, AC-4, AC-5, AC-7, AC-8
-  - [ ] Loading, failure and first run: announced skeletons, per section error isolation with `unstable_rethrow` and `reportException`, the "Add a client" first run state and the no Clerk path · AC-9, AC-10, AC-11, AC-13
-  - [ ] Accessibility and proof: `/design` gallery entries with axe in both themes, pure unit tests, real PostgreSQL tests for tenancy and archive exclusions, the updated page test · AC-3 to AC-7, AC-9, AC-11, AC-12, AC-13, AC-15
+- [x] Build it: `/develop dashboard summary`
+  - [x] The thread: `src/dashboard/` with `openProjectsSummary`, the shared section frame, the reworked header (agency · role), the open projects section streamed in its own Suspense boundary with real rows, links and empty state · AC-1, AC-6, AC-8, AC-12, AC-14
+  - [x] The other two sections: overdue invoices (overdue or sent past due, per currency totals, days overdue) and recent deliverables (ready on active projects, shared or internal chip, 7 day headline) · AC-2, AC-3, AC-4, AC-5, AC-7, AC-8
+  - [x] Loading, failure and first run: announced skeletons, per section error isolation with `unstable_rethrow` and `reportException`, the "Add a client" first run state and the no Clerk path · AC-9, AC-10, AC-11, AC-13
+  - [x] Accessibility and proof: `/design` gallery entries with axe in both themes, pure unit tests, real PostgreSQL tests for tenancy and archive exclusions, the updated page test · AC-3 to AC-7, AC-9, AC-11, AC-12, AC-13, AC-15
 - [ ] Verify it: `/check verify dashboard summary`
 - [ ] Test it: `/test dashboard summary`
 - [ ] Review it (fresh model): `/check review dashboard summary`

@@ -1,7 +1,7 @@
 # 0020. Dashboard summary
 
 **Date**: 2026-09-24
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

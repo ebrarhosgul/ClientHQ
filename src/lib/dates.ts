@@ -36,6 +36,20 @@ export function addDaysUtc(day: string, days: number): string {
 }
 
 /**
+ * Whole calendar days from `from` to `to`, both `YYYY-MM-DD`. Positive when
+ * `to` is later. Used for "N days overdue" (spec 0020, AC-5), so a due date of
+ * yesterday against today is `1`, never `0` or a fraction: both sides are
+ * parsed as UTC midnight, so no daylight or timezone shift can round a day
+ * away.
+ */
+export function daysBetweenUtc(from: string, to: string): number {
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`);
+  const toMs = Date.parse(`${to}T00:00:00.000Z`);
+
+  return Math.round((toMs - fromMs) / 86_400_000);
+}
+
+/**
  * `YYYY-MM-DD`, and a real calendar day. Matching the pattern is not enough
  * on its own: `2026-02-30` matches it and is not a real day, so the string is
  * round tripped through `Date.UTC` and compared back to itself (spec 0010 and

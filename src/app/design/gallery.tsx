@@ -56,6 +56,10 @@ import { PortalEmptyState } from "@/portal/ui/portal-empty-state";
 import { PortalTopBar } from "@/portal/ui/portal-top-bar";
 import { SectionNav } from "@/portal/ui/section-nav";
 import { AddressFields } from "@/ui/patterns/address-fields";
+import {
+  DashboardSection,
+  DashboardSectionSkeleton,
+} from "@/dashboard/ui/dashboard-section";
 import { DataTable, type Column } from "@/ui/patterns/data-table";
 import { EmptyState } from "@/ui/patterns/empty-state";
 import { ErrorState } from "@/ui/patterns/error-state";
@@ -1513,6 +1517,91 @@ export function Gallery({ prefix }: { readonly prefix: string }) {
           Nothing to render here: the proof is the keyboard, and it is the same
           ring on every control above.
         </p>
+      </Section>
+
+      <Section
+        id={scoped("dashboard-summary")}
+        title="Dashboard summary"
+        description="The three /dashboard sections share one frame (heading, count line, list, footer link) and one skeleton (spec 0020)."
+      >
+        <div className="flex flex-col gap-4">
+          <DashboardSection
+            headingId={scoped("dashboard-summary-loaded-heading")}
+            heading="Overdue invoices"
+            countLine={
+              <>
+                <p>2 overdue invoices</p>
+                <p>{fixtureMoney(420000)} overdue</p>
+              </>
+            }
+            viewAll={{ href: "#", label: "View all overdue invoices" }}
+          >
+            <ul className="flex flex-col gap-2">
+              <li className="flex flex-col gap-0.5 rounded-md border border-border p-3">
+                <a
+                  href="#"
+                  className="font-medium underline underline-offset-2"
+                >
+                  INV-0007, Acme Ltd
+                </a>
+                <span className="text-xs text-muted-foreground">
+                  {fixtureMoney(320000)} · Due 2026-09-10 · 14 days overdue
+                </span>
+              </li>
+              <li className="flex flex-col gap-0.5 rounded-md border border-border p-3">
+                <a
+                  href="#"
+                  className="font-medium underline underline-offset-2"
+                >
+                  INV-0009, Bilbo &amp; Co
+                </a>
+                <span className="text-xs text-muted-foreground">
+                  {fixtureMoney(100000)} · Due 2026-09-23 · 1 day overdue
+                </span>
+              </li>
+            </ul>
+          </DashboardSection>
+
+          <DashboardSection
+            headingId={scoped("dashboard-summary-empty-heading")}
+            heading="Open projects"
+            countLine={<p>0 open projects</p>}
+          >
+            <EmptyState
+              heading="No open projects"
+              description="Projects that are planned, in progress or in review will show up here."
+              action={<Button size="sm">New project</Button>}
+            />
+          </DashboardSection>
+
+          <div>
+            <p className="mb-2 font-mono text-xs text-muted-foreground">
+              errored: the rest of the dashboard is fine (AC-11)
+            </p>
+            <section
+              aria-labelledby={scoped("dashboard-summary-error-heading")}
+              className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground"
+            >
+              <h2
+                id={scoped("dashboard-summary-error-heading")}
+                className="text-base font-semibold tracking-tight"
+              >
+                Recent deliverables
+              </h2>
+              <ErrorState
+                heading="Recent deliverables could not be loaded"
+                description="The rest of the dashboard is fine. Try again to load this section."
+                action={<Button variant="outline">Try again</Button>}
+              />
+            </section>
+          </div>
+
+          <DashboardSectionSkeleton
+            headingId={scoped("dashboard-summary-loading-heading")}
+            heading="Recent deliverables"
+            label="Loading recent deliverables"
+          />
+        </div>
       </Section>
     </div>
   );
