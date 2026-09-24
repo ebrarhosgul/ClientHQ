@@ -42,9 +42,11 @@ test.describe("the Deliverables section states, in the gallery", () => {
   }) => {
     await page.goto("/design");
 
+    // Exact: substring matching would also pick up the dashboard summary's
+    // "Recent deliverables" section added alongside this one (spec 0020).
     const light = page
       .getByRole("region", { name: "Light" })
-      .getByRole("region", { name: "Deliverables" });
+      .getByRole("region", { name: "Deliverables", exact: true });
 
     await expect(light.getByText("Logo pack.zip")).toBeVisible();
     await expect(light.getByText("ZIP", { exact: true })).toBeVisible();
