@@ -239,6 +239,7 @@ const serverEnvSchema = z.object({
   VERCEL_ENV: optionalEnv(),
   NEXT_PUBLIC_VERCEL_ENV: optionalEnv(),
   VERCEL_GIT_COMMIT_SHA: optionalEnv(),
+  NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: optionalEnv(),
 });
 
 /**

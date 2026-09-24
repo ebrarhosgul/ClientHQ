@@ -1,7 +1,7 @@
 /**
  * Sentry in the browser (spec 0019, AC-1, AC-2, AC-5).
  *
- * The two `NEXT_PUBLIC_` reads are spelled out in full rather than going
+ * The three `NEXT_PUBLIC_` reads are spelled out in full rather than going
  * through `src/lib/env.ts`, because Next only inlines a public variable into
  * the browser bundle when it is written this way (the same exemption
  * `isClerkConfigured` has). Nothing else about the environment is visible
