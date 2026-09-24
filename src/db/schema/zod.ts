@@ -1,7 +1,7 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
-import { clientContacts, clients } from "./clients";
+import { clientContacts, clients, invitationSends } from "./clients";
 import { cronRuns } from "./cron";
 import { memberships, organizations, subscriptions, users } from "./identity";
 import { invoiceEvents, invoiceLineItems, invoices } from "./invoices";
@@ -78,6 +78,11 @@ export const insertClientContactSchema = createInsertSchema(clientContacts, {
   email: lowercaseEmail,
 });
 export const selectClientContactSchema = createSelectSchema(clientContacts);
+
+export const insertInvitationSendSchema = createInsertSchema(invitationSends, {
+  contactEmail: lowercaseEmail,
+});
+export const selectInvitationSendSchema = createSelectSchema(invitationSends);
 
 export const insertProjectSchema = createInsertSchema(projects);
 export const selectProjectSchema = createSelectSchema(projects);

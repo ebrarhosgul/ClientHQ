@@ -2,13 +2,15 @@
  * `retention_prune`, the sixth and last nightly sweep (spec 0017, AC-9; spec
  * 0018, AC-10).
  *
- * Lives in `src/cron/` rather than beside either table because it spans three
- * features: the webhook idempotency ledger (spec 0002), this feature's own
- * `cron_runs` table, and feature 19's `rate_limit_windows`. The first two
- * exist to answer a question for a limited while and then just cost storage,
- * so they share one 90 day cutoff; the rate limit windows answer their
- * question in an hour or a day at most, so a week is generous and they get
- * their own, shorter cutoff.
+ * Lives in `src/cron/` rather than beside any one table because it spans
+ * several features: the webhook idempotency ledger (spec 0002), this
+ * feature's own `cron_runs` table, feature 19's `rate_limit_windows`, and
+ * feature 10's `invitation_sends` (spec 0009, added by the security audit
+ * fix for the delete-recreate-contact rate limit bypass). The first two exist
+ * to answer a question for a limited while and then just cost storage, so
+ * they share one 90 day cutoff; the rate limit windows and the invitation
+ * sends both answer their question in an hour or a day at most, so a week is
+ * generous and they share their own, shorter cutoff.
  *
  * The current run's own `cron_runs` row is always fresh (it was inserted
  * moments ago by `runDailySweeps`, before this sweep runs), so the cutoff
@@ -18,6 +20,7 @@ import { lt } from "drizzle-orm";
 
 import {
   cronRuns,
+  invitationSends,
   processedWebhookEvents,
   rateLimitWindows,
 } from "@/db/schema";
@@ -50,12 +53,20 @@ async function run({ db, now }: SweepInput): Promise<SweepReport> {
     .delete(rateLimitWindows)
     .where(lt(rateLimitWindows.windowStart, rateLimitCutoff));
 
+  // Same reasoning as `rate_limit_windows`: the cooldown and the daily cap
+  // only ever look back a day, so a week is generous. No `.returning()`, for
+  // the same volume reason as the rate limit windows above.
+  const invitationSendsPruned = await db
+    .delete(invitationSends)
+    .where(lt(invitationSends.sentAt, rateLimitCutoff));
+
   return {
     outcome: "ok",
     counts: {
       webhook_events_pruned: webhookEventsPruned.length,
       cron_runs_pruned: cronRunsPruned.length,
       rate_limit_windows_pruned: rateLimitWindowsPruned.count,
+      invitation_sends_pruned: invitationSendsPruned.count,
     },
   };
 }

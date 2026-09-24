@@ -53,11 +53,12 @@ function render(predicate: Parameters<PgDialect["sqlToQuery"]>[0]): {
 }
 
 describe("TENANT_TABLE_KEYS", () => {
-  it("is exactly the nine tables carrying org_id", () => {
+  it("is exactly the ten tables carrying org_id", () => {
     expect([...TENANT_TABLE_KEYS]).toStrictEqual([
       "clientContacts",
       "clients",
       "deliverables",
+      "invitationSends",
       "invoiceEvents",
       "invoiceLineItems",
       "invoices",

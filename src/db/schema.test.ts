@@ -118,13 +118,14 @@ const TENANT_SCOPED = TABLES.filter(
   (table) => !NOT_TENANT_SCOPED.includes(nameOf(table)),
 );
 
-describe("the schema defines exactly the fourteen tables the specs name", () => {
-  it("has all fourteen (spec 0002's eleven, plus spec 0012's invoice_events, spec 0017's cron_runs and spec 0018's rate_limit_windows), and no fifteenth nobody wrote down", () => {
+describe("the schema defines exactly the fifteen tables the specs name", () => {
+  it("has all fifteen (spec 0002's eleven, plus spec 0012's invoice_events, spec 0017's cron_runs, spec 0018's rate_limit_windows, and invitation_sends from the security audit fix for spec 0009's rate limit bypass), and no sixteenth nobody wrote down", () => {
     expect(TABLES.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
       "cron_runs",
       "deliverables",
+      "invitation_sends",
       "invoice_events",
       "invoice_line_items",
       "invoices",
@@ -152,7 +153,7 @@ describe("the schema defines exactly the fourteen tables the specs name", () => 
     }
   });
 
-  it("gives every table but the webhook ledger, the append only events, the cron run row and the rate limit windows created_at and updated_at, both timestamptz not null", () => {
+  it("gives every table but the webhook ledger, the append only events, the cron run row, the rate limit windows and the invitation send ledger created_at and updated_at, both timestamptz not null", () => {
     for (const table of TABLES) {
       if (nameOf(table) === "processed_webhook_events") continue;
       // rate_limit_windows carries `updated_at` alone, for debugging an
@@ -163,6 +164,9 @@ describe("the schema defines exactly the fourteen tables the specs name", () => 
       // Spec 0017: a run has started_at/finished_at instead, since a run in
       // progress is exactly a row that has not finished, not a row updated.
       if (nameOf(table) === "cron_runs") continue;
+      // Append only, like invoice_events: `sent_at` is its one timestamp,
+      // and nothing here ever updates a row (security audit finding #4).
+      if (nameOf(table) === "invitation_sends") continue;
 
       for (const name of ["created_at", "updated_at"]) {
         const column = configOf(table).columns.find(
@@ -182,11 +186,12 @@ describe("the schema defines exactly the fourteen tables the specs name", () => 
  * and the sweep is over found tables so a table added later cannot skip it.
  */
 describe("AC-2: every tenant scoped table is scoped by org_id", () => {
-  it("covers the nine tables the specs scope, and only those", () => {
+  it("covers the ten tables the specs scope, and only those", () => {
     expect(TENANT_SCOPED.map(nameOf).sort()).toEqual([
       "client_contacts",
       "clients",
       "deliverables",
+      "invitation_sends",
       "invoice_events",
       "invoice_line_items",
       "invoices",
@@ -276,6 +281,9 @@ describe("AC-6: every foreign key deletes the way the spec says", () => {
     ["invoice_events", "org_id", "organizations", "cascade"],
     ["invoice_events", "invoice_id", "invoices", "cascade"],
     ["invoice_events", "actor_user_id", "users", "set null"],
+    // Security audit finding #4: an append only ledger, so it cascades with
+    // its organization like every other tenant scoped table.
+    ["invitation_sends", "org_id", "organizations", "cascade"],
   ];
 
   it.each(FOREIGN_KEYS)(
